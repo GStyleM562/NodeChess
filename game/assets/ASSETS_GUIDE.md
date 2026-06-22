@@ -17,15 +17,18 @@ game/assets/figures/
     source/                   <- optional: .blend, hi-res, reference renders
   stone_golem/
     stone_golem.glb           <- ✅ done (textured, 8 clips)
-  shadowfang/
-  sky_falcon/
-  venom_spider/
-    spider/   broodmother/    <- one merged GLB per evolution stage
-  ember_dragon/
-    baby/   young/   adult/   <- one merged GLB per stage
-  arcane_wisp/
+  nightblade/
+  storm_valkyrie/
+  venom_witch/
+    witch/   matron/          <- one merged GLB per evolution stage
+  emberborn/
+    squire/   champion/   warlord/   <- one merged GLB per stage
+  rift_mage/
   coin_trickster/
 ```
+
+> **All figures are humanoid** (Meshy currently animates humanoids only). Former animals/creatures
+> (wolf, bird, spider, dragon, wisp) were re-skinned as humanoids in the roster sheet.
 
 **Slug = lowercase_with_underscores.** Name the merged file `<slug>.glb` (evolving figures:
 `<slug>.glb` inside each stage folder). Only use a separate `animations/` folder if Meshy ever
