@@ -1,0 +1,18 @@
+# Normalize line endings for text
+* text=auto
+
+# Treat 3D assets and images as binary (no EOL conversion, no diff noise)
+*.glb   binary
+*.gltf  binary
+*.fbx   binary
+*.blend binary
+*.obj   binary
+*.stl   binary
+*.usdz  binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+*.tga   binary
+*.ktx   binary
+*.basis binary
