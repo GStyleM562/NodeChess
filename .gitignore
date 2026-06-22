@@ -1,0 +1,8 @@
+# Stray / empty scratch files
+docs/New Text Document.txt
+
+# OS / editor cruft
+Thumbs.db
+desktop.ini
+.DS_Store
+*.tmp
