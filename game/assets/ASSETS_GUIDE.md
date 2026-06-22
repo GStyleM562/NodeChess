@@ -6,27 +6,30 @@ How to export from Meshy, where to drop the files, and how to hand them to me.
 
 ## 1. Where to put things (folder map)
 
-Everything lives under `game/assets/figures/<slug>/`:
+**STANDARD = ONE merged GLB per figure** — model + textures + **all** animation clips on one rig.
+This is what Meshy exports with "put everything in one file"; it's the cleanest for Godot. No
+`animations/` subfolder needed.
 
 ```
 game/assets/figures/
   ironclad_knight/            (aka "Iron Bastion")
-    ironclad_knight.glb       <- base RIGGED model (textures embedded)
-    animations/               <- one GLB per animation clip
+    ironclad_knight.glb       <- ONE merged GLB: model + textures + all Tier 1 clips
     source/                   <- optional: .blend, hi-res, reference renders
   stone_golem/
+    stone_golem.glb           <- ✅ done (textured, 8 clips)
   shadowfang/
   sky_falcon/
   venom_spider/
-    spider/   broodmother/    <- one folder per evolution stage
+    spider/   broodmother/    <- one merged GLB per evolution stage
   ember_dragon/
-    baby/   young/   adult/   <- one folder per stage (each: model + animations/)
+    baby/   young/   adult/   <- one merged GLB per stage
   arcane_wisp/
   coin_trickster/
 ```
 
-**Slug = lowercase_with_underscores.** Drop the model `.glb` directly in the figure folder
-(or the stage folder for evolving figures), and animation clips inside its `animations/`.
+**Slug = lowercase_with_underscores.** Name the merged file `<slug>.glb` (evolving figures:
+`<slug>.glb` inside each stage folder). Only use a separate `animations/` folder if Meshy ever
+splits clips into individual files instead of merging.
 
 > Note: Meshy named the knight **"Iron Bastion"**. Our GDD name is **"Ironclad Knight"** —
 > keep whichever you prefer; tell me and I'll align the character sheet. Folder slug stays
@@ -62,16 +65,26 @@ Knight, the target set is:
 | `deploy` | spawn-in *(optional)* | reuse idle / a "stand up" |
 
 **Rules:**
-- **Animate the SAME rigged model** for every clip — all clips must share one skeleton (Godot blends
-  them via an AnimationLibrary).
-- **Best export:** one GLB containing the rig **+ all clips**. If Meshy exports one clip per file,
-  that's fine too — just name each file `ironclad_knight_<clip>.glb` (e.g. `ironclad_knight_idle.glb`).
-- If Meshy's library is missing some (e.g. `attack_heavy`, `defend`, `deploy`): the Knight is
-  **humanoid**, so **Mixamo** has all of these for free (upload the GLB, pick the animation, download).
-  We can also retime/blend in Godot. Don't block on the missing ones — grab idle + walk + attack +
-  hit + ko now; we fill the rest later.
+- **Animate the SAME rigged model** for every clip — all clips share one skeleton.
+- **Tell Meshy to "put everything in one file"** → one merged GLB with the model, textures, and all
+  clips. (This worked great for the Golem: 8 clips + texture in a single `stone_golem.glb`.)
+- If Meshy's library is missing some: humanoid figures (Knight, Trickster) can use **Mixamo** for free.
 
-**So for THIS message: yes, ask Meshy for the animations** (start with idle, walk, attack, hit, ko).
+**Meshy clip names → our names (I remap these at Godot import — you don't need to rename anything):**
+
+| Meshy clip | Our clip |
+| ---------- | -------- |
+| Idle / Idle_3 | `idle` |
+| Walking | `move_walk` |
+| Running | `move_run` |
+| Attack | `attack` |
+| Axe_Spin_Attack / 2nd attack | `attack_heavy` |
+| Block / Block2 | `defend` |
+| Hit_Reaction | `hit` |
+| Knock_Down / Death | `ko` |
+
+So the **Golem (`stone_golem.glb`)** already maps cleanly to the full Tier 1 set. Do the same per
+figure: idle, walk, (run), attack, a 2nd/heavy attack, block, hit-reaction, knockdown.
 
 ---
 
