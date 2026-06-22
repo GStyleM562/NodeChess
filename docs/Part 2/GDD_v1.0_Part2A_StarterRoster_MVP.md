@@ -36,6 +36,23 @@ Status: DRAFT — for human approval + Meshy production
 
 ---
 
+# Art Direction — ALL figures (Chibi / Mini)
+
+**Global style for every figure on the board: CUTE / CHIBI / MINI.** This applies to **every**
+Meshy prompt below — the per-figure "Visual Theme" describes *who* the character is; render all of
+them in this chibi/mini language.
+
+- **Proportions:** oversized head, small rounded body, big expressive eyes, short stubby limbs — a
+  collectible "mini figure" look (think Pokémon Duel figures on bases).
+- **Forms:** rounded, soft, chunky, readable silhouettes; minimal sharp clutter.
+- **Base:** each figure stands on a small base/pedestal sized to the board node.
+- **Cute even when menacing** ("cute-menacing"): Spider, Golem and Adult Dragon stay charming and
+  adorable, **never scary** — exaggerate personality, shrink the threat.
+- **Consistent mini scale** across all figures so they read cleanly at board distance and look great
+  in the combat close-up.
+
+---
+
 # 1. Ironclad Knight
 
 **Data**
@@ -63,7 +80,7 @@ Status: DRAFT — for human approval + Meshy production
 **Lore:** A disciplined frontline guardian who turns a stalemate into a trap.
 
 **Meshy prompt**
-- Visual Theme: heavy armored knight, blue+steel palette, tower shield, stocky proportions.
+- Visual Theme: heavy armored knight, blue+steel palette, tower shield. **Chibi/mini build** (big head, tiny stocky body, huge shield).
 - Read: bulky silhouette, clearly a defender.
 - Animation Notes: idle = slow breathing, shield set; attack = shield bash / sword chop; attack_heavy (Gold) = shoulder charge; ko = armor shatters, kneels.
 - Sound: heavy metal clanks, low grunts.
@@ -100,7 +117,7 @@ Status: DRAFT — for human approval + Meshy production
 **Lore:** A walking wall. You don't move it — you go around it, if you can.
 
 **Meshy prompt**
-- Visual Theme: rocky stone golem, mossy cracks, glowing blue core, massive arms.
+- Visual Theme: rocky stone golem, mossy cracks, glowing blue core, oversized arms. **Chibi/mini build** (big boulder head/body, stubby legs) — cute, not scary.
 - Read: huge, immovable, low and wide.
 - Animation Notes: idle = very slow heave, core pulse; move = single heavy step; attack = boulder fist slam; attack_heavy (Gold) = ground pound; ko = crumbles into rubble.
 - Sound: grinding stone, deep impacts.
@@ -135,7 +152,7 @@ Status: DRAFT — for human approval + Meshy production
 **Lore:** A blur of fang and shadow that punishes any opening.
 
 **Meshy prompt**
-- Visual Theme: sleek black wolf with violet energy markings, lean and fast.
+- Visual Theme: black wolf with violet energy markings. **Chibi/mini build** (big head, big eyes, small body, oversized paws) — cute but fierce.
 - Read: low, agile, predatory silhouette.
 - Animation Notes: idle = alert crouch, tail flick; move_run = sprint; jump = leap over enemy; attack = lunge bite; attack_heavy (Purple) = shadow-fanged maul; ko = dissolves into shadow.
 - Sound: growls, quick whooshes.
@@ -172,7 +189,7 @@ Status: DRAFT — for human approval + Meshy production
 **Lore:** Strikes from above, shoves the enemy off the objective, and is gone.
 
 **Meshy prompt**
-- Visual Theme: majestic falcon, blue+gold plumage, sharp talons, wind motifs.
+- Visual Theme: falcon, blue+gold plumage, wind motifs. **Chibi/mini build** (big head, round body, tiny talons, oversized wings) — cute.
 - Read: winged, always airborne, light.
 - Animation Notes: idle = hover with wing flaps; move_fly = gliding swoop; attack = talon strike / wing buffet (push); attack_heavy (Gold) = dive-bomb; ko = feathers scatter, spirals down.
 - Sound: wing beats, screech.
@@ -211,7 +228,7 @@ Status: DRAFT — for human approval + Meshy production
 **Lore:** Weaves a web of fear; the longer you linger, the weaker you get.
 
 **Meshy prompt**
-- Visual Theme: menacing spider, dark chitin + toxic green glow, dripping fangs. Broodmother = larger, egg-sac, more legs.
+- Visual Theme: spider, dark chitin + toxic green glow, big fangs. Broodmother = larger, egg-sac, more legs. **Chibi/mini build** (big round body, big cute eyes, short legs) — cute-menacing, not scary.
 - Read: creepy, low, many-legged.
 - Animation Notes: idle = skittering twitch; move = scuttle; attack = fang stab (Purple venom spray); attack_heavy (Purple★★) = web-and-bite; rankup = molts into Broodmother (dramatic); ko = curls up.
 - Sound: chittering, hissing.
@@ -270,7 +287,7 @@ Status: DRAFT — for human approval + Meshy production
 **Lore:** From clumsy hatchling to sky-tyrant — each kill stokes the fire.
 
 **Meshy prompt**
-- Visual Theme: 3-stage dragon. Baby = cute, big head, stubby wings, orange. Young = leaner, real wings, ember scales. Adult = massive, horned, lava-veined, smoke.
+- Visual Theme: 3-stage dragon, **all stages chibi/mini** (big head, small rounded body). Baby = super cute, stubby wings, orange. Young = ember scales, small wings. Adult = bigger & horned but still chibi and cute-menacing (lava-veined, smoke) — never scary.
 - Read: clearly escalates in size/menace per stage.
 - Animation Notes: idle = breathing with ember puffs; move = flutter (baby) → stride; attack = bite/claw; attack_heavy (Gold) = fire breath; **rankup = the hero moment** (glow → rise → transform → new form revealed, 2–3s, skippable); ko = collapses, embers fade.
 - Sound: chirps (baby) → roars (adult), fire whoosh.
@@ -313,7 +330,7 @@ Status: DRAFT — for human approval + Meshy production
 **Lore:** A mote of living spellfire that rearranges the battlefield at will.
 
 **Meshy prompt**
-- Visual Theme: floating arcane wisp/orb with a cloaked spectral form, blue-violet glow, runes orbiting.
+- Visual Theme: floating arcane wisp — a tiny cloaked spectral **chibi** (big hood, big glowing eyes, little body), blue-violet glow, runes orbiting. **Chibi/mini build.**
 - Read: ethereal, semi-transparent, hovering.
 - Animation Notes: idle = gentle bob, runes rotate; move/phase = dissolves and reforms through obstacles; attack = bolt / telekinetic shove (push/pull/swap); attack_heavy (Gold/Purple) = reality-warp swap; ko = winks out.
 - Sound: arcane hums, chimes, whooshes.
@@ -348,7 +365,7 @@ Status: DRAFT — for human approval + Meshy production
 **Lore:** Fortune's favorite. Every flip is a gamble — usually a winning one.
 
 **Meshy prompt**
-- Visual Theme: flamboyant trickster/jester or gambler figure, gold coins motif, purple+gold, mischievous.
+- Visual Theme: flamboyant trickster/jester, gold coins motif, purple+gold, mischievous. **Chibi/mini build** (big head, big grin, small body) — cute and playful.
 - Read: flashy, theatrical, mid-size.
 - Animation Notes: idle = tossing a coin, sly grin; move = jaunty stride; attack = coin-flick / cane strike; attack_heavy (Gold/Purple) = cascade of coins; ko = pratfall, coins scatter.
 - Sound: coin jingles, chuckles, whooshes.

@@ -84,6 +84,7 @@ Six "Figures" per player move across a node board, fight via **probability comba
 - **Combat presentation = Pokémon Duel attack moment:** board darkens, figure enlarges, attack resolves. The GDD **Wheel** attack type = Pokémon Duel's spinning attack disk → treat Wheel as the **hero attack type** for the prototype's "exciting combat" (Part 5 §17).
 - **Home = Pokémon Duel centerpiece** (large 3D character on a platform) + **Clash Royale usability/buttons**.
 - **Deck Builder = Clash Royale** card grid (deck tabs on top, scrollable collection below).
+- **Figure art style (DECIDED):** all board figures are **chibi / mini collectible** — oversized head, small rounded body, big eyes, on a small base (Pokémon-Duel-style minis). **Cute even when menacing** (Spider/Golem/Adult Dragon stay charming, never scary). Reads cleanly at board distance, charming in combat close-up.
 - **CRITICAL — borrow look, not rules:** Pokémon Duel resolves combat via direction + data disk. NodeChess uses its **own** color-hierarchy combat and stamina/node movement. We take Pokémon Duel's **visual identity** only (board, character centerpiece, combat drama) — never its mechanics.
 
 ---
