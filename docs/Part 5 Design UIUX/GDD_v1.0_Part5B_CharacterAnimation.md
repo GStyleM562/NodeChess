@@ -66,7 +66,7 @@ Mapped to the actual GDD mechanics. **Tier** = recommended production priority (
 | Clip | GDD trigger | Type | Tier | Notes |
 | ---- | ----------- | ---- | ---- | ----- |
 | `attack` | Attack action / combat declared (Part 1 §5, §11) | One-shot | **0** | Windup → strike, synced to the Wheel/Dice/Coin resolution. |
-| `attack_heavy` | Gold / Purple (special) outcomes (Part 1 §14) | One-shot | 2 | Bigger, color-tinted strike for special attacks; sells the hit. |
+| `attack_heavy` | Gold / Purple (special) outcomes (Part 1 §14) | One-shot | **1** | Bigger, color-tinted strike for special attacks. **DECIDED: included from the start** — all attack outcomes are animated from day one, not deferred. |
 | `defend` | On-Defend trigger; **Blue** defensive win (Part 1 §14.4, Part 2A §13) | One-shot | 1 | Guard / parry. Blue should feel like a satisfying block. |
 | `hit` / `brace` | Combat **tie** or survived exchange — "both remain" (Part 1 §14) | One-shot | 1 | Flinch but stays on the board. Distinguishes survival from KO. |
 | `ko` | Lose combat → KO Bench (Part 1 §16) | One-shot | **0** | The defeat moment (Part 5 §13: "explosion"). Then figure leaves board. |
@@ -113,7 +113,7 @@ Status effects (Part 1 §15) should each have a recognizable body language **plu
 | Clip | Context | Type | Tier | Notes |
 | ---- | ------- | ---- | ---- | ----- |
 | `idle` | Default board state | Loop | **1** | Breathing, blink, weight shift. THE liveliness clip. |
-| `idle_home` | Home screen centerpiece (Part 5 §29) | Rich loop | 2 | Larger, more expressive idle + particles for the showcase. |
+| `idle_home` | Home screen centerpiece (Part 5 §29) | Loop | 2 | **DECIDED: modest but noticeable** — clearly more alive than the board idle (some particles / a little more motion), but **not** an elaborate showcase animation. |
 | `select` | Player taps the figure to act | One-shot/overlay | 3 | Alert pose / small bounce — UX feedback that it's selected. |
 
 ---
@@ -137,7 +137,9 @@ This is the cheapest, highest-impact animation — strongly recommended even in 
 
 Windup → strike, **time-synced to the attack resolution UI** (Wheel spin / Dice roll / Coin flip).
 The Wheel is the **hero** presentation (Pokémon-Duel-style disk) — invest there first.
-Special colors get `attack_heavy` (Gold/Purple) with color-tinted VFX. Whole sequence ≤ 5s.
+**DECIDED: all attack outcomes are animated from the start** — `attack` (White/base) **and**
+`attack_heavy` (Gold/Purple, color-tinted VFX) ship together; no generic-only placeholder phase.
+Whole sequence ≤ 5s.
 
 ## 4.4 Receiving an attack / Defending
 
@@ -193,14 +195,15 @@ Pick a tier per figure (or per rarity/importance). Higher tiers include all lowe
 | Tier | Clips | Goal |
 | ---- | ----- | ---- |
 | **Tier 0 — Minimum playable** | `move_walk`, `attack`, `ko` (+ a **static** idle pose) | Board is readable; nothing looks broken. **This is your "if it's too much resource" floor** — and per your note, if there's no idle loop, figures must at least animate when they **move/fly**. |
-| **Tier 1 — MVP "feels alive"** *(recommended target)* | + `idle` (breathing loop), `move_fly`, `jump`, `deploy`, `defend`, `hit`, `rankup` | The game feels premium and alive enough to answer "is it fun?". |
+| **Tier 1 — MVP "feels alive"** ✅ **DECIDED target for the starter roster** | + `idle` (breathing loop), `move_fly`, `jump`, `deploy`, `defend`, `hit`, `rankup`, **`attack_heavy`** (all attack outcomes from the start) | The game feels premium and alive enough to answer "is it fun?". |
 | **Tier 2 — Polish** | + `attack_heavy`, status loops (fear/paralyzed/immobilized/weakened), `idle_buff`/aura, `surround_panic`, `pushed`/`pulled`, `move_run`, `victory`, `idle_home` | Full readability and game-feel. |
 | **Tier 3 — Premium / per-skin** | + `surround_menace`, `threatened`, `swap`, `teleport`, `defeat`, `select`, skin-specific flair | Showpiece characters and cosmetics. |
 
-**Recommendation:** target **Tier 1** for the prototype roster. A minimal `idle` breathing loop is
-cheap and is what actually makes figures feel "alive" — I'd keep it even when trimming. Only drop to
-Tier 0 (static idle pose + engine-side micro-bob/scale in Godot) if a specific character's animation
-budget is truly exhausted, and in that case keep `move`/`fly` animated as you said.
+**DECIDED:** starter roster targets **Tier 1**, with **all attack outcomes (`attack` + `attack_heavy`)
+animated from the start**. A minimal `idle` breathing loop is cheap and is what actually makes figures
+feel "alive" — keep it even when trimming. Only drop to Tier 0 (static idle pose + engine-side
+micro-bob/scale in Godot) if a specific character's animation budget is truly exhausted, and in that
+case keep `move`/`fly` animated.
 
 ---
 
@@ -264,13 +267,15 @@ Meshy/Mixamo source notes: <...>
 
 ---
 
-# 9. Status & Next
+# 9. Status & Decisions
 
-Status: **DRAFT** — ready to feed Meshy production and the Godot `AnimationTree` setup.
+Status: **DECISIONS LOCKED** — ready to feed Meshy production and the Godot `AnimationTree` setup.
 
-Open questions for human decision:
-- Default tier for the **starter roster** (recommend Tier 1).
-- Whether `attack` is generic or split per attack color from the start.
-- How elaborate the `idle_home` centerpiece should be.
+Resolved (2026-06-21):
+- **Starter roster tier:** **Tier 1**.
+- **Attacks:** **all attack outcomes animated from the start** — `attack` (base) **and**
+  `attack_heavy` (Gold/Purple) ship together; no generic-only phase.
+- **Home centerpiece (`idle_home`):** **modest but noticeable** — clearly more alive than the board
+  idle, but not an elaborate showcase.
 
 END OF PART 5B
