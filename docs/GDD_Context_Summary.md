@@ -78,6 +78,14 @@ Six "Figures" per player move across a node board, fight via **probability comba
 - **MVP screens (critical):** Home, Deck Builder, Collection, Battle, Rewards, Figure Detail.
 - **Claude Design constraints:** SHOULD follow GDD, suggest layout/hierarchy/icons/accessibility/microinteractions. SHOULD NOT invent mechanics/currencies/menus/PvP/battle systems.
 
+### 5.1 Visual references (confirmed — `docs/Images Reference/`)
+
+- **Battle board = Pokémon Duel:** a **3D isometric node board** with an **angled camera (~45–60°)**, NOT a flat top-down 2D view. Figures are **full 3D models** standing on nodes (→ Meshy assets; models must read well both at board distance and in combat close-up — medium poly or LODs).
+- **Combat presentation = Pokémon Duel attack moment:** board darkens, figure enlarges, attack resolves. The GDD **Wheel** attack type = Pokémon Duel's spinning attack disk → treat Wheel as the **hero attack type** for the prototype's "exciting combat" (Part 5 §17).
+- **Home = Pokémon Duel centerpiece** (large 3D character on a platform) + **Clash Royale usability/buttons**.
+- **Deck Builder = Clash Royale** card grid (deck tabs on top, scrollable collection below).
+- **CRITICAL — borrow look, not rules:** Pokémon Duel resolves combat via direction + data disk. NodeChess uses its **own** color-hierarchy combat and stamina/node movement. We take Pokémon Duel's **visual identity** only (board, character centerpiece, combat drama) — never its mechanics.
+
 ---
 
 ## 6. Project status snapshot (as of 2026-06-21)
