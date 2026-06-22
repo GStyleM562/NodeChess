@@ -95,6 +95,8 @@ all of them in this chibi/mini language.
 
 **Animation block (Tier 1):** idle ✓ · move_walk ✓ · deploy ✓ · attack ✓ · attack_heavy ✓ · defend ✓ · hit ✓ · ko ✓ · (Heavy: no displacement reaction).
 
+**Production:** ✅ **DONE** — `ironclad_knight/ironclad_knight.glb` (textured, 24-joint rig, 8 clips: Idle_5/Walking/Running/Attack/Axe_Spin/Shield_Push_Left/Hit_Reaction_1/Dead).
+
 **Validator:** PASS — D6 valid, 2 passives ≤3, 1 trait ≤3. Humanoid.
 
 ---
@@ -346,6 +348,8 @@ all of them in this chibi/mini language.
 - Sound: arcane hums, chimes, blink whoosh.
 
 **Animation block (Tier 1):** idle ✓ · move_walk (float) ✓ · **phase** (blink) ✓ · deploy ✓ · attack ✓ · attack_heavy ✓ · defend ✓ · hit ✓ · ko ✓. Humanoid.
+
+**Production:** ✅ **DONE** — `rift_mage/rift_mage.glb` (textured, 24-joint rig, 8 clips: Idle_6/Walking/Running/mage_spell_cast_1/mage_spell_cast_4/Stand_Dodge/Hit_Reaction/dying_backwards). Phase/blink handled in Godot via VFX + teleport.
 
 **Validator:** PASS — 2d6 valid (higher = generally stronger), stars ≤★★★, 2 passives, 1 trait. Note Swap-into-Goal triggers Surround-KO check before Victory (Part 2A §17). Humanoid.
 
