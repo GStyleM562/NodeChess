@@ -11,11 +11,11 @@ bot) is built on top of this next.
 
 ### Board (`scenes/board.tscn`) — current main scene (Layer 1: playable vs bot)
 
-A hand-authored **Pokémon-Duel-style** board (v2.0, **19 nodes**): 4 corner entrances, goals at
-top/bottom centre, left/right rails, and a central **X** of diagonals; ~4 steps from an entrance
-to the enemy goal via the rail (more through the centre). Low node-degree (3–4) so **surrounding
-is easy**. Figures start in a **bench** and **deploy** from entrances. Player at the **bottom**,
-enemy at the **top**. Alternating 1-action turns; you vs a simple bot.
+A hand-authored **Pokémon-Duel-style** board (v3, **20 nodes**, tall ~5×8): 4 corner entrances,
+goals at top/bottom centre, **long left/right rails** (6 nodes each), and a central **X** of
+diagonals (no node at the crossing). **Every node has at most 3 connections** (12 nodes of degree 3,
+8 of degree 2) so **surrounding is easy** and there are no 4-way hubs. Figures start in a **bench**
+and **deploy** from entrances. Player at the **bottom**, enemy at the **top**. You vs a simple bot.
 
 - **Deploy:** press a *"Desplegar …"* button (bottom), then tap a glowing entrance.
 - **Select** a blue figure → green nodes = move (by stamina), red nodes = attack an adjacent enemy.

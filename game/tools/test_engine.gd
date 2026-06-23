@@ -6,15 +6,34 @@ func _initialize() -> void:
 	_test_resolver()
 	_test_outcome()
 	_test_effects()
+	_test_map()
 	_test_surround()
 	_test_game()
 	quit()
+
+func _test_map() -> void:
+	print("== map (degrees) ==")
+	var m := MapData.new()
+	var max_deg := 0
+	var d3 := 0
+	var d2 := 0
+	for id in m.adj.keys():
+		var d: int = m.adj[id].size()
+		max_deg = maxi(max_deg, d)
+		if d == 3:
+			d3 += 1
+		elif d == 2:
+			d2 += 1
+	print("  nodes=%d  max_degree=%d  degree3=%d  degree2=%d" % [m.nodes.size(), max_deg, d3, d2])
+	_expect_b("no node has 4+ connections", max_deg <= 3, true)
+	_expect_b("player goal connected", m.adj[m.goal_player].size() > 0, true)
+	_expect_b("enemy goal connected", m.adj[m.goal_enemy].size() > 0, true)
 
 func _test_surround() -> void:
 	print("== surround KO + KO-bench return ==")
 	var gs := GameState.new(MapData.new())
 	# Pick a node and fill ALL its neighbours with enemies of the occupant.
-	var center := 7   # centre-left lower node (degree 3) in the duel map
+	var center := 8   # inner-left node (degree 3) in the duel map
 	var nbs: Array = gs.map.adj[center]
 	var e := gs.add_to_bench("enemy", 0)
 	gs.deploy(e, center)

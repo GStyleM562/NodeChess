@@ -34,60 +34,60 @@ func _edge(a: int, b: int) -> void:
 		adj[b].append(a)
 
 func _build_duel() -> void:
-	# v2.0 — modelled on the Pokémon Duel standard board:
-	# 4 corner entrances, goals at top/bottom centre (beyond the corners), left/right
-	# rails, and a central X of diagonals. Player at the bottom (-z), enemy at the top.
-	var n0 := _add(Vector3(0.0, 0, -4.5))     # player goal
-	var n1 := _add(Vector3(-2.6, 0, -3.0))    # player entrance L (corner)
-	var n2 := _add(Vector3(2.6, 0, -3.0))     # player entrance R (corner)
-	var n3 := _add(Vector3(-1.3, 0, -3.0))    # bottom inner L
-	var n4 := _add(Vector3(1.3, 0, -3.0))     # bottom inner R
-	var n5 := _add(Vector3(-2.6, 0, -1.5))    # rail L lower
-	var n6 := _add(Vector3(2.6, 0, -1.5))     # rail R lower
-	var n7 := _add(Vector3(-1.3, 0, -1.5))    # centre-left lower
-	var n8 := _add(Vector3(1.3, 0, -1.5))     # centre-right lower
-	var n9 := _add(Vector3(0.0, 0, 0.0))      # CENTER (buff)
-	var n10 := _add(Vector3(-1.3, 0, 1.5))    # centre-left upper
-	var n11 := _add(Vector3(1.3, 0, 1.5))     # centre-right upper
-	var n12 := _add(Vector3(-2.6, 0, 1.5))    # rail L upper
-	var n13 := _add(Vector3(2.6, 0, 1.5))     # rail R upper
-	var n14 := _add(Vector3(-1.3, 0, 3.0))    # top inner L
-	var n15 := _add(Vector3(1.3, 0, 3.0))     # top inner R
-	var n16 := _add(Vector3(-2.6, 0, 3.0))    # enemy entrance L (corner)
-	var n17 := _add(Vector3(2.6, 0, 3.0))     # enemy entrance R (corner)
-	var n18 := _add(Vector3(0.0, 0, 4.5))     # enemy goal
+	# v3 — Pokémon-Duel philosophy, tall (~5 cols × 8 rows). Long side RAILS,
+	# a central X of diagonals (no 4-way hub), connected goals, and EVERY node has
+	# at most 3 connections. Player at the bottom (-z), enemy at the top (+z).
+	var n0 := _add(Vector3(0.0, 0, -4.4))     # player goal
+	var n1 := _add(Vector3(-2.2, 0, -3.2))    # player entrance L (corner)
+	var n2 := _add(Vector3(2.2, 0, -3.2))     # player entrance R (corner)
+	var n3 := _add(Vector3(0.0, 0, -3.2))     # bottom centre
+	var n4 := _add(Vector3(-2.2, 0, -2.0))    # rail L 1
+	var n5 := _add(Vector3(2.2, 0, -2.0))     # rail R 1
+	var n6 := _add(Vector3(-2.2, 0, -0.8))    # rail L 2
+	var n7 := _add(Vector3(2.2, 0, -0.8))     # rail R 2
+	var n8 := _add(Vector3(-1.1, 0, -0.8))    # inner L lower
+	var n9 := _add(Vector3(1.1, 0, -0.8))     # inner R lower
+	var n10 := _add(Vector3(-1.1, 0, 0.8))    # inner L upper
+	var n11 := _add(Vector3(1.1, 0, 0.8))     # inner R upper
+	var n12 := _add(Vector3(-2.2, 0, 0.8))    # rail L 3
+	var n13 := _add(Vector3(2.2, 0, 0.8))     # rail R 3
+	var n14 := _add(Vector3(-2.2, 0, 2.0))    # rail L 4
+	var n15 := _add(Vector3(2.2, 0, 2.0))     # rail R 4
+	var n16 := _add(Vector3(0.0, 0, 3.2))     # top centre
+	var n17 := _add(Vector3(-2.2, 0, 3.2))    # enemy entrance L (corner)
+	var n18 := _add(Vector3(2.2, 0, 3.2))     # enemy entrance R (corner)
+	var n19 := _add(Vector3(0.0, 0, 4.4))     # enemy goal
 
 	var edges := [
-		# player goal + bottom edge
-		[n0, n1], [n0, n2], [n0, n3], [n0, n4], [n1, n3], [n3, n4], [n4, n2],
-		# rails down->mid, inner down->mid
-		[n1, n5], [n2, n6], [n3, n7], [n4, n8],
-		[n5, n7], [n6, n8],
-		# rails through to the upper half (flanking routes)
-		[n5, n12], [n6, n13],
-		# central X (two crossing diagonals through the centre)
-		[n7, n9], [n8, n9], [n9, n10], [n9, n11],
-		# enemy half (mirror)
-		[n10, n12], [n11, n13], [n10, n14], [n11, n15],
-		[n12, n16], [n13, n17],
-		[n14, n16], [n14, n15], [n15, n17],
-		[n18, n16], [n18, n17], [n18, n14], [n18, n15],
+		# goals (each degree 3)
+		[n0, n1], [n0, n2], [n0, n3], [n19, n16], [n19, n17], [n19, n18],
+		# bottom / top centre branch to the inner nodes
+		[n3, n8], [n3, n9], [n16, n10], [n16, n11],
+		# LONG left rail: PeL-L1-L2-L3-L4-EeL
+		[n1, n4], [n4, n6], [n6, n12], [n12, n14], [n14, n17],
+		# LONG right rail: PeR-R1-R2-R3-R4-EeR
+		[n2, n5], [n5, n7], [n7, n13], [n13, n15], [n15, n18],
+		# inner nodes hook into the rails
+		[n8, n4], [n9, n5], [n10, n14], [n11, n15],
+		# central X (two crossing diagonals; no node at the crossing -> no degree 4)
+		[n8, n11], [n9, n10],
 	]
 	for e in edges:
 		_edge(e[0], e[1])
 
 	goal_player = n0
-	goal_enemy = n18
+	goal_enemy = n19
 	nodes[n0]["role"] = "goal_player"
-	nodes[n18]["role"] = "goal_enemy"
+	nodes[n19]["role"] = "goal_enemy"
 	entrances_player = [n1, n2]
-	entrances_enemy = [n16, n17]
+	entrances_enemy = [n17, n18]
 	nodes[n1]["role"] = "entrance_player"
 	nodes[n2]["role"] = "entrance_player"
-	nodes[n16]["role"] = "entrance_enemy"
 	nodes[n17]["role"] = "entrance_enemy"
-	nodes[n9]["role"] = "buff"
-	buffs = [n9]
+	nodes[n18]["role"] = "entrance_enemy"
+	# buff at an inner node (no central hub node exists now)
+	nodes[n8]["role"] = "buff"
+	buffs = [n8]
 
 ## BFS reachable distances from `start` up to `steps`, treating `blocked` ids as
 ## impassable (cannot move through or onto them).
