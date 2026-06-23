@@ -6,8 +6,26 @@ func _initialize() -> void:
 	_test_resolver()
 	_test_outcome()
 	_test_effects()
+	_test_surround()
 	_test_game()
 	quit()
+
+func _test_surround() -> void:
+	print("== surround KO + KO-bench return ==")
+	var gs := GameState.new(MapData.new(5, 7, 1.35))
+	var center := gs.map.id_at(2, 3)
+	var e := gs.add_to_bench("enemy", 0)
+	gs.deploy(e, center)
+	for d in [[1, 0], [-1, 0], [0, 1], [0, -1]]:
+		var pu := gs.add_to_bench("player", 0)
+		gs.deploy(pu, gs.map.id_at(2 + d[0], 3 + d[1]))
+	_expect_b("center is surrounded", gs.is_surrounded(e), true)
+	var koed := gs.check_surround()
+	_expect("surround KO'd exactly 1", koed.size(), 1)
+	_expect_b("KO'd unit in enemy KO bench", gs.ko_bench["enemy"].has(e), true)
+	gs.turn_no = GameState.KO_COOLDOWN + 5
+	gs._process_ko_returns()
+	_expect_b("returned to bench after cooldown", gs.bench["enemy"].has(e), true)
 
 func _test_effects() -> void:
 	print("== status effects ==")

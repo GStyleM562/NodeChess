@@ -47,9 +47,10 @@ func _ready() -> void:
 	randomize()
 	_build_environment()
 	_gs = GameState.new(MapData.new(5, 7, 1.35))
-	for ri in [0, 1, 2]:
+	# 5 figures per side (duplicates allowed) so surrounding is feasible.
+	for ri in [0, 1, 2, 3, 4]:
 		_gs.add_to_bench("player", ri)
-	for ri in [3, 4, 1]:
+	for ri in [0, 1, 2, 3, 4]:
 		_gs.add_to_bench("enemy", ri)
 	_build_board()
 	_overlay = CombatOverlay.new()
@@ -220,7 +221,7 @@ func _refresh_bench_ui() -> void:
 	var disabled := _committed or _gs.turn_team != "player" or _busy or _over
 	for uid in bench:
 		var b := Button.new()
-		b.text = "Desplegar " + Roster.FIGURES[_gs.units[uid]["rindex"]]["name"]
+		b.text = Roster.FIGURES[_gs.units[uid]["rindex"]]["name"]
 		b.disabled = disabled
 		b.pressed.connect(_begin_deploy.bind(uid))
 		_bench_box.add_child(b)
@@ -379,6 +380,12 @@ func _player_deploy(uid: int, node: int) -> void:
 	_remaining = maxi(0, int(_gs.units[uid]["stamina"]) - 1)  # deploy costs 1
 	_committed = true
 	_refresh_bench_ui()
+	await _resolve_surround()
+	if _check_and_show_winner():
+		return
+	if _active_uid != -1 and not _gs.units[_active_uid]["alive"]:
+		await _end_player_turn()
+		return
 	_refresh_active_highlights()
 	_update_status()
 	await _maybe_auto_end()
@@ -395,6 +402,12 @@ func _player_move(node: int) -> void:
 	await _walk_vis(_active_uid, _gs.map.pos_of(node))
 	_busy = false
 	if _check_and_show_winner():
+		return
+	await _resolve_surround()
+	if _check_and_show_winner():
+		return
+	if _active_uid != -1 and not _gs.units[_active_uid]["alive"]:
+		await _end_player_turn()
 		return
 	_refresh_active_highlights()
 	_update_status()
@@ -477,8 +490,10 @@ func _animate_bot(rec: Dictionary) -> void:
 		"deploy":
 			_spawn_vis(int(rec["uid"]))
 			await get_tree().create_timer(0.3).timeout
+			await _resolve_surround()
 		"move":
 			await _walk_vis(int(rec["uid"]), _gs.map.pos_of(int(rec["node"])))
+			await _resolve_surround()
 		"attack":
 			await _play_combat(int(rec["att"]), int(rec["def"]), rec)
 		_:
@@ -515,6 +530,23 @@ func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 		_vis[ko].queue_free()
 		_vis.erase(ko)
 		_status_lbls.erase(ko)
+	_refresh_status_labels()
+	await _resolve_surround()
+
+## KO any figures that combat/movement just surrounded (enemies on every side).
+func _resolve_surround() -> void:
+	var koed := _gs.check_surround()
+	if koed.is_empty():
+		return
+	for uid in koed:
+		if _vis.has(uid):
+			_vis[uid].play_clip("ko")
+	await get_tree().create_timer(1.2).timeout
+	for uid in koed:
+		if _vis.has(uid):
+			_vis[uid].queue_free()
+			_vis.erase(uid)
+			_status_lbls.erase(uid)
 	_refresh_status_labels()
 
 func _animate_displacement(disp: Dictionary) -> void:

@@ -10,6 +10,7 @@ class_name GameState
 # Purple effect label (segment "fx") -> status id.
 const FX_STATUS := {"Miedo": "fear", "Debilitado": "weakened", "Paralizado": "paralysis", "Inmovilizado": "immobilized"}
 const STATUS_DUR := 4   # in game-turns (~2 rounds)
+const KO_COOLDOWN := 6  # game-turns before a KO'd figure returns to the bench
 
 var map: MapData
 var units := {}
@@ -99,6 +100,46 @@ func adjacent_enemies(uid: int) -> Array:
 		if board.has(nb) and units[board[nb]]["team"] != u["team"]:
 			out.append(board[nb])
 	return out
+
+# --- surround KO -----------------------------------------------------------
+## KO by surround when EVERY adjacent node is occupied by an ENEMY figure (no
+## empty escape, no friendly neighbour). Edges count: a corner figure needs only
+## its (fewer) neighbours filled by enemies.
+func is_surrounded(uid: int) -> bool:
+	var u: Dictionary = units[uid]
+	if u["node"] < 0:
+		return false
+	var nbs: Array = map.adj[u["node"]]
+	if nbs.is_empty():
+		return false
+	for nb in nbs:
+		if not board.has(nb):
+			return false
+		if units[board[nb]]["team"] == u["team"]:
+			return false
+	return true
+
+## KO every surrounded figure (evaluated simultaneously). Returns the KO'd uids.
+func check_surround() -> Array:
+	var koed := []
+	for uid in board.values():
+		if units[uid]["alive"] and is_surrounded(uid):
+			koed.append(uid)
+	for uid in koed:
+		_ko(uid)
+	return koed
+
+## KO'd figures return to their bench after a cooldown (redeployable from a free
+## entrance — so blocking entrances matters for a secondary victory).
+func _process_ko_returns() -> void:
+	for team in ["player", "enemy"]:
+		for uid in ko_bench[team].duplicate():
+			if turn_no >= int(units[uid].get("ko_until", 0)):
+				ko_bench[team].erase(uid)
+				units[uid]["alive"] = true
+				units[uid]["statuses"] = {}
+				units[uid]["node"] = -1
+				bench[team].append(uid)
 
 # --- actions ---------------------------------------------------------------
 func deploy(uid: int, node: int) -> void:
@@ -195,6 +236,8 @@ func _apply_displacement(winner_uid: int, loser_uid: int, seg: Dictionary) -> Di
 func _ko(uid: int) -> void:
 	var u: Dictionary = units[uid]
 	u["alive"] = false
+	u["statuses"] = {}
+	u["ko_until"] = turn_no + KO_COOLDOWN
 	if u["node"] >= 0 and board.get(u["node"]) == uid:
 		board.erase(u["node"])
 	u["node"] = -1
@@ -207,6 +250,7 @@ func _check_goal(u: Dictionary) -> void:
 
 func end_turn() -> void:
 	turn_no += 1
+	_process_ko_returns()
 	turn_team = "enemy" if turn_team == "player" else "player"
 	if winner == "" and not can_act(turn_team):
 		winner = "enemy" if turn_team == "player" else "player"
