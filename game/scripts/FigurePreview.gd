@@ -1,13 +1,13 @@
 extends Node3D
-## Figure viewer: shows each roster figure on a base, auto-plays idle, and lets
-## you cycle figures and play any Tier 1 clip. This is the first in-game proof
-## that the Meshy models + animations are wired correctly.
+## Figure viewer: shows each roster figure on a base, auto-frames the camera,
+## auto-plays idle, and lets you cycle figures and play any Tier 1 clip.
 
 const TIER1 := ["idle", "move_walk", "move_run", "attack", "attack_heavy", "defend", "hit", "ko"]
 
 var _index := 0
 var _current: Figure3D
 var _pivot: Node3D
+var _cam: Camera3D
 var _name_label: Label
 var _clip_label: Label
 var _turntable := true
@@ -23,10 +23,10 @@ func _process(delta: float) -> void:
 
 # ---------------------------------------------------------------- scene setup
 func _build_environment() -> void:
-	var cam := Camera3D.new()
-	cam.position = Vector3(0.0, 1.15, 3.2)
-	cam.look_at_from_position(cam.position, Vector3(0.0, 0.85, 0.0), Vector3.UP)
-	add_child(cam)
+	_cam = Camera3D.new()
+	_cam.fov = 45.0
+	_cam.position = Vector3(0.0, 0.9, 3.5)
+	add_child(_cam)
 
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-50.0, -40.0, 0.0)
@@ -47,8 +47,8 @@ func _build_environment() -> void:
 	# Node "base" disc (chibi figures stand on a pedestal, like a board node)
 	var base := MeshInstance3D.new()
 	var disc := CylinderMesh.new()
-	disc.top_radius = 0.9
-	disc.bottom_radius = 0.9
+	disc.top_radius = 0.55
+	disc.bottom_radius = 0.6
 	disc.height = 0.06
 	base.mesh = disc
 	base.position = Vector3(0.0, -0.03, 0.0)
@@ -61,12 +61,17 @@ func _build_environment() -> void:
 	_pivot.name = "Pivot"
 	add_child(_pivot)
 
+func _frame_camera(fig: Figure3D) -> void:
+	var half_h := maxf(fig.view_height * 0.5, fig.view_radius)
+	var dist := half_h / tan(deg_to_rad(_cam.fov * 0.5)) * 1.45 + fig.view_radius + 0.3
+	_cam.position = Vector3(0.0, fig.view_center_y, dist)
+	_cam.look_at(Vector3(0.0, fig.view_center_y, 0.0), Vector3.UP)
+
 # ---------------------------------------------------------------- ui
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 
-	# Header (figure name + current clip)
 	var header := VBoxContainer.new()
 	header.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	header.offset_left = 12
@@ -83,7 +88,6 @@ func _build_ui() -> void:
 	_clip_label.modulate = Color(0.75, 0.85, 1.0)
 	header.add_child(_clip_label)
 
-	# Footer: figure switch + clip buttons
 	var footer := VBoxContainer.new()
 	footer.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	footer.offset_left = 12
@@ -134,6 +138,7 @@ func _spawn(i: int) -> void:
 	if not ok:
 		_clip_label.text = "ERROR: no se pudo cargar el modelo"
 		return
+	_frame_camera(_current)
 	_play_clip("idle")
 
 func _switch(dir: int) -> void:
@@ -151,7 +156,7 @@ func _play_clip(clip_name: String) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		match event.keycode:
+		match (event as InputEventKey).keycode:
 			KEY_RIGHT:
 				_switch(1)
 			KEY_LEFT:
