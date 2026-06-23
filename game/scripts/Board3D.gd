@@ -119,8 +119,10 @@ func _make_line(a: Vector3, b: Vector3) -> void:
 
 # ---------------------------------------------------------------- figures
 func _place_figures() -> void:
+	# Only fully-animated figures. Duplicates are allowed (few figures), so we
+	# reuse a complete figure instead of the incomplete/oversized valkyrie (id 5).
 	var player_ids := [0, 1, 2]   # golem, knight, nightblade
-	var enemy_ids := [3, 4, 5]    # rift_mage, venom_witch, valkyrie
+	var enemy_ids := [3, 4, 1]    # rift_mage, venom_witch, knight (dup)
 	var p_nodes := [_map.id_at(1, 1), _map.id_at(2, 1), _map.id_at(3, 1)]
 	var e_nodes := [_map.id_at(1, _map.rows - 2), _map.id_at(2, _map.rows - 2), _map.id_at(3, _map.rows - 2)]
 	for i in 3:
