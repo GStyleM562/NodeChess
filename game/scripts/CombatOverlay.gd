@@ -105,17 +105,18 @@ func play(name_a: String, name_b: String, seg_a: Dictionary, seg_b: Dictionary,
 	_result.text = ""
 	_root.visible = true
 
-	# Spin: flicker through random segments for ~1.1s.
-	var spins := 22
+	# Spin: flicker through random segments (slower, so options are readable).
+	var spins := 16
 	for i in spins:
 		_show_seg(_rect_a, _lbl_a, pool_a[randi() % pool_a.size()])
 		_show_seg(_rect_b, _lbl_b, pool_b[randi() % pool_b.size()])
-		await get_tree().create_timer(0.05).timeout
+		# Ease out: each flicker a touch slower than the last.
+		await get_tree().create_timer(0.07 + i * 0.006).timeout
 
 	# Land on the real results.
 	_show_seg(_rect_a, _lbl_a, seg_a)
 	_show_seg(_rect_b, _lbl_b, seg_b)
-	await get_tree().create_timer(0.45).timeout
+	await get_tree().create_timer(0.7).timeout
 
 	if result > 0:
 		_result.text = name_a + " gana — " + name_b + " ¡KO!"
@@ -126,7 +127,7 @@ func play(name_a: String, name_b: String, seg_a: Dictionary, seg_b: Dictionary,
 	else:
 		_result.text = "Empate — nadie cae"
 		_result.modulate = Color(1, 1, 1)
-	await get_tree().create_timer(1.2).timeout
+	await get_tree().create_timer(2.2).timeout
 
 	_root.visible = false
 

@@ -1,8 +1,11 @@
 extends Node3D
-## Layer 1 playable board. Reads the rules engine (GameState): figures start in a
-## bench and are DEPLOYED from entrances; alternating 1-action turns; move; attack
-## -> wheel combat (CombatOverlay) -> resolve -> KO bench. Enemy = simple bot.
-## No surround-KO / rank-up / energy yet (later layers). Map is a test sandbox.
+## Layer 1 playable board (revised). Figures start in a bench and DEPLOY from an
+## entrance (deploy costs 1 stamina; the figure may keep moving with what's left).
+## One figure activates per turn: move (by remaining stamina) then the player
+## DECIDES to attack an adjacent enemy or press "Terminar turno". Attack -> wheel
+## (CombatOverlay) -> a close-up "combat shot" of the winner beating the loser ->
+## back to the board -> resolve KO. Enemy = simple bot.
+## Deferred: surround KO, KO-bench return, rank-up, energy/modifiers, real bot.
 
 const ROLE_COLOR := {
 	"normal": Color(0.20, 0.22, 0.30),
@@ -19,18 +22,23 @@ const FACE_OFFSET := 0.0
 
 var _gs: GameState
 var _cam: Camera3D
+var _combat_cam: Camera3D
 var _overlay: CombatOverlay
 var _vis := {}                # uid -> Figure3D
 var _node_mi := {}
 var _node_mat := {}
-var _selected_uid := -1
+var _highlighted := []
+# Turn / activation state
+var _active_uid := -1
+var _remaining := 0
+var _committed := false
 var _deploy_uid := -1
 var _reach := {}
 var _foe_nodes := {}          # node id -> foe uid
-var _highlighted := []
 var _busy := false
 var _over := false
 var _status: Label
+var _end_btn: Button
 var _bench_box: HBoxContainer
 
 func _ready() -> void:
@@ -54,6 +62,10 @@ func _build_environment() -> void:
 	_cam.fov = 45.0
 	_cam.look_at_from_position(Vector3(0.0, 9.0, 8.5), Vector3.ZERO, Vector3.UP)
 	add_child(_cam)
+	_combat_cam = Camera3D.new()
+	_combat_cam.fov = 50.0
+	add_child(_combat_cam)
+	_cam.current = true
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-55.0, -35.0, 0.0)
 	sun.light_energy = 1.25
@@ -160,6 +172,16 @@ func _build_ui() -> void:
 	_status.add_theme_font_size_override("font_size", 20)
 	layer.add_child(_status)
 
+	_end_btn = Button.new()
+	_end_btn.text = "Terminar turno"
+	_end_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_end_btn.offset_left = -168
+	_end_btn.offset_top = -118
+	_end_btn.offset_right = -12
+	_end_btn.offset_bottom = -74
+	_end_btn.pressed.connect(_on_end_turn_pressed)
+	layer.add_child(_end_btn)
+
 	var bench_panel := PanelContainer.new()
 	bench_panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bench_panel.offset_top = -64
@@ -181,19 +203,27 @@ func _refresh_bench_ui() -> void:
 		l.modulate = Color(0.6, 0.6, 0.7)
 		_bench_box.add_child(l)
 		return
+	var disabled := _committed or _gs.turn_team != "player" or _busy or _over
 	for uid in bench:
 		var b := Button.new()
 		b.text = "Desplegar " + Roster.FIGURES[_gs.units[uid]["rindex"]]["name"]
+		b.disabled = disabled
 		b.pressed.connect(_begin_deploy.bind(uid))
 		_bench_box.add_child(b)
 
 func _update_status() -> void:
 	if _over:
+		_end_btn.visible = false
 		return
-	if _gs.turn_team == "player":
-		_status.text = "Tu turno — toca una figura, o despliega desde la banca."
-	else:
+	_end_btn.visible = _gs.turn_team == "player"
+	_end_btn.disabled = _busy
+	if _gs.turn_team != "player":
 		_status.text = "Turno del enemigo…"
+	elif _active_uid != -1:
+		_status.text = "%s — mov restante: %d.  verde=mover · rojo=atacar · o Terminar turno." % [
+			Roster.FIGURES[_gs.units[_active_uid]["rindex"]]["name"], _remaining]
+	else:
+		_status.text = "Tu turno — toca una figura, o despliega desde la banca."
 
 # ---------------------------------------------------------------- input
 func _unhandled_input(event: InputEvent) -> void:
@@ -228,57 +258,79 @@ func _node_under_cursor(mouse: Vector2) -> int:
 func _on_board_click(mouse: Vector2) -> void:
 	var nid := _node_under_cursor(mouse)
 	if nid == -1:
-		_cancel_selection()
 		return
 	if _deploy_uid != -1:
 		if nid in _gs.free_entrances("player"):
 			_player_deploy(_deploy_uid, nid)
 		else:
-			_cancel_selection()
+			_reset_activation()
 			_update_status()
 		return
-	if _selected_uid != -1:
+	if _active_uid != -1:
 		if _reach.has(nid):
-			_player_move(_selected_uid, nid)
+			_player_move(nid)
 			return
 		if _foe_nodes.has(nid):
-			_player_attack(_selected_uid, _foe_nodes[nid])
+			_player_attack(int(_foe_nodes[nid]))
 			return
+		var uid2: int = _gs.board.get(nid, -1)
+		if uid2 != -1 and _gs.units[uid2]["team"] == "player" and not _committed:
+			_activate_unit(uid2)
+		return
 	var uid: int = _gs.board.get(nid, -1)
 	if uid != -1 and _gs.units[uid]["team"] == "player":
-		_select_unit(uid)
-	else:
-		_cancel_selection()
+		_activate_unit(uid)
 
+# ---------------------------------------------------------------- activation
 func _begin_deploy(uid: int) -> void:
-	if _busy or _over or _gs.turn_team != "player":
+	if _busy or _over or _gs.turn_team != "player" or _committed:
 		return
-	_cancel_selection()
+	_reset_activation()
 	_deploy_uid = uid
 	for e in _gs.free_entrances("player"):
 		_set_highlight(e, HILITE_DEPLOY)
 		_highlighted.append(e)
-	_status.text = "Toca una entrada azul iluminada para desplegar."
+	_status.text = "Toca una entrada azul iluminada para desplegar a %s." % Roster.FIGURES[_gs.units[uid]["rindex"]]["name"]
 
-func _select_unit(uid: int) -> void:
-	_cancel_selection()
-	_selected_uid = uid
-	_reach = _gs.reachable_for(uid)
-	for rid in _reach.keys():
-		_set_highlight(rid, HILITE_MOVE)
-		_highlighted.append(rid)
-	for foe in _gs.adjacent_enemies(uid):
+func _activate_unit(uid: int) -> void:
+	_deploy_uid = -1
+	_active_uid = uid
+	_remaining = int(_gs.units[uid]["stamina"])
+	_refresh_active_highlights()
+	_update_status()
+
+func _refresh_active_highlights() -> void:
+	_clear_highlights()
+	_reach = {}
+	_foe_nodes = {}
+	if _active_uid == -1:
+		return
+	var node: int = _gs.units[_active_uid]["node"]
+	if _remaining > 0:
+		var blocked := {}
+		for n in _gs.board.keys():
+			if n != node:
+				blocked[n] = true
+		_reach = _gs.map.reachable(node, _remaining, blocked)
+		for rid in _reach.keys():
+			_set_highlight(rid, HILITE_MOVE)
+			_highlighted.append(rid)
+	for foe in _gs.adjacent_enemies(_active_uid):
 		var fn: int = _gs.units[foe]["node"]
 		_foe_nodes[fn] = foe
 		_set_highlight(fn, HILITE_ATK)
 		_highlighted.append(fn)
-	_status.text = "%s — verde: mover · rojo: atacar." % Roster.FIGURES[_gs.units[uid]["rindex"]]["name"]
 
-func _cancel_selection() -> void:
-	_selected_uid = -1
+func _reset_activation() -> void:
+	_active_uid = -1
+	_remaining = 0
+	_committed = false
 	_deploy_uid = -1
 	_reach = {}
 	_foe_nodes = {}
+	_clear_highlights()
+
+func _clear_highlights() -> void:
 	for nid in _highlighted:
 		_set_highlight(nid, Color(0, 0, 0, 0))
 	_highlighted.clear()
@@ -302,48 +354,76 @@ func _set_highlight(nid: int, col: Color) -> void:
 
 # ---------------------------------------------------------------- player actions
 func _player_deploy(uid: int, node: int) -> void:
-	_cancel_selection()
-	_busy = true
+	_clear_highlights()
+	_deploy_uid = -1
 	_gs.deploy(uid, node)
 	_spawn_vis(uid)
+	_active_uid = uid
+	_remaining = maxi(0, int(_gs.units[uid]["stamina"]) - 1)  # deploy costs 1
+	_committed = true
 	_refresh_bench_ui()
-	await get_tree().create_timer(0.2).timeout
-	await _advance_after_action()
+	_refresh_active_highlights()
+	_update_status()
 
-func _player_move(uid: int, node: int) -> void:
-	_cancel_selection()
+func _player_move(node: int) -> void:
+	var cost: int = int(_reach[node])
+	_clear_highlights()
 	_busy = true
-	_gs.move_unit(uid, node)
-	await _walk_vis(uid, _gs.map.pos_of(node))
-	await _advance_after_action()
+	_committed = true
+	_refresh_bench_ui()
+	_update_status()
+	_gs.move_unit(_active_uid, node)
+	_remaining -= cost
+	await _walk_vis(_active_uid, _gs.map.pos_of(node))
+	_busy = false
+	if _check_and_show_winner():
+		return
+	_refresh_active_highlights()
+	_update_status()
 
-func _player_attack(att_uid: int, def_uid: int) -> void:
-	_cancel_selection()
+func _player_attack(foe_uid: int) -> void:
+	var att := _active_uid
+	_clear_highlights()
 	_busy = true
-	var rec := _gs.attack(att_uid, def_uid)
-	await _play_combat(att_uid, def_uid, rec)
-	await _advance_after_action()
+	_committed = true
+	_update_status()
+	var rec := _gs.attack(att, foe_uid)
+	await _play_combat(att, foe_uid, rec)
+	await _end_player_turn()
+
+func _on_end_turn_pressed() -> void:
+	if _busy or _over or _gs.turn_team != "player":
+		return
+	await _end_player_turn()
 
 # ---------------------------------------------------------------- flow / bot
-func _advance_after_action() -> void:
-	if _resolve_winner():
-		return
+func _end_player_turn() -> void:
+	_reset_activation()
+	_busy = true
+	_refresh_bench_ui()
 	_gs.end_turn()
 	_update_status()
+	if _check_and_show_winner():
+		return
+	await _bot_loop()
+	_busy = false
+	_refresh_bench_ui()
+	_update_status()
+
+func _bot_loop() -> void:
 	while _gs.winner == "" and _gs.turn_team == "enemy":
 		var rec := _gs.bot_action("enemy")
 		await _animate_bot(rec)
-		if _resolve_winner():
+		if _check_and_show_winner():
 			return
 		_gs.end_turn()
-		_update_status()
-	_busy = false
+		if _check_and_show_winner():
+			return
 
 func _animate_bot(rec: Dictionary) -> void:
 	match String(rec.get("type", "pass")):
 		"deploy":
 			_spawn_vis(int(rec["uid"]))
-			_refresh_bench_ui()
 			await get_tree().create_timer(0.3).timeout
 		"move":
 			await _walk_vis(int(rec["uid"]), _gs.map.pos_of(int(rec["node"])))
@@ -362,37 +442,61 @@ func _walk_vis(uid: int, target: Vector3) -> void:
 	await tw.finished
 	fig.play_clip("idle")
 
+# ---------------------------------------------------------------- combat
 func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:
-	var fa: Figure3D = _vis.get(att_uid)
-	var fb: Figure3D = _vis.get(def_uid)
-	if fa and fb:
-		_face(fa, fb.position - fa.position)
-		_face(fb, fa.position - fb.position)
-		fa.play_clip("attack")
-		fb.play_clip("attack")
 	var a_name: String = Roster.FIGURES[_gs.units[att_uid]["rindex"]]["name"]
 	var b_name: String = Roster.FIGURES[_gs.units[def_uid]["rindex"]]["name"]
+	# 1) the wheel
 	await _overlay.play(a_name, b_name, rec["seg_a"], rec["seg_b"], int(rec["result"]),
 		Roster.FIGURES[_gs.units[att_uid]["rindex"]]["attack"],
 		Roster.FIGURES[_gs.units[def_uid]["rindex"]]["attack"])
+	# 2) the close-up action shot
+	await _combat_cutaway(att_uid, def_uid, rec)
+	# 3) resolve KO removal
+	var ko: int = int(rec.get("ko", -1))
+	if ko != -1 and _vis.has(ko):
+		_vis[ko].queue_free()
+		_vis.erase(ko)
+
+func _combat_cutaway(att_uid: int, def_uid: int, rec: Dictionary) -> void:
+	var fa: Figure3D = _vis.get(att_uid)
+	var fb: Figure3D = _vis.get(def_uid)
+	if fa == null or fb == null:
+		return
+	var pa := fa.global_position
+	var pb := fb.global_position
+	var m := (pa + pb) * 0.5
+	var dir := pb - pa
+	dir.y = 0.0
+	if dir.length() < 0.01:
+		dir = Vector3(0, 0, 1)
+	dir = dir.normalized()
+	var side := dir.cross(Vector3.UP).normalized()
+	_combat_cam.look_at_from_position(m + side * 2.6 + Vector3(0, 1.4, 0), m + Vector3(0, 0.7, 0), Vector3.UP)
+	_combat_cam.current = true
+	_face(fa, pb - pa)
+	_face(fb, pa - pb)
+	fa.play_clip("attack")
+	fb.play_clip("hit")
+	await get_tree().create_timer(0.85).timeout
 	var ko: int = int(rec.get("ko", -1))
 	if ko != -1:
 		var winner_uid := def_uid if ko == att_uid else att_uid
 		if _vis.has(winner_uid):
-			_vis[winner_uid].play_clip("idle")
+			_vis[winner_uid].play_clip("attack_heavy")
 		if _vis.has(ko):
 			_vis[ko].play_clip("ko")
-			await get_tree().create_timer(1.0).timeout
-			_vis[ko].queue_free()
-			_vis.erase(ko)
+		await get_tree().create_timer(1.6).timeout
 	else:
-		if fa:
-			fa.play_clip("idle")
-		if fb:
-			fb.play_clip("idle")
+		if _vis.has(att_uid):
+			_vis[att_uid].play_clip("idle")
+		if _vis.has(def_uid):
+			_vis[def_uid].play_clip("idle")
+		await get_tree().create_timer(0.8).timeout
+	_cam.current = true
 
 # ---------------------------------------------------------------- victory
-func _resolve_winner() -> bool:
+func _check_and_show_winner() -> bool:
 	if _gs.winner == "":
 		return false
 	_show_winner(_gs.winner)
@@ -401,7 +505,8 @@ func _resolve_winner() -> bool:
 func _show_winner(team: String) -> void:
 	_over = true
 	_busy = true
-	_cancel_selection()
+	_reset_activation()
+	_end_btn.visible = false
 	var l := Label.new()
 	l.set_anchors_preset(Control.PRESET_CENTER)
 	l.add_theme_font_size_override("font_size", 48)
