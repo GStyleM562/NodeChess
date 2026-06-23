@@ -1,16 +1,23 @@
 extends RefCounted
 class_name GameState
-## Pure rules engine (no nodes / no rendering) for Layer 1:
-## bench + deploy from entrances, alternating 1-action turns (deploy/move/attack),
-## wheel combat (Combat.gd), KO -> KO bench, goal victory, and a simple bot.
-## Surround KO, rank up, energy/modifiers come in later layers.
+## Pure rules engine (no nodes). Layer 1 + combat effects:
+## bench + deploy from entrances, alternating 1-action turns, move, wheel combat,
+## STATUS EFFECTS (fear/weakened/immobilized/paralysis) applied on a Purple win,
+## DISPLACEMENT (push/pull/swap) on a displacing win, KO -> KO bench, goal victory,
+## secondary victory (no board figures AND cannot deploy), and a simple bot.
+## Surround KO + KO-bench return come next.
+
+# Purple effect label (segment "fx") -> status id.
+const FX_STATUS := {"Miedo": "fear", "Debilitado": "weakened", "Paralizado": "paralysis", "Inmovilizado": "immobilized"}
+const STATUS_DUR := 4   # in game-turns (~2 rounds)
 
 var map: MapData
-var units := {}                                   # uid -> {uid,rindex,team,node,stamina,alive}
-var board := {}                                    # node_id -> uid
-var bench := {"player": [], "enemy": []}           # uid arrays (not yet deployed)
-var ko_bench := {"player": [], "enemy": []}        # uid arrays (defeated)
+var units := {}
+var board := {}
+var bench := {"player": [], "enemy": []}
+var ko_bench := {"player": [], "enemy": []}
 var turn_team := "player"
+var turn_no := 0
 var winner := ""
 var _next_uid := 0
 
@@ -23,9 +30,31 @@ func add_to_bench(team: String, rindex: int) -> int:
 	units[uid] = {
 		"uid": uid, "rindex": rindex, "team": team, "node": -1,
 		"stamina": int(Roster.FIGURES[rindex].get("stamina", 2)), "alive": true,
+		"statuses": {},
 	}
 	bench[team].append(uid)
 	return uid
+
+# --- statuses --------------------------------------------------------------
+func apply_status(uid: int, s: String, dur: int = STATUS_DUR) -> void:
+	units[uid]["statuses"][s] = turn_no + dur
+
+func has_status(uid: int, s: String) -> bool:
+	var st: Dictionary = units[uid]["statuses"]
+	return st.has(s) and turn_no <= int(st[s])
+
+func status_list(uid: int) -> Array:
+	var out := []
+	for s in units[uid]["statuses"].keys():
+		if turn_no <= int(units[uid]["statuses"][s]):
+			out.append(s)
+	return out
+
+func can_move(uid: int) -> bool:
+	return not has_status(uid, "immobilized") and not has_status(uid, "paralysis")
+
+func can_attack(uid: int) -> bool:
+	return not has_status(uid, "fear") and not has_status(uid, "paralysis")
 
 # --- queries ---------------------------------------------------------------
 func entrances(team: String) -> Array:
@@ -48,10 +77,14 @@ func units_on_board(team: String) -> Array:
 			out.append(board[nid])
 	return out
 
+## Secondary defeat: a side that has no figures on the board AND cannot deploy
+## (entrances blocked or nothing to deploy) cannot act.
 func can_act(team: String) -> bool:
 	return units_on_board(team).size() > 0 or can_deploy(team)
 
 func reachable_for(uid: int) -> Dictionary:
+	if not can_move(uid):
+		return {}
 	var u: Dictionary = units[uid]
 	var blocked := {}
 	for nid in board.keys():
@@ -82,23 +115,82 @@ func move_unit(uid: int, node: int) -> void:
 	board[node] = uid
 	_check_goal(u)
 
-## Resolve an attack. KO only happens on a damage (White/Gold) win; Purple/Blue
-## wins do not eliminate (status / block — applied in a later layer).
-## Returns the combat record for the view to animate.
+func _roll_for(uid: int) -> Dictionary:
+	var s: Dictionary = Combat.roll(Roster.FIGURES[units[uid]["rindex"]]["attack"]).duplicate(true)
+	if has_status(uid, "weakened"):
+		if s.has("pow"):
+			s["pow"] = maxi(0, int(s["pow"]) - 20)
+		if s.has("stars"):
+			s["stars"] = maxi(1, int(s["stars"]) - 1)
+	return s
+
+## Resolve an attack. KO only on a damage (White/Gold) win. Purple win applies a
+## status (and/or displacement); Blue win blocks. Returns the combat record.
 func attack(att_uid: int, def_uid: int) -> Dictionary:
-	var a: Dictionary = units[att_uid]
-	var d: Dictionary = units[def_uid]
-	var seg_a := Combat.roll(Roster.FIGURES[a["rindex"]]["attack"])
-	var seg_b := Combat.roll(Roster.FIGURES[d["rindex"]]["attack"])
+	var seg_a := _roll_for(att_uid)
+	var seg_b := _roll_for(def_uid)
 	var oc := Combat.outcome(seg_a, seg_b)
 	var ko_uid := -1
+	var applied := {}
+	var disp := {}
 	if oc["ko"]:
 		ko_uid = def_uid if int(oc["result"]) > 0 else att_uid
 		_ko(ko_uid)
+	elif int(oc["result"]) != 0:
+		var winner_uid: int = att_uid if int(oc["result"]) > 0 else def_uid
+		var loser_uid: int = def_uid if int(oc["result"]) > 0 else att_uid
+		var ws: Dictionary = oc["win_seg"]
+		var fx := String(ws.get("fx", ""))
+		if FX_STATUS.has(fx):
+			apply_status(loser_uid, FX_STATUS[fx], STATUS_DUR)
+			applied = {"status": FX_STATUS[fx], "target": loser_uid, "fx": fx}
+		if ws.has("disp"):
+			disp = _apply_displacement(winner_uid, loser_uid, ws)
 	return {
 		"att": att_uid, "def": def_uid, "seg_a": seg_a, "seg_b": seg_b,
-		"result": int(oc["result"]), "win_col": oc["win_col"], "effect": oc["effect"], "ko": ko_uid,
+		"result": int(oc["result"]), "win_col": oc["win_col"], "effect": oc["effect"],
+		"ko": ko_uid, "status": applied, "disp": disp,
 	}
+
+func _apply_displacement(winner_uid: int, loser_uid: int, seg: Dictionary) -> Dictionary:
+	var w: Dictionary = units[winner_uid]
+	var l: Dictionary = units[loser_uid]
+	var typ := String(seg.get("disp", ""))
+	if typ == "swap":
+		var wn: int = w["node"]
+		var ln: int = l["node"]
+		board[ln] = winner_uid
+		board[wn] = loser_uid
+		w["node"] = ln
+		l["node"] = wn
+		_check_goal(w)
+		_check_goal(l)
+		return {"type": "swap", "a": winner_uid, "a_to": ln, "b": loser_uid, "b_to": wn}
+	# push / pull
+	var wc: int = map.nodes[w["node"]]["col"]
+	var wr: int = map.nodes[w["node"]]["row"]
+	var lc: int = map.nodes[l["node"]]["col"]
+	var lr: int = map.nodes[l["node"]]["row"]
+	var dcol: int
+	var drow: int
+	if typ == "push":
+		dcol = signi(lc - wc)
+		drow = signi(lr - wr)
+	else:
+		dcol = signi(wc - lc)
+		drow = signi(wr - lr)
+	var steps := int(seg.get("n", 1))
+	var cur: int = l["node"]
+	for i in steps:
+		var nxt := map.dir_node(cur, dcol, drow)
+		if nxt == -1 or board.has(nxt):
+			break
+		board.erase(cur)
+		cur = nxt
+		board[cur] = loser_uid
+		l["node"] = cur
+	_check_goal(l)
+	return {"type": typ, "uid": loser_uid, "to": l["node"]}
 
 func _ko(uid: int) -> void:
 	var u: Dictionary = units[uid]
@@ -114,28 +206,25 @@ func _check_goal(u: Dictionary) -> void:
 		winner = u["team"]
 
 func end_turn() -> void:
+	turn_no += 1
 	turn_team = "enemy" if turn_team == "player" else "player"
-	# Win if the side to move cannot act at all.
 	if winner == "" and not can_act(turn_team):
 		winner = "enemy" if turn_team == "player" else "player"
 
 # --- simple bot ------------------------------------------------------------
-## Takes ONE legal action for `team`. Returns a record the view can animate.
 func bot_action(team: String) -> Dictionary:
-	# 1) Deploy until a few are out.
 	if can_deploy(team) and units_on_board(team).size() < 3:
 		var uid: int = bench[team][0]
 		var node: int = free_entrances(team)[0]
 		deploy(uid, node)
 		return {"type": "deploy", "uid": uid, "node": node}
-	# 2) Attack if adjacent to an enemy.
 	for uid in units_on_board(team):
-		var foes := adjacent_enemies(uid)
-		if foes.size() > 0:
-			var rec := attack(uid, foes[0])
-			rec["type"] = "attack"
-			return rec
-	# 3) Move toward the enemy goal (creates pressure -> combat).
+		if can_attack(uid):
+			var foes := adjacent_enemies(uid)
+			if foes.size() > 0:
+				var rec := attack(uid, foes[0])
+				rec["type"] = "attack"
+				return rec
 	var goal_node: int = map.goal_enemy if team == "player" else map.goal_player
 	var gp := map.pos_of(goal_node)
 	for uid in units_on_board(team):

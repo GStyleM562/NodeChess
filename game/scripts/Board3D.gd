@@ -19,12 +19,14 @@ const HILITE_MOVE := Color(0.35, 1.0, 0.5)
 const HILITE_ATK := Color(1.0, 0.3, 0.3)
 const HILITE_DEPLOY := Color(0.4, 0.8, 1.0)
 const FACE_OFFSET := 0.0
+const STATUS_ES := {"fear": "Miedo", "weakened": "Debilitado", "paralysis": "Paralizado", "immobilized": "Inmovilizado"}
 
 var _gs: GameState
 var _cam: Camera3D
 var _combat_cam: Camera3D
 var _overlay: CombatOverlay
 var _vis := {}                # uid -> Figure3D
+var _status_lbls := {}        # uid -> Label3D (status indicator over the figure)
 var _node_mi := {}
 var _node_mat := {}
 var _highlighted := []
@@ -138,6 +140,17 @@ func _spawn_vis(uid: int) -> void:
 	_face(fig, Vector3(0, 0, 1.0) if u["team"] == "player" else Vector3(0, 0, -1.0))
 	_add_team_ring(fig, u["team"])
 	fig.play_clip("idle")
+	var lbl := Label3D.new()
+	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.no_depth_test = true
+	lbl.pixel_size = 0.004
+	lbl.font_size = 64
+	lbl.outline_size = 14
+	lbl.modulate = Color(1.0, 0.8, 0.3)
+	lbl.position = Vector3(0, 2.05, 0)
+	lbl.visible = false
+	fig.add_child(lbl)
+	_status_lbls[uid] = lbl
 	_vis[uid] = fig
 
 func _add_team_ring(fig: Figure3D, team: String) -> void:
@@ -226,6 +239,7 @@ func _update_status() -> void:
 			Roster.FIGURES[_gs.units[_active_uid]["rindex"]]["name"], _remaining]
 	else:
 		_status.text = "Tu turno — toca una figura, o despliega desde la banca."
+	_refresh_status_labels()
 
 # ---------------------------------------------------------------- input
 func _unhandled_input(event: InputEvent) -> void:
@@ -317,11 +331,12 @@ func _refresh_active_highlights() -> void:
 		for rid in _reach.keys():
 			_set_highlight(rid, HILITE_MOVE)
 			_highlighted.append(rid)
-	for foe in _gs.adjacent_enemies(_active_uid):
-		var fn: int = _gs.units[foe]["node"]
-		_foe_nodes[fn] = foe
-		_set_highlight(fn, HILITE_ATK)
-		_highlighted.append(fn)
+	if _gs.can_attack(_active_uid):
+		for foe in _gs.adjacent_enemies(_active_uid):
+			var fn: int = _gs.units[foe]["node"]
+			_foe_nodes[fn] = foe
+			_set_highlight(fn, HILITE_ATK)
+			_highlighted.append(fn)
 
 func _reset_activation() -> void:
 	_active_uid = -1
@@ -399,9 +414,24 @@ func _player_has_actions() -> bool:
 	for uid in _gs.units_on_board("player"):
 		if not _gs.reachable_for(uid).is_empty():
 			return true
-		if not _gs.adjacent_enemies(uid).is_empty():
+		if _gs.can_attack(uid) and not _gs.adjacent_enemies(uid).is_empty():
 			return true
 	return false
+
+func _refresh_status_labels() -> void:
+	for uid in _status_lbls.keys():
+		var lbl = _status_lbls[uid]
+		if not is_instance_valid(lbl) or not _vis.has(uid) or not _gs.units.has(uid):
+			continue
+		var sl := _gs.status_list(uid)
+		lbl.text = _status_text(sl)
+		lbl.visible = not sl.is_empty()
+
+func _status_text(list: Array) -> String:
+	var parts := []
+	for s in list:
+		parts.append(STATUS_ES.get(s, s))
+	return " · ".join(parts)
 
 func _player_attack(foe_uid: int) -> void:
 	var att := _active_uid
@@ -475,11 +505,48 @@ func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 		Roster.FIGURES[_gs.units[def_uid]["rindex"]]["attack"])
 	# 2) the close-up action shot
 	await _combat_cutaway(att_uid, def_uid, rec)
+	# 2.5) displacement (push / pull / swap), if any
+	var disp: Dictionary = rec.get("disp", {})
+	if not disp.is_empty():
+		await _animate_displacement(disp)
 	# 3) resolve KO removal (only real KOs)
 	var ko: int = int(rec.get("ko", -1))
 	if ko != -1 and _vis.has(ko):
 		_vis[ko].queue_free()
 		_vis.erase(ko)
+		_status_lbls.erase(ko)
+	_refresh_status_labels()
+
+func _animate_displacement(disp: Dictionary) -> void:
+	match String(disp.get("type", "")):
+		"swap":
+			var fa: Figure3D = _vis.get(int(disp["a"]))
+			var fb: Figure3D = _vis.get(int(disp["b"]))
+			var ta := _gs.map.pos_of(int(disp["a_to"]))
+			var tb := _gs.map.pos_of(int(disp["b_to"]))
+			var tw := create_tween()
+			tw.set_parallel(true)
+			if fa:
+				fa.play_clip("move_walk")
+				tw.tween_property(fa, "position", ta, 0.4)
+			if fb:
+				fb.play_clip("move_walk")
+				tw.tween_property(fb, "position", tb, 0.4)
+			await tw.finished
+			if fa:
+				fa.play_clip("idle")
+			if fb:
+				fb.play_clip("idle")
+		"push", "pull":
+			var f: Figure3D = _vis.get(int(disp["uid"]))
+			if f:
+				var to := _gs.map.pos_of(int(disp["to"]))
+				if f.position.distance_to(to) > 0.05:
+					f.play_clip("move_walk")
+					var tw2 := create_tween()
+					tw2.tween_property(f, "position", to, 0.4)
+					await tw2.finished
+					f.play_clip("idle")
 
 func _combat_msg(a_name: String, b_name: String, rec: Dictionary) -> Array:
 	var r: int = int(rec["result"])

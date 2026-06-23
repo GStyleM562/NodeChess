@@ -5,8 +5,21 @@ extends SceneTree
 func _initialize() -> void:
 	_test_resolver()
 	_test_outcome()
+	_test_effects()
 	_test_game()
 	quit()
+
+func _test_effects() -> void:
+	print("== status effects ==")
+	var gs := GameState.new(MapData.new(5, 7, 1.35))
+	var u := gs.add_to_bench("player", 4)  # venom witch
+	gs.apply_status(u, "fear")
+	_expect_b("fear blocks attack", gs.can_attack(u), false)
+	_expect_b("fear still allows move", gs.can_move(u), true)
+	gs.apply_status(u, "immobilized")
+	_expect_b("immobilized blocks move", gs.can_move(u), false)
+	gs.turn_no = 9999
+	_expect_b("status expires over time", gs.has_status(u, "fear"), false)
 
 func _expect(name: String, got: int, want: int) -> void:
 	print(("  OK   " if got == want else "  FAIL ") + name + "  got=%d want=%d" % [got, want])

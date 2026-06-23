@@ -27,6 +27,15 @@ func id_at(c: int, r: int) -> int:
 func pos_of(id: int) -> Vector3:
 	return nodes[id]["pos"]
 
+## Neighbour node id one step in grid direction (dcol, drow), or -1 if off-board.
+func dir_node(id: int, dcol: int, drow: int) -> int:
+	var n: Dictionary = nodes[id]
+	var nc: int = n["col"] + dcol
+	var nr: int = n["row"] + drow
+	if nc < 0 or nc >= cols or nr < 0 or nr >= rows:
+		return -1
+	return id_at(nc, nr)
+
 func role_of(id: int) -> String:
 	return nodes[id]["role"]
 

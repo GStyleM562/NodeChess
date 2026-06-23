@@ -50,12 +50,13 @@ static func resolve(a: Dictionary, b: Dictionary) -> int:
 ## Returns { result: 1/-1/0, ko: bool, win_col: String, effect: String }.
 static func outcome(a: Dictionary, b: Dictionary) -> Dictionary:
 	var r := resolve(a, b)
-	var out := {"result": r, "ko": false, "win_col": "", "effect": ""}
+	var out := {"result": r, "ko": false, "win_col": "", "effect": "", "win_seg": {}}
 	if r == 0:
 		return out
 	var w: Dictionary = a if r > 0 else b
 	var wc := String(w.get("col", ""))
 	out["win_col"] = wc
+	out["win_seg"] = w
 	if wc == "white" or wc == "gold":
 		out["ko"] = bool(w.get("ko", true))   # damage kills (unless overridden)
 		out["effect"] = "KO"

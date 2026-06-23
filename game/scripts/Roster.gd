@@ -61,11 +61,11 @@ const FIGURES := [
 		},
 		"attack": [
 			{"col": "red", "w": 1}, {"col": "white", "pow": 20, "w": 2},
-			{"col": "purple", "stars": 1, "w": 3}, {"col": "blue", "w": 4},
-			{"col": "gold", "pow": 30, "w": 5}, {"col": "white", "pow": 50, "w": 6},
-			{"col": "purple", "stars": 2, "w": 5}, {"col": "blue", "w": 4},
+			{"col": "purple", "stars": 1, "fx": "Empuje", "disp": "push", "n": 1, "w": 3}, {"col": "blue", "w": 4},
+			{"col": "gold", "pow": 30, "fx": "Intercambio", "disp": "swap", "ko": false, "w": 5}, {"col": "white", "pow": 50, "w": 6},
+			{"col": "purple", "stars": 2, "fx": "Jalon", "disp": "pull", "n": 1, "w": 5}, {"col": "blue", "w": 4},
 			{"col": "gold", "pow": 40, "w": 3}, {"col": "white", "pow": 80, "w": 2},
-			{"col": "purple", "stars": 3, "w": 1},
+			{"col": "purple", "stars": 3, "fx": "Intercambio", "disp": "swap", "w": 1},
 		],
 	},
 	{
