@@ -62,12 +62,16 @@ func _ready() -> void:
 # ---------------------------------------------------------------- environment
 func _build_environment() -> void:
 	_cam = Camera3D.new()
-	_cam.fov = 45.0
+	# Lock the HORIZONTAL fov (KEEP_WIDTH) so the board's width is always fully
+	# visible on a tall portrait screen (no cut-off edges); height gets extra room.
+	_cam.keep_aspect = Camera3D.KEEP_WIDTH
+	_cam.fov = 34.0
 	# Camera on the player's side: player sits at the BOTTOM, enemy at the top.
 	_cam.look_at_from_position(Vector3(0.0, 11.5, -11.0), Vector3.ZERO, Vector3.UP)
 	add_child(_cam)
 	_combat_cam = Camera3D.new()
-	_combat_cam.fov = 50.0
+	_combat_cam.keep_aspect = Camera3D.KEEP_WIDTH
+	_combat_cam.fov = 45.0
 	add_child(_combat_cam)
 	_cam.current = true
 	var sun := DirectionalLight3D.new()
