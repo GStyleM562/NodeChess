@@ -64,7 +64,7 @@ func _build_environment() -> void:
 	_cam = Camera3D.new()
 	_cam.fov = 45.0
 	# Camera on the player's side: player sits at the BOTTOM, enemy at the top.
-	_cam.look_at_from_position(Vector3(0.0, 9.6, -9.2), Vector3.ZERO, Vector3.UP)
+	_cam.look_at_from_position(Vector3(0.0, 11.5, -11.0), Vector3.ZERO, Vector3.UP)
 	add_child(_cam)
 	_combat_cam = Camera3D.new()
 	_combat_cam.fov = 50.0
@@ -533,13 +533,23 @@ func _walk_vis(uid: int, target: Vector3) -> void:
 
 # ---------------------------------------------------------------- combat
 func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:
-	var a_name: String = Roster.FIGURES[_gs.units[att_uid]["rindex"]]["name"]
-	var b_name: String = Roster.FIGURES[_gs.units[def_uid]["rindex"]]["name"]
+	var a_name := _named(att_uid)
+	var b_name := _named(def_uid)
+	var a_col := _team_color(_gs.units[att_uid]["team"])
+	var b_col := _team_color(_gs.units[def_uid]["team"])
+	# Pre-combat windup on the board: face off + attacker winds up.
+	var fa0: Figure3D = _vis.get(att_uid)
+	var fb0: Figure3D = _vis.get(def_uid)
+	if fa0 and fb0:
+		_face(fa0, fb0.position - fa0.position)
+		_face(fb0, fa0.position - fb0.position)
+		fa0.play_clip("attack")
+	await get_tree().create_timer(0.45).timeout
 	var msg := _combat_msg(a_name, b_name, rec)
-	# 1) the wheel
+	# 1) the wheel (announce + spin + result)
 	await _overlay.play(a_name, b_name, rec["seg_a"], rec["seg_b"], msg[0], msg[1],
 		Roster.FIGURES[_gs.units[att_uid]["rindex"]]["attack"],
-		Roster.FIGURES[_gs.units[def_uid]["rindex"]]["attack"])
+		Roster.FIGURES[_gs.units[def_uid]["rindex"]]["attack"], a_col, b_col)
 	# 2) the close-up action shot
 	await _combat_cutaway(att_uid, def_uid, rec)
 	# 2.5) displacement (push / pull / swap), if any
@@ -601,6 +611,13 @@ func _animate_displacement(disp: Dictionary) -> void:
 					tw2.tween_property(f, "position", to, 0.4)
 					await tw2.finished
 					f.play_clip("idle")
+
+func _named(uid: int) -> String:
+	var n: String = Roster.FIGURES[_gs.units[uid]["rindex"]]["name"]
+	return n + ("  (tú)" if _gs.units[uid]["team"] == "player" else "  (rival)")
+
+func _team_color(team: String) -> Color:
+	return Color(0.45, 0.7, 1.0) if team == "player" else Color(1.0, 0.5, 0.45)
 
 func _combat_msg(a_name: String, b_name: String, rec: Dictionary) -> Array:
 	var r: int = int(rec["result"])

@@ -100,11 +100,24 @@ func _mk_wheel() -> Array:
 ## Presents the combat. `msg`/`msg_col` describe the outcome (built by the view,
 ## since winning is not always a KO). Returns when finished (caller `await`s).
 func play(name_a: String, name_b: String, seg_a: Dictionary, seg_b: Dictionary,
-		msg: String, msg_col: Color, pool_a: Array, pool_b: Array) -> void:
+		msg: String, msg_col: Color, pool_a: Array, pool_b: Array,
+		col_a: Color = Color(1, 1, 1), col_b: Color = Color(1, 1, 1)) -> void:
 	_name_a.text = name_a
+	_name_a.modulate = col_a       # ally = blue, enemy = red (set by the view)
 	_name_b.text = name_b
-	_result.text = ""
+	_name_b.modulate = col_b
+	_lbl_a.text = "?"
+	_lbl_b.text = "?"
+	_rect_a.color = Color(0.2, 0.2, 0.25)
+	_rect_b.color = Color(0.2, 0.2, 0.25)
 	_root.visible = true
+
+	# Announce: "X inicia combate contra Y" (small beat before the wheel).
+	_title.text = "¡Combate!"
+	_result.text = name_a + "  inicia combate contra  " + name_b
+	_result.modulate = Color(1.0, 0.95, 0.7)
+	await get_tree().create_timer(1.2).timeout
+	_result.text = ""
 
 	# Spin: flicker through random segments (slower, so options are readable).
 	var spins := 16

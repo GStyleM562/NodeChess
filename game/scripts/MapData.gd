@@ -37,26 +37,26 @@ func _build_duel() -> void:
 	# v3 — Pokémon-Duel philosophy, tall (~5 cols × 8 rows). Long side RAILS,
 	# a central X of diagonals (no 4-way hub), connected goals, and EVERY node has
 	# at most 3 connections. Player at the bottom (-z), enemy at the top (+z).
-	var n0 := _add(Vector3(0.0, 0, -4.4))     # player goal
-	var n1 := _add(Vector3(-2.2, 0, -3.2))    # player entrance L (corner)
-	var n2 := _add(Vector3(2.2, 0, -3.2))     # player entrance R (corner)
-	var n3 := _add(Vector3(0.0, 0, -3.2))     # bottom centre
-	var n4 := _add(Vector3(-2.2, 0, -2.0))    # rail L 1
-	var n5 := _add(Vector3(2.2, 0, -2.0))     # rail R 1
-	var n6 := _add(Vector3(-2.2, 0, -0.8))    # rail L 2
-	var n7 := _add(Vector3(2.2, 0, -0.8))     # rail R 2
-	var n8 := _add(Vector3(-1.1, 0, -0.8))    # inner L lower
-	var n9 := _add(Vector3(1.1, 0, -0.8))     # inner R lower
-	var n10 := _add(Vector3(-1.1, 0, 0.8))    # inner L upper
-	var n11 := _add(Vector3(1.1, 0, 0.8))     # inner R upper
-	var n12 := _add(Vector3(-2.2, 0, 0.8))    # rail L 3
-	var n13 := _add(Vector3(2.2, 0, 0.8))     # rail R 3
-	var n14 := _add(Vector3(-2.2, 0, 2.0))    # rail L 4
-	var n15 := _add(Vector3(2.2, 0, 2.0))     # rail R 4
-	var n16 := _add(Vector3(0.0, 0, 3.2))     # top centre
-	var n17 := _add(Vector3(-2.2, 0, 3.2))    # enemy entrance L (corner)
-	var n18 := _add(Vector3(2.2, 0, 3.2))     # enemy entrance R (corner)
-	var n19 := _add(Vector3(0.0, 0, 4.4))     # enemy goal
+	var n0 := _add(Vector3(0.0, 0, -5.7))     # player goal
+	var n1 := _add(Vector3(-2.85, 0, -4.2))   # player entrance L (corner)
+	var n2 := _add(Vector3(2.85, 0, -4.2))    # player entrance R (corner)
+	var n3 := _add(Vector3(0.0, 0, -4.2))     # bottom centre
+	var n4 := _add(Vector3(-2.85, 0, -2.6))   # rail L 1
+	var n5 := _add(Vector3(2.85, 0, -2.6))    # rail R 1
+	var n6 := _add(Vector3(-2.85, 0, -1.05))  # rail L 2
+	var n7 := _add(Vector3(2.85, 0, -1.05))   # rail R 2
+	var n8 := _add(Vector3(-1.45, 0, -1.05))  # inner L lower
+	var n9 := _add(Vector3(1.45, 0, -1.05))   # inner R lower
+	var n10 := _add(Vector3(-1.45, 0, 1.05))  # inner L upper
+	var n11 := _add(Vector3(1.45, 0, 1.05))   # inner R upper
+	var n12 := _add(Vector3(-2.85, 0, 1.05))  # rail L 3
+	var n13 := _add(Vector3(2.85, 0, 1.05))   # rail R 3
+	var n14 := _add(Vector3(-2.85, 0, 2.6))   # rail L 4
+	var n15 := _add(Vector3(2.85, 0, 2.6))    # rail R 4
+	var n16 := _add(Vector3(0.0, 0, 4.2))     # top centre
+	var n17 := _add(Vector3(-2.85, 0, 4.2))   # enemy entrance L (corner)
+	var n18 := _add(Vector3(2.85, 0, 4.2))    # enemy entrance R (corner)
+	var n19 := _add(Vector3(0.0, 0, 5.7))     # enemy goal
 
 	var edges := [
 		# goals (each degree 3)
