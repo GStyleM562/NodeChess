@@ -1,6 +1,7 @@
 extends Node3D
 ## Figure viewer: shows each roster figure on a base, auto-frames the camera,
-## auto-plays idle, and lets you cycle figures and play any Tier 1 clip.
+## auto-plays idle, lets you cycle figures and play any Tier 1 clip.
+## On-screen debug shows the measured height/scale; mouse wheel = zoom.
 
 const TIER1 := ["idle", "move_walk", "move_run", "attack", "attack_heavy", "defend", "hit", "ko"]
 
@@ -10,7 +11,9 @@ var _pivot: Node3D
 var _cam: Camera3D
 var _name_label: Label
 var _clip_label: Label
+var _debug_label: Label
 var _turntable := true
+var _zoom := 1.0
 
 func _ready() -> void:
 	_build_environment()
@@ -44,7 +47,6 @@ func _build_environment() -> void:
 	we.environment = env
 	add_child(we)
 
-	# Node "base" disc (chibi figures stand on a pedestal, like a board node)
 	var base := MeshInstance3D.new()
 	var disc := CylinderMesh.new()
 	disc.top_radius = 0.55
@@ -63,9 +65,12 @@ func _build_environment() -> void:
 
 func _frame_camera(fig: Figure3D) -> void:
 	var half_h := maxf(fig.view_height * 0.5, fig.view_radius)
-	var dist := half_h / tan(deg_to_rad(_cam.fov * 0.5)) * 1.45 + fig.view_radius + 0.3
+	var dist := (half_h / tan(deg_to_rad(_cam.fov * 0.5)) * 1.45 + fig.view_radius + 0.3) * _zoom
 	_cam.position = Vector3(0.0, fig.view_center_y, dist)
 	_cam.look_at(Vector3(0.0, fig.view_center_y, 0.0), Vector3.UP)
+	if _debug_label != null:
+		_debug_label.text = "H=%.2f  scale=%.1f  src=%s  camZ=%.2f  (rueda=zoom)" % [
+			fig.view_height, fig.applied_scale, fig.measure_source, dist]
 
 # ---------------------------------------------------------------- ui
 func _build_ui() -> void:
@@ -87,6 +92,11 @@ func _build_ui() -> void:
 	_clip_label.add_theme_font_size_override("font_size", 18)
 	_clip_label.modulate = Color(0.75, 0.85, 1.0)
 	header.add_child(_clip_label)
+
+	_debug_label = Label.new()
+	_debug_label.add_theme_font_size_override("font_size", 14)
+	_debug_label.modulate = Color(1.0, 0.85, 0.5)
+	header.add_child(_debug_label)
 
 	var footer := VBoxContainer.new()
 	footer.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -114,6 +124,10 @@ func _build_ui() -> void:
 	spin_btn.button_pressed = true
 	spin_btn.toggled.connect(func(on): _turntable = on)
 	nav.add_child(spin_btn)
+	var reset_btn := Button.new()
+	reset_btn.text = "Reset zoom"
+	reset_btn.pressed.connect(func(): _zoom = 1.0; if _current: _frame_camera(_current))
+	nav.add_child(reset_btn)
 
 	var clips := HFlowContainer.new()
 	clips.alignment = FlowContainer.ALIGNMENT_CENTER
@@ -163,3 +177,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				_switch(-1)
 			KEY_SPACE:
 				_play_clip("idle")
+	elif event is InputEventMouseButton and event.pressed:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_zoom = maxf(0.2, _zoom * 0.9)
+			if _current: _frame_camera(_current)
+		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_zoom = minf(5.0, _zoom * 1.1)
+			if _current: _frame_camera(_current)
