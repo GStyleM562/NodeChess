@@ -1,0 +1,7 @@
+# Godot 4 import cache (regenerated on open)
+.godot/
+
+# Export artifacts
+export_presets.cfg
+build/
+*.tmp

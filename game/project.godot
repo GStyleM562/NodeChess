@@ -1,0 +1,23 @@
+; Engine configuration file.
+; NodeChess — Godot 4.6 project (MVP scaffold)
+
+config_version=5
+
+[application]
+
+config/name="NodeChess"
+config/description="Tactical board battler — figure/animation preview (MVP scaffold)"
+run/main_scene="res://scenes/figure_preview.tscn"
+config/features=PackedStringArray("4.6", "Mobile")
+
+[display]
+
+window/size/viewport_width=540
+window/size/viewport_height=960
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
