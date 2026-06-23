@@ -9,15 +9,22 @@ bot) is built on top of this next.
 1. Open **Godot 4.6.3** → Import → select `game/project.godot`.
 2. Press **F5** (or Play). Main scene = `scenes/board.tscn` (the playable board).
 
-### Board (`scenes/board.tscn`) — current main scene
+### Board (`scenes/board.tscn`) — current main scene (Layer 1: playable vs bot)
 
-A procedural 5×7 symmetric node board with the figures placed by team (blue = player,
-red = enemy, shown by the ring under each figure). It is the playable shell — **no rules yet**.
+A procedural 5×7 symmetric node board. Figures start in a **bench** and are **deployed**
+from entrances (GDD rules). Alternating 1-action turns; you vs a simple bot.
 
-- **Tap a blue figure** → reachable nodes light up green (limited by that figure's stamina).
-- **Tap a green node** → the figure walks there (walk → idle animation).
-- **Mouse wheel** = zoom.
-- Node colors: blue = your entrances, red = enemy entrances, green = your goal, gold = enemy goal, orange = buff node.
+- **Deploy:** press a *"Desplegar …"* button (bottom), then tap a glowing entrance.
+- **Select** a blue figure → green nodes = move (by stamina), red nodes = attack an adjacent enemy.
+- **Attack** → both figures' attack **wheels** spin, land, and the result resolves:
+  Blue > White/Purple/Gold (cycle: White>Gold>Purple>White), Red = miss. Loser → **KO bench**.
+- **Win** by entering the enemy goal (gold), or when the enemy can no longer act.
+- **Mouse wheel** = zoom. Node colors: blue = your entrances, red = enemy, green = your goal, gold = enemy goal, orange = buff.
+
+**Not yet (later layers):** surround KO, rank-up, energy/modifiers, KO-bench return, the real Medium bot, balanced maps.
+
+Architecture: `scripts/Combat.gd` (roll + color resolver), `scripts/GameState.gd` (pure rules engine),
+`scripts/Board3D.gd` (view), `scripts/CombatOverlay.gd` (wheel). Engine tests: `tools/test_engine.gd`.
 
 > The figure viewer is still available — set `scenes/figure_preview.tscn` as the run scene.
 
