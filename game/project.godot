@@ -12,8 +12,10 @@ config_version=5
 
 config/name="NodeChess"
 config/description="Tactical board battler — MVP scaffold (board + figures)"
+config/version="0.1.0"
 run/main_scene="res://scenes/board.tscn"
 config/features=PackedStringArray("4.6", "Mobile")
+config/icon="res://icon.svg"
 
 [display]
 

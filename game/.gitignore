@@ -5,3 +5,7 @@
 export_presets.cfg
 build/
 *.tmp
+
+# Android gradle build template (large, regenerable) + gradle caches
+/android/
+.gradle/

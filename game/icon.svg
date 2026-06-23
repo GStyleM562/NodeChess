@@ -1,0 +1,6 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <rect width="128" height="128" rx="24" fill="#141a2e"/>
+  <circle cx="64" cy="44" r="16" fill="#5aa0ff"/>
+  <rect x="40" y="78" width="48" height="14" rx="7" fill="#ffb24d"/>
+  <text x="64" y="116" font-family="sans-serif" font-size="20" fill="#e8eefc" text-anchor="middle">NC</text>
+</svg>
