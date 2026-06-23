@@ -63,8 +63,8 @@ func _ready() -> void:
 func _build_environment() -> void:
 	_cam = Camera3D.new()
 	_cam.fov = 45.0
-	# Camera on the player's side: player (row 0) sits at the BOTTOM, enemy at top.
-	_cam.look_at_from_position(Vector3(0.0, 9.0, -8.5), Vector3.ZERO, Vector3.UP)
+	# Camera on the player's side: player sits at the BOTTOM, enemy at the top.
+	_cam.look_at_from_position(Vector3(0.0, 9.6, -9.2), Vector3.ZERO, Vector3.UP)
 	add_child(_cam)
 	_combat_cam = Camera3D.new()
 	_combat_cam.fov = 50.0

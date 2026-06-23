@@ -34,44 +34,60 @@ func _edge(a: int, b: int) -> void:
 		adj[b].append(a)
 
 func _build_duel() -> void:
-	# Player half (bottom, -z) ... CENTER ... Enemy half (top, +z)
-	var n0 := _add(Vector3(0.0, 0, -4.0))     # player goal
-	var n1 := _add(Vector3(-2.2, 0, -2.8))    # player entrance L
-	var n2 := _add(Vector3(2.2, 0, -2.8))     # player entrance R
-	var n3 := _add(Vector3(0.0, 0, -2.8))     # player front
-	var n4 := _add(Vector3(-1.5, 0, -1.3))    # player mid L
-	var n5 := _add(Vector3(1.5, 0, -1.3))     # player mid R
-	var n6 := _add(Vector3(0.0, 0, -1.3))     # player center
-	var n7 := _add(Vector3(0.0, 0, 0.0))      # CENTER (buff)
-	var n8 := _add(Vector3(-1.5, 0, 1.3))     # enemy mid L
-	var n9 := _add(Vector3(1.5, 0, 1.3))      # enemy mid R
-	var n10 := _add(Vector3(0.0, 0, 1.3))     # enemy center
-	var n11 := _add(Vector3(-2.2, 0, 2.8))    # enemy entrance L
-	var n12 := _add(Vector3(2.2, 0, 2.8))     # enemy entrance R
-	var n13 := _add(Vector3(0.0, 0, 2.8))     # enemy front
-	var n14 := _add(Vector3(0.0, 0, 4.0))     # enemy goal
+	# v2.0 — modelled on the Pokémon Duel standard board:
+	# 4 corner entrances, goals at top/bottom centre (beyond the corners), left/right
+	# rails, and a central X of diagonals. Player at the bottom (-z), enemy at the top.
+	var n0 := _add(Vector3(0.0, 0, -4.5))     # player goal
+	var n1 := _add(Vector3(-2.6, 0, -3.0))    # player entrance L (corner)
+	var n2 := _add(Vector3(2.6, 0, -3.0))     # player entrance R (corner)
+	var n3 := _add(Vector3(-1.3, 0, -3.0))    # bottom inner L
+	var n4 := _add(Vector3(1.3, 0, -3.0))     # bottom inner R
+	var n5 := _add(Vector3(-2.6, 0, -1.5))    # rail L lower
+	var n6 := _add(Vector3(2.6, 0, -1.5))     # rail R lower
+	var n7 := _add(Vector3(-1.3, 0, -1.5))    # centre-left lower
+	var n8 := _add(Vector3(1.3, 0, -1.5))     # centre-right lower
+	var n9 := _add(Vector3(0.0, 0, 0.0))      # CENTER (buff)
+	var n10 := _add(Vector3(-1.3, 0, 1.5))    # centre-left upper
+	var n11 := _add(Vector3(1.3, 0, 1.5))     # centre-right upper
+	var n12 := _add(Vector3(-2.6, 0, 1.5))    # rail L upper
+	var n13 := _add(Vector3(2.6, 0, 1.5))     # rail R upper
+	var n14 := _add(Vector3(-1.3, 0, 3.0))    # top inner L
+	var n15 := _add(Vector3(1.3, 0, 3.0))     # top inner R
+	var n16 := _add(Vector3(-2.6, 0, 3.0))    # enemy entrance L (corner)
+	var n17 := _add(Vector3(2.6, 0, 3.0))     # enemy entrance R (corner)
+	var n18 := _add(Vector3(0.0, 0, 4.5))     # enemy goal
 
 	var edges := [
-		[n0, n1], [n0, n2], [n0, n3], [n1, n4], [n2, n5], [n3, n4], [n3, n5],
-		[n4, n6], [n5, n6], [n4, n7], [n5, n7], [n6, n7],
-		[n14, n11], [n14, n12], [n14, n13], [n11, n8], [n12, n9], [n13, n8], [n13, n9],
-		[n8, n10], [n9, n10], [n8, n7], [n9, n7], [n10, n7],
+		# player goal + bottom edge
+		[n0, n1], [n0, n2], [n0, n3], [n0, n4], [n1, n3], [n3, n4], [n4, n2],
+		# rails down->mid, inner down->mid
+		[n1, n5], [n2, n6], [n3, n7], [n4, n8],
+		[n5, n7], [n6, n8],
+		# rails through to the upper half (flanking routes)
+		[n5, n12], [n6, n13],
+		# central X (two crossing diagonals through the centre)
+		[n7, n9], [n8, n9], [n9, n10], [n9, n11],
+		# enemy half (mirror)
+		[n10, n12], [n11, n13], [n10, n14], [n11, n15],
+		[n12, n16], [n13, n17],
+		[n14, n16], [n14, n15], [n15, n17],
+		[n18, n16], [n18, n17], [n18, n14], [n18, n15],
 	]
 	for e in edges:
 		_edge(e[0], e[1])
 
 	goal_player = n0
-	goal_enemy = n14
+	goal_enemy = n18
 	nodes[n0]["role"] = "goal_player"
-	nodes[n14]["role"] = "goal_enemy"
+	nodes[n18]["role"] = "goal_enemy"
 	entrances_player = [n1, n2]
-	entrances_enemy = [n11, n12]
+	entrances_enemy = [n16, n17]
 	nodes[n1]["role"] = "entrance_player"
 	nodes[n2]["role"] = "entrance_player"
-	nodes[n11]["role"] = "entrance_enemy"
-	nodes[n12]["role"] = "entrance_enemy"
-	nodes[n7]["role"] = "buff"
-	buffs = [n7]
+	nodes[n16]["role"] = "entrance_enemy"
+	nodes[n17]["role"] = "entrance_enemy"
+	nodes[n9]["role"] = "buff"
+	buffs = [n9]
 
 ## BFS reachable distances from `start` up to `steps`, treating `blocked` ids as
 ## impassable (cannot move through or onto them).

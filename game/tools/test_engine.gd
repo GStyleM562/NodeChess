@@ -14,7 +14,7 @@ func _test_surround() -> void:
 	print("== surround KO + KO-bench return ==")
 	var gs := GameState.new(MapData.new())
 	# Pick a node and fill ALL its neighbours with enemies of the occupant.
-	var center := 6   # player-center node in the duel map
+	var center := 7   # centre-left lower node (degree 3) in the duel map
 	var nbs: Array = gs.map.adj[center]
 	var e := gs.add_to_bench("enemy", 0)
 	gs.deploy(e, center)
