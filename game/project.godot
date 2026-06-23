@@ -11,8 +11,8 @@ config_version=5
 [application]
 
 config/name="NodeChess"
-config/description="Tactical board battler — figure/animation preview (MVP scaffold)"
-run/main_scene="res://scenes/figure_preview.tscn"
+config/description="Tactical board battler — MVP scaffold (board + figures)"
+run/main_scene="res://scenes/board.tscn"
 config/features=PackedStringArray("4.6", "Mobile")
 
 [display]

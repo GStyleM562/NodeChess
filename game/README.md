@@ -7,7 +7,19 @@ bot) is built on top of this next.
 ## Open & run
 
 1. Open **Godot 4.6.3** → Import → select `game/project.godot`.
-2. Press **F5** (or Play). Main scene = `scenes/figure_preview.tscn`.
+2. Press **F5** (or Play). Main scene = `scenes/board.tscn` (the playable board).
+
+### Board (`scenes/board.tscn`) — current main scene
+
+A procedural 5×7 symmetric node board with the figures placed by team (blue = player,
+red = enemy, shown by the ring under each figure). It is the playable shell — **no rules yet**.
+
+- **Tap a blue figure** → reachable nodes light up green (limited by that figure's stamina).
+- **Tap a green node** → the figure walks there (walk → idle animation).
+- **Mouse wheel** = zoom.
+- Node colors: blue = your entrances, red = enemy entrances, green = your goal, gold = enemy goal, orange = buff node.
+
+> The figure viewer is still available — set `scenes/figure_preview.tscn` as the run scene.
 
 > Headless check (no editor): `Godot --headless --path game --import` then
 > `Godot --headless --path game --script res://tools/verify_figures.gd`.
