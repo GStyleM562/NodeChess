@@ -43,6 +43,30 @@ static func resolve(a: Dictionary, b: Dictionary) -> int:
 	var beats := {"white": "gold", "gold": "purple", "purple": "white"}
 	return 1 if beats[ca] == cb else -1
 
+## Full combat outcome: who wins AND whether it is a KO.
+## Winning with White/Gold (damage) -> KO. Winning with Purple -> applies its
+## effect/status, NOT a KO (unless the segment's effect is itself a KO). Winning
+## with Blue -> defensive block, NOT a KO. Ties -> nothing.
+## Returns { result: 1/-1/0, ko: bool, win_col: String, effect: String }.
+static func outcome(a: Dictionary, b: Dictionary) -> Dictionary:
+	var r := resolve(a, b)
+	var out := {"result": r, "ko": false, "win_col": "", "effect": ""}
+	if r == 0:
+		return out
+	var w: Dictionary = a if r > 0 else b
+	var wc := String(w.get("col", ""))
+	out["win_col"] = wc
+	if wc == "white" or wc == "gold":
+		out["ko"] = bool(w.get("ko", true))   # damage kills (unless overridden)
+		out["effect"] = "KO"
+	elif wc == "purple":
+		out["ko"] = bool(w.get("ko", false))  # purple applies a status, not a KO
+		out["effect"] = String(w.get("fx", "Estado"))
+	elif wc == "blue":
+		out["ko"] = false
+		out["effect"] = "Bloqueo"
+	return out
+
 ## Human-readable label for a rolled segment (for the result UI).
 static func label(s: Dictionary) -> String:
 	match String(s.get("col", "red")):

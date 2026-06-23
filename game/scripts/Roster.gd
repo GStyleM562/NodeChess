@@ -47,7 +47,7 @@ const FIGURES := [
 		},
 		"attack": [
 			{"col": "white", "pow": 100, "w": 49.5},
-			{"col": "purple", "stars": 2, "w": 49.5}, {"col": "red", "w": 1},
+			{"col": "purple", "stars": 2, "fx": "Miedo", "w": 49.5}, {"col": "red", "w": 1},
 		],
 	},
 	{
@@ -78,7 +78,7 @@ const FIGURES := [
 			"defend": "Block10", "hit": "Hit_Reaction_to_Waist", "ko": "Dead",
 		},
 		"attack": [
-			{"col": "purple", "stars": 1, "w": 25}, {"col": "purple", "stars": 2, "w": 15},
+			{"col": "purple", "stars": 1, "fx": "Miedo", "w": 25}, {"col": "purple", "stars": 2, "fx": "Debilitado", "w": 15},
 			{"col": "blue", "w": 15}, {"col": "white", "pow": 40, "w": 20},
 			{"col": "red", "w": 25},
 		],

@@ -97,9 +97,10 @@ func _mk_wheel() -> Array:
 	rect.add_child(l)
 	return [rect, l]
 
-## Presents the combat. Returns when finished (caller should `await`).
+## Presents the combat. `msg`/`msg_col` describe the outcome (built by the view,
+## since winning is not always a KO). Returns when finished (caller `await`s).
 func play(name_a: String, name_b: String, seg_a: Dictionary, seg_b: Dictionary,
-		result: int, pool_a: Array, pool_b: Array) -> void:
+		msg: String, msg_col: Color, pool_a: Array, pool_b: Array) -> void:
 	_name_a.text = name_a
 	_name_b.text = name_b
 	_result.text = ""
@@ -118,15 +119,8 @@ func play(name_a: String, name_b: String, seg_a: Dictionary, seg_b: Dictionary,
 	_show_seg(_rect_b, _lbl_b, seg_b)
 	await get_tree().create_timer(0.7).timeout
 
-	if result > 0:
-		_result.text = name_a + " gana — " + name_b + " ¡KO!"
-		_result.modulate = Color(0.6, 1, 0.7)
-	elif result < 0:
-		_result.text = name_b + " gana — " + name_a + " ¡KO!"
-		_result.modulate = Color(1, 0.6, 0.6)
-	else:
-		_result.text = "Empate — nadie cae"
-		_result.modulate = Color(1, 1, 1)
+	_result.text = msg
+	_result.modulate = msg_col
 	await get_tree().create_timer(2.2).timeout
 
 	_root.visible = false

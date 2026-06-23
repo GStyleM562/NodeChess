@@ -82,21 +82,23 @@ func move_unit(uid: int, node: int) -> void:
 	board[node] = uid
 	_check_goal(u)
 
-## Resolve an attack. Returns the combat record for the view to animate.
+## Resolve an attack. KO only happens on a damage (White/Gold) win; Purple/Blue
+## wins do not eliminate (status / block — applied in a later layer).
+## Returns the combat record for the view to animate.
 func attack(att_uid: int, def_uid: int) -> Dictionary:
 	var a: Dictionary = units[att_uid]
 	var d: Dictionary = units[def_uid]
 	var seg_a := Combat.roll(Roster.FIGURES[a["rindex"]]["attack"])
 	var seg_b := Combat.roll(Roster.FIGURES[d["rindex"]]["attack"])
-	var r := Combat.resolve(seg_a, seg_b)
+	var oc := Combat.outcome(seg_a, seg_b)
 	var ko_uid := -1
-	if r > 0:
-		ko_uid = def_uid
-	elif r < 0:
-		ko_uid = att_uid
-	if ko_uid != -1:
+	if oc["ko"]:
+		ko_uid = def_uid if int(oc["result"]) > 0 else att_uid
 		_ko(ko_uid)
-	return {"att": att_uid, "def": def_uid, "seg_a": seg_a, "seg_b": seg_b, "result": r, "ko": ko_uid}
+	return {
+		"att": att_uid, "def": def_uid, "seg_a": seg_a, "seg_b": seg_b,
+		"result": int(oc["result"]), "win_col": oc["win_col"], "effect": oc["effect"], "ko": ko_uid,
+	}
 
 func _ko(uid: int) -> void:
 	var u: Dictionary = units[uid]

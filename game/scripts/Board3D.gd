@@ -216,7 +216,8 @@ func _update_status() -> void:
 		_end_btn.visible = false
 		return
 	_end_btn.visible = _gs.turn_team == "player"
-	_end_btn.disabled = _busy
+	# Can't end the turn without acting — unless there is genuinely nothing to do.
+	_end_btn.disabled = _busy or (not _committed and _player_has_actions())
 	if _gs.turn_team != "player":
 		_status.text = "Turno del enemigo…"
 	elif _active_uid != -1:
@@ -364,6 +365,7 @@ func _player_deploy(uid: int, node: int) -> void:
 	_refresh_bench_ui()
 	_refresh_active_highlights()
 	_update_status()
+	await _maybe_auto_end()
 
 func _player_move(node: int) -> void:
 	var cost: int = int(_reach[node])
@@ -380,6 +382,25 @@ func _player_move(node: int) -> void:
 		return
 	_refresh_active_highlights()
 	_update_status()
+	await _maybe_auto_end()
+
+## After a committed action, if the active figure has no moves left and no enemy
+## to attack, end the turn automatically.
+func _maybe_auto_end() -> void:
+	if _over or _busy or _gs.turn_team != "player":
+		return
+	if _committed and _reach.is_empty() and _foe_nodes.is_empty():
+		await _end_player_turn()
+
+func _player_has_actions() -> bool:
+	if _gs.can_deploy("player"):
+		return true
+	for uid in _gs.units_on_board("player"):
+		if not _gs.reachable_for(uid).is_empty():
+			return true
+		if not _gs.adjacent_enemies(uid).is_empty():
+			return true
+	return false
 
 func _player_attack(foe_uid: int) -> void:
 	var att := _active_uid
@@ -446,17 +467,34 @@ func _walk_vis(uid: int, target: Vector3) -> void:
 func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 	var a_name: String = Roster.FIGURES[_gs.units[att_uid]["rindex"]]["name"]
 	var b_name: String = Roster.FIGURES[_gs.units[def_uid]["rindex"]]["name"]
+	var msg := _combat_msg(a_name, b_name, rec)
 	# 1) the wheel
-	await _overlay.play(a_name, b_name, rec["seg_a"], rec["seg_b"], int(rec["result"]),
+	await _overlay.play(a_name, b_name, rec["seg_a"], rec["seg_b"], msg[0], msg[1],
 		Roster.FIGURES[_gs.units[att_uid]["rindex"]]["attack"],
 		Roster.FIGURES[_gs.units[def_uid]["rindex"]]["attack"])
 	# 2) the close-up action shot
 	await _combat_cutaway(att_uid, def_uid, rec)
-	# 3) resolve KO removal
+	# 3) resolve KO removal (only real KOs)
 	var ko: int = int(rec.get("ko", -1))
 	if ko != -1 and _vis.has(ko):
 		_vis[ko].queue_free()
 		_vis.erase(ko)
+
+func _combat_msg(a_name: String, b_name: String, rec: Dictionary) -> Array:
+	var r: int = int(rec["result"])
+	if r == 0:
+		return ["Empate — nadie cae", Color(1, 1, 1)]
+	var winner := a_name if r > 0 else b_name
+	var loser := b_name if r > 0 else a_name
+	if int(rec.get("ko", -1)) != -1:
+		return ["%s vence — %s ¡KO!" % [winner, loser], Color(0.6, 1.0, 0.7)]
+	match String(rec.get("win_col", "")):
+		"purple":
+			return ["%s gana (Morado) — %s: %s. ¡No cae!" % [winner, loser, rec.get("effect", "Estado")], Color(0.78, 0.55, 1.0)]
+		"blue":
+			return ["%s bloquea (Azul) — nadie cae" % winner, Color(0.45, 0.65, 1.0)]
+		_:
+			return ["%s gana — %s resiste" % [winner, loser], Color(1, 1, 1)]
 
 func _combat_cutaway(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 	var fa: Figure3D = _vis.get(att_uid)
@@ -472,13 +510,15 @@ func _combat_cutaway(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 		dir = Vector3(0, 0, 1)
 	dir = dir.normalized()
 	var side := dir.cross(Vector3.UP).normalized()
-	_combat_cam.look_at_from_position(m + side * 2.6 + Vector3(0, 1.4, 0), m + Vector3(0, 0.7, 0), Vector3.UP)
+	var sep := pa.distance_to(pb)
+	# 3/4 side angle, backed off enough to frame BOTH fighters.
+	var cam_pos := m + side * (sep + 3.0) + Vector3(0, 1.75, 0)
+	_combat_cam.look_at_from_position(cam_pos, m + Vector3(0, 0.85, 0), Vector3.UP)
 	_combat_cam.current = true
 	_face(fa, pb - pa)
 	_face(fb, pa - pb)
 	fa.play_clip("attack")
-	fb.play_clip("hit")
-	await get_tree().create_timer(0.85).timeout
+	await get_tree().create_timer(0.5).timeout
 	var ko: int = int(rec.get("ko", -1))
 	if ko != -1:
 		var winner_uid := def_uid if ko == att_uid else att_uid
@@ -486,13 +526,17 @@ func _combat_cutaway(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 			_vis[winner_uid].play_clip("attack_heavy")
 		if _vis.has(ko):
 			_vis[ko].play_clip("ko")
-		await get_tree().create_timer(1.6).timeout
+		await get_tree().create_timer(1.7).timeout
 	else:
+		# Survives: defender blocks (Blue) or flinches, then both return to idle.
+		if _vis.has(def_uid):
+			_vis[def_uid].play_clip("defend" if String(rec.get("win_col", "")) == "blue" else "hit")
+		await get_tree().create_timer(1.1).timeout
 		if _vis.has(att_uid):
 			_vis[att_uid].play_clip("idle")
 		if _vis.has(def_uid):
 			_vis[def_uid].play_clip("idle")
-		await get_tree().create_timer(0.8).timeout
+		await get_tree().create_timer(0.4).timeout
 	_cam.current = true
 
 # ---------------------------------------------------------------- victory

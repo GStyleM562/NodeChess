@@ -4,11 +4,28 @@ extends SceneTree
 
 func _initialize() -> void:
 	_test_resolver()
+	_test_outcome()
 	_test_game()
 	quit()
 
 func _expect(name: String, got: int, want: int) -> void:
 	print(("  OK   " if got == want else "  FAIL ") + name + "  got=%d want=%d" % [got, want])
+
+func _expect_b(name: String, got: bool, want: bool) -> void:
+	print(("  OK   " if got == want else "  FAIL ") + name + "  got=%s want=%s" % [got, want])
+
+func _test_outcome() -> void:
+	print("== outcome (a win is not always a KO) ==")
+	var white := {"col": "white", "pow": 60}
+	var gold := {"col": "gold", "pow": 40}
+	var purple := {"col": "purple", "stars": 2, "fx": "Miedo"}
+	var blue := {"col": "blue"}
+	var red := {"col": "red"}
+	_expect_b("white beats gold -> KO", bool(Combat.outcome(white, gold)["ko"]), true)
+	_expect_b("purple beats white -> NO KO", bool(Combat.outcome(purple, white)["ko"]), false)
+	_expect_b("blue beats white -> NO KO", bool(Combat.outcome(blue, white)["ko"]), false)
+	_expect_b("white beats red -> KO", bool(Combat.outcome(white, red)["ko"]), true)
+	_expect_b("blue vs blue tie -> no KO", bool(Combat.outcome(blue, blue)["ko"]), false)
 
 func _test_resolver() -> void:
 	print("== resolver ==")
