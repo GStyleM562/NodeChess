@@ -60,7 +60,8 @@ func _ready() -> void:
 func _build_environment() -> void:
 	_cam = Camera3D.new()
 	_cam.fov = 45.0
-	_cam.look_at_from_position(Vector3(0.0, 9.0, 8.5), Vector3.ZERO, Vector3.UP)
+	# Camera on the player's side: player (row 0) sits at the BOTTOM, enemy at top.
+	_cam.look_at_from_position(Vector3(0.0, 9.0, -8.5), Vector3.ZERO, Vector3.UP)
 	add_child(_cam)
 	_combat_cam = Camera3D.new()
 	_combat_cam.fov = 50.0
@@ -511,14 +512,18 @@ func _combat_cutaway(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 	dir = dir.normalized()
 	var side := dir.cross(Vector3.UP).normalized()
 	var sep := pa.distance_to(pb)
-	# 3/4 side angle, backed off enough to frame BOTH fighters.
-	var cam_pos := m + side * (sep + 3.0) + Vector3(0, 1.75, 0)
-	_combat_cam.look_at_from_position(cam_pos, m + Vector3(0, 0.85, 0), Vector3.UP)
+	# Hide the other figures so they don't block the shot.
+	for uid in _vis.keys():
+		if uid != att_uid and uid != def_uid:
+			_vis[uid].visible = false
+	# 3/4 side angle, backed off a bit more to frame BOTH fighters.
+	var cam_pos := m + side * (sep + 4.3) + Vector3(0, 2.0, 0)
+	_combat_cam.look_at_from_position(cam_pos, m + Vector3(0, 0.9, 0), Vector3.UP)
 	_combat_cam.current = true
 	_face(fa, pb - pa)
 	_face(fb, pa - pb)
 	fa.play_clip("attack")
-	await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(0.65).timeout
 	var ko: int = int(rec.get("ko", -1))
 	if ko != -1:
 		var winner_uid := def_uid if ko == att_uid else att_uid
@@ -526,17 +531,21 @@ func _combat_cutaway(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 			_vis[winner_uid].play_clip("attack_heavy")
 		if _vis.has(ko):
 			_vis[ko].play_clip("ko")
-		await get_tree().create_timer(1.7).timeout
+		await get_tree().create_timer(2.5).timeout      # hold so the KO is appreciated
 	else:
 		# Survives: defender blocks (Blue) or flinches, then both return to idle.
 		if _vis.has(def_uid):
 			_vis[def_uid].play_clip("defend" if String(rec.get("win_col", "")) == "blue" else "hit")
-		await get_tree().create_timer(1.1).timeout
+		await get_tree().create_timer(1.8).timeout
 		if _vis.has(att_uid):
 			_vis[att_uid].play_clip("idle")
 		if _vis.has(def_uid):
 			_vis[def_uid].play_clip("idle")
-		await get_tree().create_timer(0.4).timeout
+		await get_tree().create_timer(0.6).timeout
+	# Restore the others.
+	for uid in _vis.keys():
+		if uid != att_uid and uid != def_uid:
+			_vis[uid].visible = true
 	_cam.current = true
 
 # ---------------------------------------------------------------- victory
