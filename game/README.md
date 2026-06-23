@@ -11,8 +11,10 @@ bot) is built on top of this next.
 
 ### Board (`scenes/board.tscn`) — current main scene (Layer 1: playable vs bot)
 
-A procedural 5×7 symmetric node board. Figures start in a **bench** and are **deployed**
-from entrances (GDD rules). Alternating 1-action turns; you vs a simple bot.
+A hand-authored **Pokémon-Duel-style** node graph (15 sparse nodes with diagonals/crossings —
+few connections per node, so **surrounding is easy**). Figures start in a **bench** and are
+**deployed** from entrances (GDD rules). Alternating 1-action turns; you vs a simple bot.
+Player is at the **bottom**, enemy at the **top**.
 
 - **Deploy:** press a *"Desplegar …"* button (bottom), then tap a glowing entrance.
 - **Select** a blue figure → green nodes = move (by stamina), red nodes = attack an adjacent enemy.

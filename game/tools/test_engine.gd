@@ -12,13 +12,15 @@ func _initialize() -> void:
 
 func _test_surround() -> void:
 	print("== surround KO + KO-bench return ==")
-	var gs := GameState.new(MapData.new(5, 7, 1.35))
-	var center := gs.map.id_at(2, 3)
+	var gs := GameState.new(MapData.new())
+	# Pick a node and fill ALL its neighbours with enemies of the occupant.
+	var center := 6   # player-center node in the duel map
+	var nbs: Array = gs.map.adj[center]
 	var e := gs.add_to_bench("enemy", 0)
 	gs.deploy(e, center)
-	for d in [[1, 0], [-1, 0], [0, 1], [0, -1]]:
+	for nb in nbs:
 		var pu := gs.add_to_bench("player", 0)
-		gs.deploy(pu, gs.map.id_at(2 + d[0], 3 + d[1]))
+		gs.deploy(pu, nb)
 	_expect_b("center is surrounded", gs.is_surrounded(e), true)
 	var koed := gs.check_surround()
 	_expect("surround KO'd exactly 1", koed.size(), 1)
@@ -29,7 +31,7 @@ func _test_surround() -> void:
 
 func _test_effects() -> void:
 	print("== status effects ==")
-	var gs := GameState.new(MapData.new(5, 7, 1.35))
+	var gs := GameState.new(MapData.new())
 	var u := gs.add_to_bench("player", 4)  # venom witch
 	gs.apply_status(u, "fear")
 	_expect_b("fear blocks attack", gs.can_attack(u), false)
@@ -80,7 +82,7 @@ func _test_resolver() -> void:
 
 func _test_game() -> void:
 	print("== bot vs bot game ==")
-	var gs := GameState.new(MapData.new(5, 7, 1.35))
+	var gs := GameState.new(MapData.new())
 	for ri in [0, 1, 2]:
 		gs.add_to_bench("player", ri)
 	for ri in [3, 4, 1]:

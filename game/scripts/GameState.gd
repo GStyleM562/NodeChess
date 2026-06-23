@@ -207,27 +207,27 @@ func _apply_displacement(winner_uid: int, loser_uid: int, seg: Dictionary) -> Di
 		_check_goal(w)
 		_check_goal(l)
 		return {"type": "swap", "a": winner_uid, "a_to": ln, "b": loser_uid, "b_to": wn}
-	# push / pull
-	var wc: int = map.nodes[w["node"]]["col"]
-	var wr: int = map.nodes[w["node"]]["row"]
-	var lc: int = map.nodes[l["node"]]["col"]
-	var lr: int = map.nodes[l["node"]]["row"]
-	var dcol: int
-	var drow: int
-	if typ == "push":
-		dcol = signi(lc - wc)
-		drow = signi(lr - wr)
-	else:
-		dcol = signi(wc - lc)
-		drow = signi(wr - lr)
+	# push / pull along the graph, guided by node positions
+	var win_pos := map.pos_of(w["node"])
 	var steps := int(seg.get("n", 1))
 	var cur: int = l["node"]
 	for i in steps:
-		var nxt := map.dir_node(cur, dcol, drow)
-		if nxt == -1 or board.has(nxt):
+		var cur_pos := map.pos_of(cur)
+		var want := (cur_pos - win_pos) if typ == "push" else (win_pos - cur_pos)
+		want = want.normalized()
+		var best := -1
+		var best_score := 0.15   # require a clear directional match
+		for nb in map.adj[cur]:
+			if board.has(nb):
+				continue
+			var score := (map.pos_of(nb) - cur_pos).normalized().dot(want)
+			if score > best_score:
+				best_score = score
+				best = nb
+		if best == -1:
 			break
 		board.erase(cur)
-		cur = nxt
+		cur = best
 		board[cur] = loser_uid
 		l["node"] = cur
 	_check_goal(l)

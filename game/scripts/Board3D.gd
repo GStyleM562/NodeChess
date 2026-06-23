@@ -46,7 +46,7 @@ var _bench_box: HBoxContainer
 func _ready() -> void:
 	randomize()
 	_build_environment()
-	_gs = GameState.new(MapData.new(5, 7, 1.35))
+	_gs = GameState.new(MapData.new())
 	# 5 figures per side (duplicates allowed) so surrounding is feasible.
 	for ri in [0, 1, 2, 3, 4]:
 		_gs.add_to_bench("player", ri)
@@ -446,6 +446,28 @@ func _status_text(list: Array) -> String:
 		parts.append(STATUS_ES.get(s, s))
 	return " · ".join(parts)
 
+## Big dramatic effect word that pops over the affected figure, then fades.
+func _dramatize_effect(uid: int, fx_text: String) -> void:
+	var f: Figure3D = _vis.get(uid)
+	if f == null:
+		return
+	var l := Label3D.new()
+	l.text = "¡" + fx_text + "!"
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.pixel_size = 0.006
+	l.font_size = 110
+	l.outline_size = 22
+	l.modulate = Color(1.0, 0.45, 1.0)
+	l.position = Vector3(0, 2.6, 0)
+	l.scale = Vector3(0.3, 0.3, 0.3)
+	f.add_child(l)
+	var tw := create_tween()
+	tw.tween_property(l, "scale", Vector3(1.5, 1.5, 1.5), 0.25)
+	tw.tween_interval(0.7)
+	tw.tween_property(l, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(l.queue_free)
+
 func _player_attack(foe_uid: int) -> void:
 	var att := _active_uid
 	_clear_highlights()
@@ -635,7 +657,11 @@ func _combat_cutaway(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 		# Survives: defender blocks (Blue) or flinches, then both return to idle.
 		if _vis.has(def_uid):
 			_vis[def_uid].play_clip("defend" if String(rec.get("win_col", "")) == "blue" else "hit")
-		await get_tree().create_timer(1.8).timeout
+		# Drama: pop the applied effect over the affected figure.
+		var st: Dictionary = rec.get("status", {})
+		if not st.is_empty():
+			_dramatize_effect(int(st["target"]), String(st.get("fx", "Estado")))
+		await get_tree().create_timer(1.9).timeout
 		if _vis.has(att_uid):
 			_vis[att_uid].play_clip("idle")
 		if _vis.has(def_uid):
