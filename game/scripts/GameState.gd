@@ -283,6 +283,11 @@ func bot_action(team: String) -> Dictionary:
 				best_d = dd
 				best = nid
 		if best != -1:
+			var blocked := {}
+			for n in board.keys():
+				if n != units[uid]["node"]:
+					blocked[n] = true
+			var p := map.path_to(units[uid]["node"], best, blocked)
 			move_unit(uid, best)
-			return {"type": "move", "uid": uid, "node": best}
+			return {"type": "move", "uid": uid, "node": best, "path": p}
 	return {"type": "pass"}

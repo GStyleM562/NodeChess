@@ -409,6 +409,13 @@ func _player_deploy(uid: int, node: int) -> void:
 
 func _player_move(node: int) -> void:
 	var cost: int = int(_reach[node])
+	# Compute the path BEFORE moving (board state is still current).
+	var from_node: int = _gs.units[_active_uid]["node"]
+	var blocked := {}
+	for n in _gs.board.keys():
+		if n != from_node:
+			blocked[n] = true
+	var path := _gs.map.path_to(from_node, node, blocked)
 	_clear_highlights()
 	_busy = true
 	_committed = true
@@ -416,7 +423,7 @@ func _player_move(node: int) -> void:
 	_update_status()
 	_gs.move_unit(_active_uid, node)
 	_remaining -= cost
-	await _walk_vis(_active_uid, _gs.map.pos_of(node))
+	await _walk_path(_active_uid, path)
 	_busy = false
 	if _check_and_show_winner():
 		return
@@ -531,7 +538,7 @@ func _animate_bot(rec: Dictionary) -> void:
 			await get_tree().create_timer(0.3).timeout
 			await _resolve_surround()
 		"move":
-			await _walk_vis(int(rec["uid"]), _gs.map.pos_of(int(rec["node"])))
+			await _walk_path(int(rec["uid"]), rec.get("path", [int(rec["node"])]))
 			await _resolve_surround()
 		"attack":
 			await _play_combat(int(rec["att"]), int(rec["def"]), rec)
@@ -546,6 +553,21 @@ func _walk_vis(uid: int, target: Vector3) -> void:
 	var tw := create_tween()
 	tw.tween_property(fig, "position", target, dur)
 	await tw.finished
+	fig.play_clip("idle")
+
+## Walk the figure THROUGH each node of the path (follows the graph edges).
+func _walk_path(uid: int, nodes: Array) -> void:
+	var fig: Figure3D = _vis.get(uid)
+	if fig == null or nodes.is_empty():
+		return
+	fig.play_clip("move_walk")
+	for nid in nodes:
+		var target := _gs.map.pos_of(int(nid))
+		_face(fig, target - fig.position)
+		var dur := maxf(0.16, fig.position.distance_to(target) * 0.34)
+		var tw := create_tween()
+		tw.tween_property(fig, "position", target, dur)
+		await tw.finished
 	fig.play_clip("idle")
 
 # ---------------------------------------------------------------- combat

@@ -105,3 +105,26 @@ func reachable(start: int, steps: int, blocked: Dictionary = {}) -> Dictionary:
 			q.append(nb)
 	dist.erase(start)
 	return dist
+
+## Shortest node path from `start` to `target` (BFS), as the list of nodes to walk
+## THROUGH (excludes start, includes target). `blocked` = impassable node ids.
+func path_to(start: int, target: int, blocked: Dictionary = {}) -> Array:
+	if start == target:
+		return []
+	var prev := {start: -1}
+	var q := [start]
+	while not q.is_empty():
+		var cur: int = q.pop_front()
+		for nb in adj[cur]:
+			if prev.has(nb) or blocked.has(nb):
+				continue
+			prev[nb] = cur
+			if nb == target:
+				var path := []
+				var n := target
+				while n != start:
+					path.push_front(n)
+					n = int(prev[n])
+				return path
+			q.append(nb)
+	return [target]   # fallback (shouldn't happen for a reachable target)

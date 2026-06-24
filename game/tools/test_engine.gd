@@ -28,6 +28,16 @@ func _test_map() -> void:
 	_expect_b("no node has 4+ connections", max_deg <= 3, true)
 	_expect_b("player goal connected", m.adj[m.goal_player].size() > 0, true)
 	_expect_b("enemy goal connected", m.adj[m.goal_enemy].size() > 0, true)
+	var p := m.path_to(m.entrances_player[0], m.goal_enemy)
+	_expect_b("path entrance->enemy goal exists", p.size() > 0 and int(p[p.size() - 1]) == m.goal_enemy, true)
+	# each step in the path is adjacent to the previous (a real walk along edges)
+	var contiguous := true
+	var prev: int = m.entrances_player[0]
+	for nid in p:
+		if not (int(nid) in m.adj[prev]):
+			contiguous = false
+		prev = int(nid)
+	_expect_b("path steps are edge-adjacent", contiguous, true)
 
 func _test_surround() -> void:
 	print("== surround KO + KO-bench return ==")
