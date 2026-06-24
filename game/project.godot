@@ -13,7 +13,7 @@ config_version=5
 config/name="NodeChess"
 config/description="Tactical board battler — MVP scaffold (board + figures)"
 config/version="0.1.0"
-run/main_scene="res://scenes/board.tscn"
+run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.6", "Mobile")
 config/icon="res://icon.svg"
 
@@ -22,7 +22,7 @@ config/icon="res://icon.svg"
 window/size/viewport_width=540
 window/size/viewport_height=960
 window/stretch/mode="canvas_items"
-window/handheld/orientation="portrait"
+window/handheld/orientation=1
 
 [rendering]
 

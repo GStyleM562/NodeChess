@@ -191,7 +191,18 @@ func _build_ui() -> void:
 	_status.offset_left = 12
 	_status.offset_top = 10
 	_status.add_theme_font_size_override("font_size", 20)
+	_status.offset_right = -110
 	layer.add_child(_status)
+
+	var menu_btn := Button.new()
+	menu_btn.text = "Menú"
+	menu_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	menu_btn.offset_left = -100
+	menu_btn.offset_top = 8
+	menu_btn.offset_right = -10
+	menu_btn.offset_bottom = 46
+	menu_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+	layer.add_child(menu_btn)
 
 	_end_btn = Button.new()
 	_end_btn.text = "Terminar turno"
