@@ -44,6 +44,8 @@ var _end_btn: Button
 var _bench_box: HBoxContainer
 
 func _ready() -> void:
+	# Force PORTRAIT at runtime (reliable on Android regardless of the manifest).
+	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
 	randomize()
 	_build_environment()
 	_gs = GameState.new(MapData.new())
