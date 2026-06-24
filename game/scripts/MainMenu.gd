@@ -35,6 +35,7 @@ func _ready() -> void:
 	vb.add_child(_spacer(20))
 	vb.add_child(_menu_button("Jugar", func(): get_tree().change_scene_to_file("res://scenes/board.tscn")))
 	vb.add_child(_menu_button("Dex", func(): get_tree().change_scene_to_file("res://scenes/dex.tscn")))
+	vb.add_child(_menu_button("Probar ataques", func(): get_tree().change_scene_to_file("res://scenes/attack_tester.tscn")))
 
 func _menu_button(text: String, cb: Callable) -> CenterContainer:
 	var b := Button.new()
