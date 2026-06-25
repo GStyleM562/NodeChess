@@ -68,19 +68,25 @@ static func outcome(a: Dictionary, b: Dictionary) -> Dictionary:
 		out["effect"] = "Bloqueo"
 	return out
 
-## Human-readable label for a rolled segment (for the result UI).
+## Human-readable name of the attack (NOT the colour word). The colour is shown by
+## the cell/coin colour; the text describes what the attack does. A segment may
+## override it with a "name" field.
 static func label(s: Dictionary) -> String:
+	if s.has("name"):
+		return String(s["name"])
 	match String(s.get("col", "red")):
 		"white":
-			return "White %d" % int(s.get("pow", 0))
+			return "Daño %d" % int(s.get("pow", 0))
 		"gold":
-			return "Gold %d" % int(s.get("pow", 0))
+			return "Oro %d" % int(s.get("pow", 0))
 		"purple":
-			return "Purple " + "★".repeat(int(s.get("stars", 1)))
+			var stars := "★".repeat(int(s.get("stars", 1)))
+			var base := String(s["fx"]) if s.has("fx") else "Especial"
+			return base + " " + stars
 		"blue":
-			return "Blue"
+			return "Bloqueo"
 		_:
-			return "Miss"
+			return "Fallo"
 
 static func color_of(s: Dictionary) -> Color:
 	match String(s.get("col", "red")):

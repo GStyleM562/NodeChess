@@ -173,24 +173,43 @@ func _set_shape(p: Panel, seg: Dictionary, circle: bool) -> void:
 		(lbl as Label).modulate = col.lightened(0.45)
 
 # --------------------------------------------------------------- coin
+## A real coin toss: the coin RISES in an arc and falls back down, flipping the
+## whole time. It has TWO faces (heads/tails = the two main attacks); you see both
+## alternate while it spins, and it lands on the rolled result.
 func _coin(pool: Array, result: Dictionary) -> void:
-	var coin := _mk_shape(result, 160, true)
-	coin.set_anchors_preset(Control.PRESET_CENTER)
+	var faces := _two_faces(pool)
+	var coin := _mk_shape(faces[0], 160, true)
 	_stage.add_child(coin)
 	await get_tree().process_frame
 	coin.pivot_offset = coin.size * 0.5
-	for i in 8:
-		await _flip(coin, pool[randi() % pool.size()], true, 0.07)
-	await _flip(coin, result, true, 0.13)
+	var base := _stage.size * 0.5 - coin.size * 0.5
+	coin.position = base
+	var arc := 190.0
+	var n := 12
+	for i in n:
+		var phase := float(i + 1) / float(n)
+		var y := base.y - arc * sin(PI * phase)        # up then back down
+		var face: Dictionary = result if i == n - 1 else faces[i % 2]
+		var t1 := create_tween().set_parallel(true)
+		t1.tween_property(coin, "scale:y", 0.07, 0.06)
+		t1.tween_property(coin, "position:y", (coin.position.y + y) * 0.5, 0.06)
+		await t1.finished
+		_set_shape(coin, face, true)
+		var t2 := create_tween().set_parallel(true)
+		t2.tween_property(coin, "scale:y", 1.0, 0.06)
+		t2.tween_property(coin, "position:y", y, 0.06)
+		await t2.finished
+	var land := create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BOUNCE)
+	land.tween_property(coin, "position:y", base.y, 0.3)
+	await land.finished
 
-func _flip(shape: Panel, seg: Dictionary, circle: bool, t: float) -> void:
-	var t1 := create_tween()
-	t1.tween_property(shape, "scale:y", 0.06, t)
-	await t1.finished
-	_set_shape(shape, seg, circle)
-	var t2 := create_tween()
-	t2.tween_property(shape, "scale:y", 1.0, t)
-	await t2.finished
+## The two highest-weight segments = the coin's two faces (heads / tails).
+func _two_faces(pool: Array) -> Array:
+	var s := pool.duplicate()
+	s.sort_custom(func(a, b): return float(a.get("w", 1.0)) > float(b.get("w", 1.0)))
+	if s.size() >= 2:
+		return [s[0], s[1]]
+	return [s[0], s[0]]
 
 # --------------------------------------------------------------- die
 func _die(pool: Array, result: Dictionary) -> void:
