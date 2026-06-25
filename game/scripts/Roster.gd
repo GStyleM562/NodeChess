@@ -16,8 +16,8 @@ const FIGURES := [
 			"defend": "Block2", "hit": "Hit_Reaction_1", "ko": "Knock_Down",
 		},
 		"attack": [
-			{"col": "blue", "w": 35}, {"col": "white", "pow": 80, "w": 30},
-			{"col": "white", "pow": 50, "w": 15}, {"col": "gold", "pow": 40, "w": 10},
+			{"col": "blue", "name": "Bedrock Wall", "w": 35}, {"col": "white", "name": "Boulder Fist", "pow": 80, "w": 30},
+			{"col": "white", "name": "Rockslide", "pow": 50, "w": 15}, {"col": "gold", "name": "Ground Pound", "pow": 40, "w": 10},
 			{"col": "red", "w": 10},
 		],
 	},
@@ -31,9 +31,9 @@ const FIGURES := [
 			"defend": "Shield_Push_Left", "hit": "Hit_Reaction_1", "ko": "Dead",
 		},
 		"attack": [
-			{"col": "white", "pow": 60, "w": 1}, {"col": "white", "pow": 80, "w": 1},
-			{"col": "blue", "w": 1}, {"col": "blue", "w": 1},
-			{"col": "purple", "stars": 1, "w": 1}, {"col": "gold", "pow": 40, "w": 1},
+			{"col": "white", "name": "Sword Chop", "pow": 60, "w": 1}, {"col": "white", "name": "Shield Bash", "pow": 80, "w": 1},
+			{"col": "blue", "name": "Shield Wall", "w": 1}, {"col": "blue", "name": "Shield Wall", "w": 1},
+			{"col": "purple", "name": "Stagger", "stars": 1, "w": 1}, {"col": "gold", "name": "Shoulder Charge", "pow": 40, "w": 1},
 		],
 	},
 	{
@@ -46,8 +46,8 @@ const FIGURES := [
 			"defend": "Block8", "hit": "Hit_Reaction_1", "ko": "Fall_Dead_from_Abdominal_Injury",
 		},
 		"attack": [
-			{"col": "white", "pow": 100, "w": 49.5},
-			{"col": "purple", "stars": 2, "fx": "Miedo", "w": 49.5}, {"col": "red", "w": 1},
+			{"col": "white", "name": "Killing Edge", "pow": 100, "w": 49.5},
+			{"col": "purple", "name": "Fear Gas", "stars": 2, "fx": "Miedo", "w": 49.5}, {"col": "red", "w": 1},
 		],
 	},
 	{
@@ -60,12 +60,12 @@ const FIGURES := [
 			"defend": "Stand_Dodge", "hit": "Hit_Reaction", "ko": "dying_backwards",
 		},
 		"attack": [
-			{"col": "red", "w": 1}, {"col": "white", "pow": 20, "w": 2},
-			{"col": "purple", "stars": 1, "fx": "Empuje", "disp": "push", "n": 1, "w": 3}, {"col": "blue", "w": 4},
-			{"col": "gold", "pow": 30, "fx": "Intercambio", "disp": "swap", "ko": false, "w": 5}, {"col": "white", "pow": 50, "w": 6},
-			{"col": "purple", "stars": 2, "fx": "Jalon", "disp": "pull", "n": 1, "w": 5}, {"col": "blue", "w": 4},
-			{"col": "gold", "pow": 40, "w": 3}, {"col": "white", "pow": 80, "w": 2},
-			{"col": "purple", "stars": 3, "fx": "Intercambio", "disp": "swap", "w": 1},
+			{"col": "red", "w": 1}, {"col": "white", "name": "Arc Bolt", "pow": 20, "w": 2},
+			{"col": "purple", "name": "Force Wave", "stars": 1, "fx": "Empuje", "disp": "push", "n": 1, "w": 3}, {"col": "blue", "name": "Rune Ward", "w": 4},
+			{"col": "gold", "name": "Rift Swap", "pow": 30, "fx": "Intercambio", "disp": "swap", "ko": false, "w": 5}, {"col": "white", "name": "Arcane Lance", "pow": 50, "w": 6},
+			{"col": "purple", "name": "Gravity Hook", "stars": 2, "fx": "Jalon", "disp": "pull", "n": 1, "w": 5}, {"col": "blue", "name": "Rune Ward", "w": 4},
+			{"col": "gold", "name": "Astral Strike", "pow": 40, "w": 3}, {"col": "white", "name": "Mana Burst", "pow": 80, "w": 2},
+			{"col": "purple", "name": "Reality Warp", "stars": 3, "fx": "Intercambio", "disp": "swap", "w": 1},
 		],
 	},
 	{
@@ -78,8 +78,8 @@ const FIGURES := [
 			"defend": "Block10", "hit": "Hit_Reaction_to_Waist", "ko": "Dead",
 		},
 		"attack": [
-			{"col": "purple", "stars": 1, "fx": "Miedo", "w": 25}, {"col": "purple", "stars": 2, "fx": "Debilitado", "w": 15},
-			{"col": "blue", "w": 15}, {"col": "white", "pow": 40, "w": 20},
+			{"col": "purple", "name": "Fear Hex", "stars": 1, "fx": "Miedo", "w": 25}, {"col": "purple", "name": "Plague Cloud", "stars": 2, "fx": "Debilitado", "w": 15},
+			{"col": "blue", "name": "Hex Ward", "w": 15}, {"col": "white", "name": "Venom Bolt", "pow": 40, "w": 20},
 			{"col": "red", "w": 25},
 		],
 	},
@@ -91,8 +91,8 @@ const FIGURES := [
 			"idle": "Armature|Unreal Take|baselayer",
 		},
 		"attack": [
-			{"col": "white", "pow": 50, "w": 30}, {"col": "gold", "pow": 30, "w": 20},
-			{"col": "purple", "stars": 1, "w": 15}, {"col": "blue", "w": 10},
+			{"col": "white", "name": "Spear Thrust", "pow": 50, "w": 30}, {"col": "gold", "name": "Wing Buffet", "pow": 30, "w": 20},
+			{"col": "purple", "name": "Gale Cry", "stars": 1, "w": 15}, {"col": "blue", "name": "Storm Guard", "w": 10},
 			{"col": "red", "w": 25},
 		],
 	},

@@ -145,9 +145,14 @@ func _mk_shape(seg: Dictionary, size: int, circle: bool) -> Panel:
 	var lbl := Label.new()
 	lbl.name = "lbl"
 	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lbl.offset_left = 10
+	lbl.offset_right = -10
+	lbl.offset_top = 6
+	lbl.offset_bottom = -6
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lbl.add_theme_font_size_override("font_size", 22)
+	lbl.add_theme_font_size_override("font_size", 21)
 	p.add_child(lbl)
 	_set_shape(p, seg, circle)
 	return p
@@ -178,7 +183,7 @@ func _set_shape(p: Panel, seg: Dictionary, circle: bool) -> void:
 ## alternate while it spins, and it lands on the rolled result.
 func _coin(pool: Array, result: Dictionary) -> void:
 	var faces := _two_faces(pool)
-	var coin := _mk_shape(faces[0], 160, true)
+	var coin := _mk_shape(faces[0], 180, true)
 	_stage.add_child(coin)
 	await get_tree().process_frame
 	coin.pivot_offset = coin.size * 0.5
@@ -213,7 +218,8 @@ func _two_faces(pool: Array) -> Array:
 
 # --------------------------------------------------------------- die
 func _die(pool: Array, result: Dictionary) -> void:
-	var die := _mk_shape(result, 160, false)
+	# Large enough to show the whole die (and a wrapped attack name) on screen.
+	var die := _mk_shape(result, 220, false)
 	die.set_anchors_preset(Control.PRESET_CENTER)
 	_stage.add_child(die)
 	await get_tree().process_frame
@@ -221,7 +227,7 @@ func _die(pool: Array, result: Dictionary) -> void:
 	for i in 11:
 		_set_shape(die, pool[randi() % pool.size()], false)
 		var tw := create_tween()
-		tw.tween_property(die, "rotation", randf_range(-0.28, 0.28), 0.06)
+		tw.tween_property(die, "rotation", randf_range(-0.16, 0.16), 0.06)
 		await tw.finished
 	_set_shape(die, result, false)
 	var land := create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
@@ -234,8 +240,8 @@ func _dice2(pool: Array, result: Dictionary) -> void:
 	hb.set_anchors_preset(Control.PRESET_CENTER)
 	hb.add_theme_constant_override("separation", 26)
 	_stage.add_child(hb)
-	var d1 := _mk_shape(result, 120, false)
-	var d2 := _mk_shape(result, 120, false)
+	var d1 := _mk_shape(result, 140, false)
+	var d2 := _mk_shape(result, 140, false)
 	hb.add_child(d1)
 	hb.add_child(d2)
 	await get_tree().process_frame
@@ -245,8 +251,8 @@ func _dice2(pool: Array, result: Dictionary) -> void:
 		_set_shape(d1, pool[randi() % pool.size()], false)
 		_set_shape(d2, pool[randi() % pool.size()], false)
 		var tw := create_tween().set_parallel(true)
-		tw.tween_property(d1, "rotation", randf_range(-0.28, 0.28), 0.06)
-		tw.tween_property(d2, "rotation", randf_range(-0.28, 0.28), 0.06)
+		tw.tween_property(d1, "rotation", randf_range(-0.16, 0.16), 0.06)
+		tw.tween_property(d2, "rotation", randf_range(-0.16, 0.16), 0.06)
 		await tw.finished
 	_set_shape(d1, result, false)
 	_set_shape(d2, result, false)
@@ -303,7 +309,7 @@ func _mk_cell(seg: Dictionary, y: float, width: int) -> Control:
 	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lbl.add_theme_font_size_override("font_size", 26)
+	lbl.add_theme_font_size_override("font_size", 22)
 	lbl.text = Combat.label(seg)
 	lbl.modulate = col.lightened(0.35)
 	cell.add_child(lbl)

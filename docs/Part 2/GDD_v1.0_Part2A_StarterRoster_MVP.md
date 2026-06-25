@@ -2,7 +2,7 @@
 
 # Part 2A - Starter Roster (MVP Prototype)
 
-Version: 1.1
+Version: 1.2
 
 Status: DRAFT — for human approval + Meshy production
 
@@ -15,6 +15,13 @@ Status: DRAFT — for human approval + Meshy production
 > the former animal/creature figures (wolf, bird, spider, dragon, wisp) were re-skinned as humanoids
 > **keeping their exact gameplay** (class, attack system, stamina, attack pool, passives, evolution,
 > traits). One shared, Mixamo-friendly animation approach for the whole roster.
+>
+> **v1.2 — every attack now has a fictional NAME.** Each pool segment carries a flavour name (e.g.
+> Nightblade's Purple ★★ Fear is *"Fear Gas"*). The **name** is what shows on the coin faces, dice
+> faces and wheel/reel segments in-game; the **colour** still conveys the hierarchy (the cell colour),
+> and Purple attacks also display their ★ rating. The `Outcome`/`Segment` column keeps the mechanical
+> value (colour + power/★ + effect) — names never change balance, only presentation. Red (Miss) is
+> shown as *"Fallo"*.
 
 ---
 
@@ -70,14 +77,14 @@ all of them in this chibi/mini language.
 
 **Attack Pool (D6)**
 
-| Face | Outcome |
-| ---- | ------- |
-| 1 | White 60 |
-| 2 | White 80 |
-| 3 | Blue |
-| 4 | Blue |
-| 5 | Purple ★ |
-| 6 | Gold 40 |
+| Face | Name | Outcome |
+| ---- | ---- | ------- |
+| 1 | Sword Chop | White 60 |
+| 2 | Shield Bash | White 80 |
+| 3 | Shield Wall | Blue |
+| 4 | Shield Wall | Blue |
+| 5 | Stagger ★ | Purple ★ |
+| 6 | Shoulder Charge | Gold 40 |
 
 **Passives (2/3)**
 1. *Hold the Line* — On Defend: a **tie** also Immobilizes the attacker for 1 turn.
@@ -110,13 +117,13 @@ all of them in this chibi/mini language.
 
 **Attack Pool (Wheel — total 100%)**
 
-| Segment | Prob |
-| ------- | ---- |
-| Blue | 35% |
-| White 80 | 30% |
-| White 50 | 15% |
-| Gold 40 | 10% |
-| Red (Miss) | 10% |
+| Name | Segment | Prob |
+| ---- | ------- | ---- |
+| Bedrock Wall | Blue | 35% |
+| Boulder Fist | White 80 | 30% |
+| Rockslide | White 50 | 15% |
+| Ground Pound | Gold 40 | 10% |
+| Fallo | Red (Miss) | 10% |
 
 **Passives (2/3)**
 1. *Bedrock* (Aura) — Cannot be displaced or swapped (reinforces Heavy/Anchor).
@@ -149,11 +156,11 @@ all of them in this chibi/mini language.
 
 **Attack Pool (Coin)**
 
-| Result | Outcome |
-| ------ | ------- |
-| Heads 49.5% | White 100 |
-| Tails 49.5% | Purple ★★ (Fear) |
-| Miss 1% | Red |
+| Result | Name | Outcome |
+| ------ | ---- | ------- |
+| Heads 49.5% | Killing Edge | White 100 |
+| Tails 49.5% | Fear Gas ★★ | Purple ★★ (Fear) |
+| Miss 1% | Fallo | Red |
 
 **Passives (2/3)**
 1. *Lunge* — On Move: if it moved 2+ nodes before attacking, **Miss is rerolled once**.
@@ -184,13 +191,13 @@ all of them in this chibi/mini language.
 
 **Attack Pool (Wheel — total 100%)**
 
-| Segment | Prob |
-| ------- | ---- |
-| White 50 | 30% |
-| Gold 30 (Push 1) | 20% |
-| Purple ★ | 15% |
-| Blue | 10% |
-| Red (Miss) | 25% |
+| Name | Segment | Prob |
+| ---- | ------- | ---- |
+| Spear Thrust | White 50 | 30% |
+| Wing Buffet | Gold 30 (Push 1) | 20% |
+| Gale Cry ★ | Purple ★ | 15% |
+| Storm Guard | Blue | 10% |
+| Fallo | Red (Miss) | 25% |
 
 **Passives (2/3)**
 1. *Aerial* — Winged flight: flies over terrain (cosmetic terrain ignored; still blocked by occupancy unless jumping).
@@ -221,13 +228,13 @@ all of them in this chibi/mini language.
 
 **Attack Pool — Stage 1 (Wheel — total 100%)**
 
-| Segment | Prob |
-| ------- | ---- |
-| Purple ★ (Fear) | 25% |
-| Purple ★★ (Weakened) | 15% |
-| Blue | 15% |
-| White 40 | 20% |
-| Red (Miss) | 25% |
+| Name | Segment | Prob |
+| ---- | ------- | ---- |
+| Fear Hex ★ | Purple ★ (Fear) | 25% |
+| Plague Cloud ★★ | Purple ★★ (Weakened) | 15% |
+| Hex Ward | Blue | 15% |
+| Venom Bolt | White 40 | 20% |
+| Fallo | Red (Miss) | 25% |
 
 **Passives (2/3)**
 1. *Venom Hex* — Purple wins also apply **Weakened** (1 turn) in addition to their listed effect.
@@ -260,36 +267,36 @@ all of them in this chibi/mini language.
 
 **Stage 1 — Ember Squire (Dice D6, Stamina 3, mobile/low damage)**
 
-| Face | Outcome |
-| ---- | ------- |
-| 1 | White 40 |
-| 2 | White 60 |
-| 3 | Red (Miss) |
-| 4 | Purple ★ |
-| 5 | Gold 30 |
-| 6 | White 80 |
+| Face | Name | Outcome |
+| ---- | ---- | ------- |
+| 1 | Ember Jab | White 40 |
+| 2 | Flame Slash | White 60 |
+| 3 | Fallo | Red (Miss) |
+| 4 | Cinder Burst ★ | Purple ★ |
+| 5 | Blaze Kick | Gold 30 |
+| 6 | Fire Slash | White 80 |
 
 **Stage 2 — Flame Champion (Dice D6, Stamina 2)**
 
-| Face | Outcome |
-| ---- | ------- |
-| 1 | White 60 |
-| 2 | White 80 |
-| 3 | Purple ★ |
-| 4 | Gold 40 |
-| 5 | White 100 |
-| 6 | White 90 |
+| Face | Name | Outcome |
+| ---- | ---- | ------- |
+| 1 | Flame Slash | White 60 |
+| 2 | Fire Slash | White 80 |
+| 3 | Cinder Burst ★ | Purple ★ |
+| 4 | Inferno Strike | Gold 40 |
+| 5 | Searing Blow | White 100 |
+| 6 | Blazing Arc | White 90 |
 
 **Stage 3 — Infernal Warlord (Dice D6, Stamina 2) — unlocks Hidden Passive**
 
-| Face | Outcome |
-| ---- | ------- |
-| 1 | White 80 |
-| 2 | Gold 50 |
-| 3 | Purple ★★ (Weakened) |
-| 4 | White 100 |
-| 5 | Gold 60 |
-| 6 | White 120 |
+| Face | Name | Outcome |
+| ---- | ---- | ------- |
+| 1 | Fire Slash | White 80 |
+| 2 | Hellfire Smash | Gold 50 |
+| 3 | Molten Curse ★★ | Purple ★★ (Weakened) |
+| 4 | Searing Blow | White 100 |
+| 5 | Cataclysm | Gold 60 |
+| 6 | Apocalypse Edge | White 120 |
 
 **Passives (1/3 base)**
 1. *Kindling Resolve* — On Rank Up: cleanse all debuffs (in addition to the standard Rank Up cleanse) and gain +1 Stamina until end of next turn.
@@ -319,19 +326,19 @@ all of them in this chibi/mini language.
 
 **Attack Pool (2d6 sum)**
 
-| Sum | Outcome |
-| --- | ------- |
-| 2 | Red (Miss) |
-| 3 | White 20 |
-| 4 | Purple ★ (Push 1) |
-| 5 | Blue |
-| 6 | Gold 30 (Swap) |
-| 7 | White 50 |
-| 8 | Purple ★★ (Pull 1) |
-| 9 | Blue |
-| 10 | Gold 40 |
-| 11 | White 80 |
-| 12 | Purple ★★★ (Swap + Push 1) |
+| Sum | Name | Outcome |
+| --- | ---- | ------- |
+| 2 | Fallo | Red (Miss) |
+| 3 | Arc Bolt | White 20 |
+| 4 | Force Wave ★ | Purple ★ (Push 1) |
+| 5 | Rune Ward | Blue |
+| 6 | Rift Swap | Gold 30 (Swap) |
+| 7 | Arcane Lance | White 50 |
+| 8 | Gravity Hook ★★ | Purple ★★ (Pull 1) |
+| 9 | Rune Ward | Blue |
+| 10 | Astral Strike | Gold 40 |
+| 11 | Mana Burst | White 80 |
+| 12 | Reality Warp ★★★ | Purple ★★★ (Swap + Push 1) |
 
 **Passives (2/3)**
 1. *Blink* — On Move: may Phase (blink) through 1 enemy at no extra stamina.
@@ -364,12 +371,12 @@ all of them in this chibi/mini language.
 
 **Attack Pool (Double Coin — each coin 50/50, results combined)**
 
-| Coin A | Coin B | Combined result | Prob |
-| ------ | ------ | --------------- | ---- |
-| H (White 60) | H (Gold 40) | **White 100** | 25% |
-| H (White 60) | T (Blue) | **Blue** | 25% |
-| T (Purple ★) | H (Gold 40) | **Gold 50** | 25% |
-| T (Purple ★) | T (Blue) | **Purple ★★** | 25% |
+| Coin A | Coin B | Name | Combined result | Prob |
+| ------ | ------ | ---- | --------------- | ---- |
+| H (White 60) | H (Gold 40) | Jackpot Strike | **White 100** | 25% |
+| H (White 60) | T (Blue) | Lucky Guard | **Blue** | 25% |
+| T (Purple ★) | H (Gold 40) | Golden Flick | **Gold 50** | 25% |
+| T (Purple ★) | T (Blue) | Wild Card ★★ | **Purple ★★** | 25% |
 
 **Passives (1/3)**
 1. *Loaded Dice* (Once Per Match) — Reroll one of its own coins after a flip.

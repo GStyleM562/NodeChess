@@ -68,25 +68,25 @@ static func outcome(a: Dictionary, b: Dictionary) -> Dictionary:
 		out["effect"] = "Bloqueo"
 	return out
 
-## Human-readable name of the attack (NOT the colour word). The colour is shown by
-## the cell/coin colour; the text describes what the attack does. A segment may
-## override it with a "name" field.
+## Display name of the attack shown on coins / dice / reels. Each segment carries
+## a fictional "name" (e.g. "Fear Gas"); Purple attacks also show their ★ rating.
+## The colour (hierarchy) is conveyed by the cell/coin colour, not the text. When a
+## segment has no "name", we fall back to a generic descriptor by colour.
 static func label(s: Dictionary) -> String:
+	var col := String(s.get("col", "red"))
+	var base: String
 	if s.has("name"):
-		return String(s["name"])
-	match String(s.get("col", "red")):
-		"white":
-			return "Daño %d" % int(s.get("pow", 0))
-		"gold":
-			return "Oro %d" % int(s.get("pow", 0))
-		"purple":
-			var stars := "★".repeat(int(s.get("stars", 1)))
-			var base := String(s["fx"]) if s.has("fx") else "Especial"
-			return base + " " + stars
-		"blue":
-			return "Bloqueo"
-		_:
-			return "Fallo"
+		base = String(s["name"])
+	else:
+		match col:
+			"white": base = "Daño %d" % int(s.get("pow", 0))
+			"gold": base = "Oro %d" % int(s.get("pow", 0))
+			"purple": base = String(s["fx"]) if s.has("fx") else "Especial"
+			"blue": base = "Bloqueo"
+			_: base = "Fallo"
+	if col == "purple":
+		return base + " " + "★".repeat(int(s.get("stars", 1)))
+	return base
 
 static func color_of(s: Dictionary) -> Color:
 	match String(s.get("col", "red")):
