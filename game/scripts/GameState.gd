@@ -35,6 +35,7 @@ var turn_no := 0
 var winner := ""
 var energy := {"player": 0, "enemy": 0}
 var pending_buff := {"player": {}, "enemy": {}}   # one-shot combat buffs from modifiers
+var _att_moved_ctx := 0                           # nodes the attacker moved this turn (for Lunge/Dive)
 var _next_uid := 0
 
 func _init(_map: MapData) -> void:
@@ -240,8 +241,12 @@ func _boost_seg(s: Dictionary, dmg: int, stars: int) -> void:
 
 ## Resolve an attack. KO only on a damage (White/Gold) win. Purple win applies a
 ## status (and/or displacement); Blue win blocks. Returns the combat record.
-func attack(att_uid: int, def_uid: int) -> Dictionary:
+func attack(att_uid: int, def_uid: int, att_moved: int = 0) -> Dictionary:
 	var seg_a := _roll_for(att_uid, true)
+	# PASSIVE — Lunge: after moving 2+ nodes this turn, reroll a Miss once.
+	if String(seg_a.get("col", "")) == "red" and att_moved >= 2 and has_passive(att_uid, "lunge"):
+		seg_a = _roll_for(att_uid, true)
+	_att_moved_ctx = att_moved
 	var seg_b := _roll_for(def_uid, false)
 	var oc := Combat.outcome(seg_a, seg_b)
 	var ko_uid := -1
@@ -274,6 +279,9 @@ func attack(att_uid: int, def_uid: int) -> Dictionary:
 		if has_passive(def_uid, "hold_the_line"):
 			apply_status(att_uid, "immobilized", STATUS_DUR)
 			applied = {"status": "immobilized", "target": att_uid, "fx": "Hold the Line"}
+		# PASSIVE — Hexstep: the Witch retreats 1 node (away from the attacker) on a tie.
+		if has_passive(def_uid, "hexstep"):
+			disp = _apply_displacement(att_uid, def_uid, {"disp": "push", "n": 1})
 	return {
 		"att": att_uid, "def": def_uid, "seg_a": seg_a, "seg_b": seg_b,
 		"result": int(oc["result"]), "win_col": oc["win_col"], "effect": oc["effect"],
@@ -314,6 +322,8 @@ func _apply_displacement(winner_uid: int, loser_uid: int, seg: Dictionary) -> Di
 	var win_pos := map.pos_of(w["node"])
 	var steps := int(seg.get("n", 1))
 	if has_passive(winner_uid, "arcane_pull"):   # PASSIVE — Arcane Pull: +1 distance
+		steps += 1
+	if typ == "push" and _att_moved_ctx >= 3 and has_passive(winner_uid, "dive"):  # PASSIVE — Dive
 		steps += 1
 	var cur: int = l["node"]
 	for i in steps:

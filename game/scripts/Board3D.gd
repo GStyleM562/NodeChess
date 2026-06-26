@@ -473,7 +473,8 @@ func _player_move(node: int) -> void:
 	_refresh_bench_ui()
 	_update_status()
 	_gs.move_unit(_active_uid, node)
-	if is_jump:
+	# PASSIVE — Blink: Rift Mage phases through an enemy for the normal cost (no penalty).
+	if is_jump and not _gs.has_passive(_active_uid, "blink"):
 		_remaining = 0
 		_jumped = true
 	else:
@@ -549,12 +550,22 @@ func _dramatize_effect(uid: int, fx_text: String) -> void:
 
 func _player_attack(foe_uid: int) -> void:
 	var att := _active_uid
+	var moved := maxi(0, int(_gs.units[att]["stamina"]) - _remaining)   # for Lunge / Dive
 	_clear_highlights()
 	_busy = true
 	_committed = true
 	_update_status()
-	var rec := _gs.attack(att, foe_uid)
+	var rec := _gs.attack(att, foe_uid, moved)
 	await _play_combat(att, foe_uid, rec)
+	# PASSIVE — Bloodthirst: on an enemy KO, the attacker may move 1 node (no attack).
+	if int(rec.get("ko", -1)) == foe_uid and _gs.units[att]["alive"] and _gs.has_passive(att, "bloodthirst"):
+		_busy = false
+		_remaining = 1
+		_jumped = true               # the bonus is a move only — no second attack
+		_status.text = "%s — ¡sed de sangre! mueve 1 nodo." % Roster.FIGURES[_gs.units[att]["rindex"]]["name"]
+		_refresh_active_highlights()
+		await _maybe_auto_end()
+		return
 	await _end_player_turn()
 
 func _on_end_turn_pressed() -> void:

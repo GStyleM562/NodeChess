@@ -40,6 +40,7 @@ const FIGURES := [
 	},
 	{
 		"id": "nightblade", "name": "Nightblade", "stamina": 3, "type": "Moneda",
+		"passives": ["lunge", "bloodthirst"],
 		"glb": "res://assets/figures/nightblade/nightblade.glb",
 		"size": 0.95, "complete": true,
 		"clips": {
@@ -54,7 +55,7 @@ const FIGURES := [
 	},
 	{
 		"id": "rift_mage", "name": "Rift Mage", "stamina": 2, "type": "Suma 2d6",
-		"passives": ["arcane_pull"],
+		"passives": ["arcane_pull", "blink"],
 		"glb": "res://assets/figures/rift_mage/rift_mage.glb",
 		"size": 0.95, "complete": true,
 		"clips": {
@@ -73,7 +74,7 @@ const FIGURES := [
 	},
 	{
 		"id": "venom_witch", "name": "Venom Witch", "stamina": 2, "type": "Ruleta",
-		"passives": ["venom_hex"],
+		"passives": ["venom_hex", "hexstep"],
 		"glb": "res://assets/figures/venom_witch/witch/witch.glb",
 		"size": 1.00, "complete": true,
 		"clips": {
@@ -89,6 +90,7 @@ const FIGURES := [
 	},
 	{
 		"id": "storm_valkyrie", "name": "Storm Valkyrie", "stamina": 4, "type": "Ruleta", # anim incomplete (1 clip)
+		"passives": ["aerial", "dive"],
 		"glb": "res://assets/figures/storm_valkyrie/Meshy_AI_model_Animation_Walking_withSkin.glb",
 		"size": 1.00, "complete": false,
 		"clips": {
@@ -96,7 +98,7 @@ const FIGURES := [
 		},
 		"attack": [
 			{"col": "white", "name": "Spear Thrust", "pow": 50, "w": 30}, {"col": "gold", "name": "Wing Buffet", "pow": 30, "w": 20},
-			{"col": "purple", "name": "Gale Cry", "stars": 1, "w": 15}, {"col": "blue", "name": "Storm Guard", "w": 10},
+			{"col": "purple", "name": "Gale Cry", "stars": 1, "fx": "Empuje", "disp": "push", "n": 1, "w": 15}, {"col": "blue", "name": "Storm Guard", "w": 10},
 			{"col": "red", "w": 25},
 		],
 	},
