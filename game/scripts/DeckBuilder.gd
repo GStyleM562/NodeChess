@@ -3,8 +3,10 @@ extends Control
 ## before a match. Writes the choice to Loadout.player_team and starts the board.
 
 var _team: Array = []
+var _map_index := 0
 var _team_box: HBoxContainer
 var _avail_box: VBoxContainer
+var _map_box: HBoxContainer
 var _counter: Label
 var _play_btn: Button
 
@@ -12,6 +14,7 @@ func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_team = Loadout.player_team.duplicate()
+	_map_index = Loadout.map_index
 
 	var bg := ColorRect.new()
 	bg.color = Color(0.06, 0.07, 0.12)
@@ -38,6 +41,16 @@ func _ready() -> void:
 	_counter.modulate = Color(0.8, 0.85, 1.0)
 	_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(_counter)
+
+	var map_hdr := Label.new()
+	map_hdr.text = "Mapa:"
+	map_hdr.add_theme_font_size_override("font_size", 18)
+	root.add_child(map_hdr)
+	_map_box = HBoxContainer.new()
+	_map_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_map_box.add_theme_constant_override("separation", 8)
+	root.add_child(_map_box)
+	_build_maps()
 
 	var team_hdr := Label.new()
 	team_hdr.text = "Tu equipo (toca para quitar):"
@@ -80,6 +93,23 @@ func _ready() -> void:
 	nav.add_child(_play_btn)
 
 	_refresh()
+
+func _build_maps() -> void:
+	for c in _map_box.get_children():
+		c.queue_free()
+	for i in MapData.count():
+		var b := Button.new()
+		b.text = MapData.display_name(i)
+		b.toggle_mode = true
+		b.button_pressed = (i == _map_index)
+		b.custom_minimum_size = Vector2(0, 46)
+		b.add_theme_font_size_override("font_size", 18)
+		b.pressed.connect(_select_map.bind(i))
+		_map_box.add_child(b)
+
+func _select_map(i: int) -> void:
+	_map_index = i
+	_build_maps()
 
 func _build_available() -> void:
 	for ri in Roster.FIGURES.size():
@@ -124,4 +154,5 @@ func _on_play() -> void:
 	if not Loadout.valid(_team):
 		return
 	Loadout.player_team = _team.duplicate()
+	Loadout.map_index = _map_index
 	get_tree().change_scene_to_file("res://scenes/board.tscn")

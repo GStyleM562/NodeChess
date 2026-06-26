@@ -4,6 +4,10 @@ class_name MapData
 ## Fewer nodes than a grid + low node-degree => surrounding is easy and the board
 ## reads cleanly. Symmetric top/bottom: player at the BOTTOM (-z), enemy at the TOP.
 
+## The three playable maps (same rules: goals top/bottom + connected, two entrances
+## per side, a buff node, every node <= 3 connections, symmetric left/right).
+const NAMES := ["Rieles", "Reloj de Arena", "Plaza"]
+
 var nodes := []          # [{id, pos:Vector3, role:String}]
 var adj := {}            # id -> Array[int]
 var entrances_player := []
@@ -11,9 +15,22 @@ var entrances_enemy := []
 var goal_player := -1
 var goal_enemy := -1
 var buffs := []
+var map_name := ""
 
-func _init() -> void:
-	_build_duel()
+func _init(layout := 0) -> void:
+	match layout:
+		1:
+			_build_hourglass()
+		2:
+			_build_plaza()
+		_:
+			_build_duel()
+
+static func count() -> int:
+	return NAMES.size()
+
+static func display_name(i: int) -> String:
+	return NAMES[i] if i >= 0 and i < NAMES.size() else "Mapa %d" % i
 
 func pos_of(id: int) -> Vector3:
 	return nodes[id]["pos"]
@@ -34,6 +51,7 @@ func _edge(a: int, b: int) -> void:
 		adj[b].append(a)
 
 func _build_duel() -> void:
+	map_name = NAMES[0]
 	# v3 — Pokémon-Duel philosophy, tall (~5 cols × 8 rows). Long side RAILS,
 	# a central X of diagonals (no 4-way hub), connected goals, and EVERY node has
 	# at most 3 connections. Player at the bottom (-z), enemy at the top (+z).
@@ -88,6 +106,53 @@ func _build_duel() -> void:
 	# buff at an inner node (no central hub node exists now)
 	nodes[n8]["role"] = "buff"
 	buffs = [n8]
+
+## Shared 16-node layout: an X of crossing diagonals (no node at the crossing, so
+## no degree-4 hub), 2 entrances per side, goals top/bottom. `P` = 16 positions,
+## `bf` = buff node ids. Topology is fixed; geometry/buffs vary per map.
+func _build_x16(mname: String, P: Array, bf: Array) -> void:
+	map_name = mname
+	for p in P:
+		_add(p)
+	var edges := [
+		[0, 1], [0, 2], [0, 3], [15, 13], [15, 14], [15, 12],
+		[1, 4], [2, 5], [3, 6], [3, 7], [12, 8], [12, 9],
+		[4, 6], [5, 7], [6, 9], [7, 8], [8, 10], [9, 11],
+		[10, 13], [11, 14], [13, 15], [14, 15],
+	]
+	for e in edges:
+		_edge(e[0], e[1])
+	goal_player = 0
+	goal_enemy = 15
+	nodes[0]["role"] = "goal_player"
+	nodes[15]["role"] = "goal_enemy"
+	entrances_player = [1, 2]
+	entrances_enemy = [13, 14]
+	nodes[1]["role"] = "entrance_player"
+	nodes[2]["role"] = "entrance_player"
+	nodes[13]["role"] = "entrance_enemy"
+	nodes[14]["role"] = "entrance_enemy"
+	for b in bf:
+		nodes[b]["role"] = "buff"
+	buffs = bf
+
+func _build_hourglass() -> void:
+	# Tall, pinched in the middle — short side lanes, tight centre (easy surrounds).
+	_build_x16(NAMES[1], [
+		Vector3(0, 0, -5.7), Vector3(-2.9, 0, -4.2), Vector3(2.9, 0, -4.2), Vector3(0, 0, -4.2),
+		Vector3(-2.9, 0, -2.3), Vector3(2.9, 0, -2.3), Vector3(-1.2, 0, -1.1), Vector3(1.2, 0, -1.1),
+		Vector3(-1.2, 0, 1.1), Vector3(1.2, 0, 1.1), Vector3(-2.9, 0, 2.3), Vector3(2.9, 0, 2.3),
+		Vector3(0, 0, 4.2), Vector3(-2.9, 0, 4.2), Vector3(2.9, 0, 4.2), Vector3(0, 0, 5.7),
+	], [6, 9])
+
+func _build_plaza() -> void:
+	# Shorter and rounder — wider inner ring, faster games, more open centre.
+	_build_x16(NAMES[2], [
+		Vector3(0, 0, -4.9), Vector3(-2.9, 0, -3.6), Vector3(2.9, 0, -3.6), Vector3(0, 0, -3.6),
+		Vector3(-2.9, 0, -1.5), Vector3(2.9, 0, -1.5), Vector3(-1.7, 0, -0.8), Vector3(1.7, 0, -0.8),
+		Vector3(-1.7, 0, 0.8), Vector3(1.7, 0, 0.8), Vector3(-2.9, 0, 1.5), Vector3(2.9, 0, 1.5),
+		Vector3(0, 0, 3.6), Vector3(-2.9, 0, 3.6), Vector3(2.9, 0, 3.6), Vector3(0, 0, 4.9),
+	], [7, 8])
 
 ## BFS reachable distances from `start` up to `steps`, treating `blocked` ids as
 ## impassable (cannot move through or onto them).

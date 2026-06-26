@@ -13,5 +13,8 @@ static var enemy_team: Array = [1, 0, 2, 4, 5]
 # Equipped modifier cards (ids into GameState.MODIFIERS), up to 3.
 static var player_modifiers: Array = ["power_surge", "cleanse", "adrenaline"]
 
+# Chosen map (index into MapData layouts).
+static var map_index := 0
+
 static func valid(team: Array) -> bool:
 	return team.size() == DECK_SIZE

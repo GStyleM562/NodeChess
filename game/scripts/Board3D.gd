@@ -51,7 +51,7 @@ func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
 	randomize()
 	_build_environment()
-	_gs = GameState.new(MapData.new())
+	_gs = GameState.new(MapData.new(Loadout.map_index))
 	# Teams come from the Deck Builder (player) + a preset enemy deck.
 	for ri in Loadout.player_team:
 		_gs.add_to_bench("player", int(ri))
