@@ -99,14 +99,54 @@ func can_act(team: String) -> bool:
 	return units_on_board(team).size() > 0 or can_deploy(team)
 
 func reachable_for(uid: int) -> Dictionary:
-	if not can_move(uid):
+	return move_targets(uid, int(units[uid]["stamina"]))
+
+## All nodes this unit can reach with `budget` stamina (node -> cost). Includes
+## JUMPS: with >= 2 stamina, a unit standing next to an enemy may hop OVER it,
+## landing on a free node just beyond the enemy (passing through the enemy's node).
+## A jump costs 2 stamina. Any figure with enough stamina can do this.
+func move_targets(uid: int, budget: int) -> Dictionary:
+	if not can_move(uid) or budget <= 0:
 		return {}
 	var u: Dictionary = units[uid]
 	var blocked := {}
 	for nid in board.keys():
 		if nid != u["node"]:
 			blocked[nid] = true
-	return map.reachable(u["node"], u["stamina"], blocked)
+	var reach := map.reachable(u["node"], budget, blocked)
+	reach.erase(u["node"])
+	if budget >= 2:
+		for e in map.adj[u["node"]]:
+			var occ := int(board.get(e, -1))
+			if occ == -1 or units[occ]["team"] == u["team"] or not units[occ]["alive"]:
+				continue                                  # only hop over a live enemy
+			for f in map.adj[e]:
+				if f == u["node"] or board.has(f):
+					continue                              # land on a free node beyond it
+				if not reach.has(f) or int(reach[f]) > 2:
+					reach[f] = 2                          # a jump costs 2 stamina
+	return reach
+
+## Walking path (excluding start) to a target — the shorter of the normal route and
+## a jump (hop over an adjacent enemy: [enemy_node, target]).
+func move_path(uid: int, target: int) -> Array:
+	var u: Dictionary = units[uid]
+	var blocked := {}
+	for nid in board.keys():
+		if nid != u["node"]:
+			blocked[nid] = true
+	var normal := map.path_to(u["node"], target, blocked)
+	var jump: Array = []
+	for e in map.adj[u["node"]]:
+		var occ := int(board.get(e, -1))
+		if occ != -1 and units[occ]["team"] != u["team"] and units[occ]["alive"] and target in map.adj[e]:
+			jump = [e, target]                            # hop over the enemy
+			break
+	if normal.is_empty():
+		return jump
+	if jump.is_empty():
+		return normal
+	return jump if jump.size() < normal.size() else normal
 
 func adjacent_enemies(uid: int) -> Array:
 	var u: Dictionary = units[uid]
@@ -492,11 +532,7 @@ func _node_occupant(node: int) -> int:
 	return int(board.get(node, -1))
 
 func _bot_path(uid: int, node: int) -> Array:
-	var blocked := {}
-	for n in board.keys():
-		if n != units[uid]["node"]:
-			blocked[n] = true
-	return map.path_to(units[uid]["node"], node, blocked)
+	return move_path(uid, node)
 
 ## P(attacker's pool beats defender's pool), exact over all weighted segment pairs.
 func _win_prob(a: Array, b: Array) -> float:

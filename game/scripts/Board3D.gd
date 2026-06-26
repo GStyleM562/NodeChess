@@ -393,11 +393,7 @@ func _refresh_active_highlights() -> void:
 		return
 	var node: int = _gs.units[_active_uid]["node"]
 	if _remaining > 0:
-		var blocked := {}
-		for n in _gs.board.keys():
-			if n != node:
-				blocked[n] = true
-		_reach = _gs.map.reachable(node, _remaining, blocked)
+		_reach = _gs.move_targets(_active_uid, _remaining)   # includes jumps over enemies
 		for rid in _reach.keys():
 			_set_highlight(rid, HILITE_MOVE)
 			_highlighted.append(rid)
@@ -461,13 +457,8 @@ func _player_deploy(uid: int, node: int) -> void:
 
 func _player_move(node: int) -> void:
 	var cost: int = int(_reach[node])
-	# Compute the path BEFORE moving (board state is still current).
-	var from_node: int = _gs.units[_active_uid]["node"]
-	var blocked := {}
-	for n in _gs.board.keys():
-		if n != from_node:
-			blocked[n] = true
-	var path := _gs.map.path_to(from_node, node, blocked)
+	# Compute the path BEFORE moving (board state is still current). Jump-aware.
+	var path := _gs.move_path(_active_uid, node)
 	_clear_highlights()
 	_busy = true
 	_committed = true
