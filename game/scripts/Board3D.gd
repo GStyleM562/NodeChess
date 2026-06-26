@@ -49,11 +49,11 @@ func _ready() -> void:
 	randomize()
 	_build_environment()
 	_gs = GameState.new(MapData.new())
-	# 5 figures per side (duplicates allowed) so surrounding is feasible.
-	for ri in [0, 1, 2, 3, 4]:
-		_gs.add_to_bench("player", ri)
-	for ri in [0, 1, 2, 3, 4]:
-		_gs.add_to_bench("enemy", ri)
+	# Teams come from the Deck Builder (player) + a preset enemy deck.
+	for ri in Loadout.player_team:
+		_gs.add_to_bench("player", int(ri))
+	for ri in Loadout.enemy_team:
+		_gs.add_to_bench("enemy", int(ri))
 	_build_board()
 	_overlay = CombatOverlay.new()
 	add_child(_overlay)

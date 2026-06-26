@@ -33,7 +33,7 @@ func _ready() -> void:
 	vb.add_child(sub)
 
 	vb.add_child(_spacer(20))
-	vb.add_child(_menu_button("Jugar", func(): get_tree().change_scene_to_file("res://scenes/board.tscn")))
+	vb.add_child(_menu_button("Jugar", func(): get_tree().change_scene_to_file("res://scenes/deck_builder.tscn")))
 	vb.add_child(_menu_button("Dex", func(): get_tree().change_scene_to_file("res://scenes/dex.tscn")))
 	vb.add_child(_menu_button("Probar ataques", func(): get_tree().change_scene_to_file("res://scenes/attack_tester.tscn")))
 
