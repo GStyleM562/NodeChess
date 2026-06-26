@@ -44,6 +44,7 @@ var _end_btn: Button
 var _bench_box: HBoxContainer
 var _energy_label: Label
 var _mods_box: HBoxContainer
+var _jumped := false           # active figure hopped an enemy this turn -> no attack
 
 func _ready() -> void:
 	# Force PORTRAIT at runtime (reliable on Android regardless of the manifest).
@@ -276,8 +277,11 @@ func _update_status() -> void:
 	if _gs.turn_team != "player":
 		_status.text = "Turno del enemigo…"
 	elif _active_uid != -1:
-		_status.text = "%s — mov restante: %d.  verde=mover · rojo=atacar · o Terminar turno." % [
-			Roster.FIGURES[_gs.units[_active_uid]["rindex"]]["name"], _remaining]
+		var fname: String = Roster.FIGURES[_gs.units[_active_uid]["rindex"]]["name"]
+		if _jumped:
+			_status.text = "%s saltó sobre el enemigo — sin más acciones." % fname
+		else:
+			_status.text = "%s — mov restante: %d.  verde=mover · rojo=atacar · o Terminar turno." % [fname, _remaining]
 	else:
 		_status.text = "Tu turno — toca una figura, o despliega desde la banca."
 	_refresh_status_labels()
@@ -382,6 +386,7 @@ func _activate_unit(uid: int) -> void:
 	_deploy_uid = -1
 	_active_uid = uid
 	_remaining = int(_gs.units[uid]["stamina"])
+	_jumped = false
 	_refresh_active_highlights()
 	_update_status()
 
@@ -397,7 +402,7 @@ func _refresh_active_highlights() -> void:
 		for rid in _reach.keys():
 			_set_highlight(rid, HILITE_MOVE)
 			_highlighted.append(rid)
-	if _gs.can_attack(_active_uid):
+	if _gs.can_attack(_active_uid) and not _jumped:   # no attack after a jump
 		for foe in _gs.adjacent_enemies(_active_uid):
 			var fn: int = _gs.units[foe]["node"]
 			_foe_nodes[fn] = foe
@@ -408,6 +413,7 @@ func _reset_activation() -> void:
 	_active_uid = -1
 	_remaining = 0
 	_committed = false
+	_jumped = false
 	_deploy_uid = -1
 	_reach = {}
 	_foe_nodes = {}
@@ -459,13 +465,19 @@ func _player_move(node: int) -> void:
 	var cost: int = int(_reach[node])
 	# Compute the path BEFORE moving (board state is still current). Jump-aware.
 	var path := _gs.move_path(_active_uid, node)
+	# A jump crosses an occupied (enemy) node: it uses up ALL stamina and forbids attacking.
+	var is_jump := not path.is_empty() and _gs.board.has(path[0])
 	_clear_highlights()
 	_busy = true
 	_committed = true
 	_refresh_bench_ui()
 	_update_status()
 	_gs.move_unit(_active_uid, node)
-	_remaining -= cost
+	if is_jump:
+		_remaining = 0
+		_jumped = true
+	else:
+		_remaining -= cost
 	await _walk_path(_active_uid, path)
 	_busy = false
 	if _check_and_show_winner():
