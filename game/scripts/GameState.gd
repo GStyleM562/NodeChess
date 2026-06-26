@@ -12,6 +12,19 @@ const FX_STATUS := {"Miedo": "fear", "Debilitado": "weakened", "Paralizado": "pa
 const STATUS_DUR := 4   # in game-turns (~2 rounds)
 const KO_COOLDOWN := 6  # game-turns before a KO'd figure returns to the bench
 
+# --- Plan B: energy + modifiers + buff nodes -------------------------------
+const ENERGY_MAX := 10
+const ENERGY_PER_TURN := 1
+const BUFF_ENERGY := 1     # extra energy/turn for controlling a buff node
+const BUFF_DMG := 20       # combat bonus for a unit standing on a buff node
+const BUFF_STARS := 1
+## Modifier cards: spend energy to activate. Equipped per player (see Loadout).
+const MODIFIERS := {
+	"power_surge": {"name": "Power Surge", "cost": 3, "desc": "Tu próximo ataque: +20 daño / +1★"},
+	"cleanse": {"name": "Cleanse", "cost": 2, "desc": "Quita los debuffs de tus figuras"},
+	"adrenaline": {"name": "Adrenaline", "cost": 2, "desc": "Tu próximo ataque repite un Fallo"},
+}
+
 var map: MapData
 var units := {}
 var board := {}
@@ -20,6 +33,8 @@ var ko_bench := {"player": [], "enemy": []}
 var turn_team := "player"
 var turn_no := 0
 var winner := ""
+var energy := {"player": 0, "enemy": 0}
+var pending_buff := {"player": {}, "enemy": {}}   # one-shot combat buffs from modifiers
 var _next_uid := 0
 
 func _init(_map: MapData) -> void:
@@ -156,20 +171,38 @@ func move_unit(uid: int, node: int) -> void:
 	board[node] = uid
 	_check_goal(u)
 
-func _roll_for(uid: int) -> Dictionary:
-	var s: Dictionary = Combat.roll(Roster.FIGURES[units[uid]["rindex"]]["attack"]).duplicate(true)
+func _roll_for(uid: int, is_attacker := false) -> Dictionary:
+	var pool: Array = Roster.FIGURES[units[uid]["rindex"]]["attack"]
+	var s: Dictionary = Combat.roll(pool).duplicate(true)
 	if has_status(uid, "weakened"):
 		if s.has("pow"):
 			s["pow"] = maxi(0, int(s["pow"]) - 20)
 		if s.has("stars"):
 			s["stars"] = maxi(1, int(s["stars"]) - 1)
+	# BUFF NODE — a unit standing on a buff node rolls stronger.
+	if int(units[uid]["node"]) in map.buffs:
+		_boost_seg(s, BUFF_DMG, BUFF_STARS)
+	# MODIFIERS — one-shot attacker buffs (consumed on use).
+	if is_attacker:
+		var pb: Dictionary = pending_buff[units[uid]["team"]]
+		if pb.get("adrenaline", false) and String(s.get("col", "")) == "red":
+			s = Combat.roll(pool).duplicate(true)   # reroll one Miss
+		if pb.get("surge", false):
+			_boost_seg(s, BUFF_DMG, BUFF_STARS)
+		pending_buff[units[uid]["team"]] = {}
 	return s
+
+func _boost_seg(s: Dictionary, dmg: int, stars: int) -> void:
+	if s.has("pow"):
+		s["pow"] = int(s["pow"]) + dmg
+	if String(s.get("col", "")) == "purple":
+		s["stars"] = int(s.get("stars", 1)) + stars
 
 ## Resolve an attack. KO only on a damage (White/Gold) win. Purple win applies a
 ## status (and/or displacement); Blue win blocks. Returns the combat record.
 func attack(att_uid: int, def_uid: int) -> Dictionary:
-	var seg_a := _roll_for(att_uid)
-	var seg_b := _roll_for(def_uid)
+	var seg_a := _roll_for(att_uid, true)
+	var seg_b := _roll_for(def_uid, false)
 	var oc := Combat.outcome(seg_a, seg_b)
 	var ko_uid := -1
 	var applied := {}
@@ -284,8 +317,40 @@ func end_turn() -> void:
 	turn_no += 1
 	_process_ko_returns()
 	turn_team = "enemy" if turn_team == "player" else "player"
+	_grant_energy(turn_team)
 	if winner == "" and not can_act(turn_team):
 		winner = "enemy" if turn_team == "player" else "player"
+
+# --- energy / modifiers / buff nodes ---------------------------------------
+func _grant_energy(team: String) -> void:
+	var gain := ENERGY_PER_TURN
+	if controls_buff(team):
+		gain += BUFF_ENERGY
+	energy[team] = mini(ENERGY_MAX, int(energy[team]) + gain)
+
+func controls_buff(team: String) -> bool:
+	for b in map.buffs:
+		var occ := int(board.get(b, -1))
+		if occ != -1 and units[occ]["alive"] and units[occ]["team"] == team:
+			return true
+	return false
+
+func can_use_modifier(team: String, mod_id: String) -> bool:
+	return MODIFIERS.has(mod_id) and int(energy[team]) >= int(MODIFIERS[mod_id]["cost"])
+
+func activate_modifier(team: String, mod_id: String) -> bool:
+	if not can_use_modifier(team, mod_id):
+		return false
+	energy[team] = int(energy[team]) - int(MODIFIERS[mod_id]["cost"])
+	match mod_id:
+		"power_surge":
+			pending_buff[team]["surge"] = true
+		"adrenaline":
+			pending_buff[team]["adrenaline"] = true
+		"cleanse":
+			for uid in units_on_board(team):
+				units[uid]["statuses"] = {}
+	return true
 
 # --- simple bot ------------------------------------------------------------
 # --- bot ------------------------------------------------------------------
@@ -328,6 +393,8 @@ func bot_action(team: String) -> Dictionary:
 				atk_uid = uid
 				atk_foe = foe
 	if atk_uid != -1:
+		if bot_difficulty >= 2 and best >= 0.6 and can_use_modifier(team, "power_surge"):
+			activate_modifier(team, "power_surge")     # spend energy to press an edge
 		var rec := attack(atk_uid, atk_foe)
 		rec["type"] = "attack"
 		return rec
@@ -362,6 +429,17 @@ func bot_action(team: String) -> Dictionary:
 			var uid := _best_bench(team)
 			deploy(uid, node)
 			return {"type": "deploy", "uid": uid, "node": node}
+
+	# 4.5) CONTROL THE BUFF NODE — grab an uncontested centre node if safe.
+	if not controls_buff(team):
+		for uid in my:
+			if not can_move(uid):
+				continue
+			for b in map.buffs:
+				if _node_occupant(b) == -1 and not _all_neighbours_held(b, opp) and reachable_for(uid).has(b):
+					var p := _bot_path(uid, b)
+					move_unit(uid, b)
+					return {"type": "move", "uid": uid, "node": b, "path": p}
 
 	# 5) ADVANCE — the move that progresses most toward the goal, avoiding surrounds.
 	var mv_uid := -1

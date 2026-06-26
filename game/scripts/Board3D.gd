@@ -42,6 +42,8 @@ var _over := false
 var _status: Label
 var _end_btn: Button
 var _bench_box: HBoxContainer
+var _energy_label: Label
+var _mods_box: HBoxContainer
 
 func _ready() -> void:
 	# Force PORTRAIT at runtime (reliable on Android regardless of the manifest).
@@ -225,6 +227,27 @@ func _build_ui() -> void:
 	_bench_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	bench_panel.add_child(_bench_box)
 
+	# Energy readout (top-left) + equipped modifier cards (row above End Turn).
+	_energy_label = Label.new()
+	_energy_label.add_theme_font_size_override("font_size", 22)
+	_energy_label.modulate = Color(1.0, 0.85, 0.35)
+	_energy_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_energy_label.offset_left = 12
+	_energy_label.offset_top = 50
+	layer.add_child(_energy_label)
+
+	var mods_panel := PanelContainer.new()
+	mods_panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	mods_panel.offset_top = -162
+	mods_panel.offset_bottom = -122
+	mods_panel.offset_left = 8
+	mods_panel.offset_right = -8
+	layer.add_child(mods_panel)
+	_mods_box = HBoxContainer.new()
+	_mods_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_mods_box.add_theme_constant_override("separation", 8)
+	mods_panel.add_child(_mods_box)
+
 func _refresh_bench_ui() -> void:
 	for c in _bench_box.get_children():
 		c.queue_free()
@@ -258,6 +281,35 @@ func _update_status() -> void:
 	else:
 		_status.text = "Tu turno — toca una figura, o despliega desde la banca."
 	_refresh_status_labels()
+	_refresh_energy_mods()
+
+func _refresh_energy_mods() -> void:
+	if _energy_label != null:
+		_energy_label.text = "⚡ %d/%d" % [int(_gs.energy["player"]), GameState.ENERGY_MAX]
+		if _gs.controls_buff("player"):
+			_energy_label.text += "  (buff +1)"
+	if _mods_box == null:
+		return
+	for c in _mods_box.get_children():
+		c.queue_free()
+	var can_play := not _busy and not _over and _gs.turn_team == "player"
+	for mid in Loadout.player_modifiers:
+		if not GameState.MODIFIERS.has(mid):
+			continue
+		var m: Dictionary = GameState.MODIFIERS[mid]
+		var b := Button.new()
+		b.text = "%s (%d⚡)" % [m["name"], int(m["cost"])]
+		b.tooltip_text = String(m["desc"])
+		b.disabled = not (can_play and _gs.can_use_modifier("player", mid))
+		b.pressed.connect(_on_modifier.bind(mid))
+		_mods_box.add_child(b)
+
+func _on_modifier(mid: String) -> void:
+	if _busy or _over or _gs.turn_team != "player":
+		return
+	if _gs.activate_modifier("player", mid):
+		_status.text = "Modificador activado: " + String(GameState.MODIFIERS[mid]["name"])
+		_update_status()
 
 # ---------------------------------------------------------------- input
 func _unhandled_input(event: InputEvent) -> void:
