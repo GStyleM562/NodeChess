@@ -256,7 +256,105 @@ func end_turn() -> void:
 		winner = "enemy" if turn_team == "player" else "player"
 
 # --- simple bot ------------------------------------------------------------
+# --- bot ------------------------------------------------------------------
+## 0 = random/easy, 1 = medium (no surround setups), 2 = hard (default).
+var bot_difficulty := 2
+
 func bot_action(team: String) -> Dictionary:
+	if bot_difficulty <= 0:
+		return _bot_easy(team)
+	var my := units_on_board(team)
+	var target_goal: int = map.goal_player if team == "enemy" else map.goal_enemy
+	var own_goal: int = map.goal_enemy if team == "enemy" else map.goal_player
+	var opp := _enemy_team(team)
+	var md := maxf(1.0, _dist(map.goal_player, map.goal_enemy))
+
+	# 1) WIN NOW — step onto the target goal if reachable.
+	for uid in my:
+		if can_move(uid):
+			var reach := reachable_for(uid)
+			if reach.has(target_goal):
+				var p := _bot_path(uid, target_goal)
+				move_unit(uid, target_goal)
+				return {"type": "move", "uid": uid, "node": target_goal, "path": p}
+
+	# 2) BEST ATTACK — by real win/KO probability, weighted by enemy threat.
+	var atk_uid := -1
+	var atk_foe := -1
+	var best := -INF
+	for uid in my:
+		if not can_attack(uid):
+			continue
+		var mine := _pool_of(uid)
+		for foe in adjacent_enemies(uid):
+			var wp := _win_prob(mine, _pool_of(foe))
+			var kp := _ko_prob(mine, _pool_of(foe))
+			var threat := 1.0 - clampf(_dist(units[foe]["node"], own_goal) / md, 0.0, 1.0)
+			var score := wp * 0.7 + kp * 0.6 + threat * 0.5
+			if (wp >= 0.45 or threat > 0.7) and score > best:
+				best = score
+				atk_uid = uid
+				atk_foe = foe
+	if atk_uid != -1:
+		var rec := attack(atk_uid, atk_foe)
+		rec["type"] = "attack"
+		return rec
+
+	# 3) SURROUND SETUP — move beside an enemy so it ends fully surrounded by us.
+	if bot_difficulty >= 2:
+		for uid in my:
+			if not can_move(uid):
+				continue
+			for nid in reachable_for(uid).keys():
+				if _all_neighbours_held(nid, opp):
+					continue                                   # don't walk into a surround
+				for nb in map.adj[nid]:
+					var occ := _node_occupant(nb)
+					if occ != -1 and units[occ]["team"] == opp and units[occ]["alive"]:
+						if _all_neighbours_held(units[occ]["node"], team, nid):
+							var p := _bot_path(uid, nid)
+							move_unit(uid, nid)
+							return {"type": "move", "uid": uid, "node": nid, "path": p}
+
+	# 4) DEPLOY — strongest bench figure to the entrance nearest the target goal.
+	if can_deploy(team) and my.size() < 4:
+		var fe := free_entrances(team)
+		if not fe.is_empty():
+			var node: int = fe[0]
+			var bd := INF
+			for n in fe:
+				var dd := _dist(n, target_goal)
+				if dd < bd:
+					bd = dd
+					node = n
+			var uid := _best_bench(team)
+			deploy(uid, node)
+			return {"type": "deploy", "uid": uid, "node": node}
+
+	# 5) ADVANCE — the move that progresses most toward the goal, avoiding surrounds.
+	var mv_uid := -1
+	var mv_node := -1
+	var best_impr := 0.01
+	for uid in my:
+		if not can_move(uid):
+			continue
+		var cur := _dist(units[uid]["node"], target_goal)
+		for nid in reachable_for(uid).keys():
+			if _all_neighbours_held(nid, opp):
+				continue
+			var impr := cur - _dist(nid, target_goal)
+			if impr > best_impr:
+				best_impr = impr
+				mv_uid = uid
+				mv_node = nid
+	if mv_uid != -1:
+		var p := _bot_path(mv_uid, mv_node)
+		move_unit(mv_uid, mv_node)
+		return {"type": "move", "uid": mv_uid, "node": mv_node, "path": p}
+
+	return {"type": "pass"}
+
+func _bot_easy(team: String) -> Dictionary:
 	if can_deploy(team) and units_on_board(team).size() < 3:
 		var uid: int = bench[team][0]
 		var node: int = free_entrances(team)[0]
@@ -269,25 +367,99 @@ func bot_action(team: String) -> Dictionary:
 				var rec := attack(uid, foes[0])
 				rec["type"] = "attack"
 				return rec
-	var goal_node: int = map.goal_enemy if team == "player" else map.goal_player
-	var gp := map.pos_of(goal_node)
-	for uid in units_on_board(team):
-		var reach := reachable_for(uid)
-		if reach.is_empty():
-			continue
-		var best := -1
-		var best_d := INF
-		for nid in reach.keys():
-			var dd := map.pos_of(nid).distance_to(gp)
-			if dd < best_d:
-				best_d = dd
-				best = nid
-		if best != -1:
-			var blocked := {}
-			for n in board.keys():
-				if n != units[uid]["node"]:
-					blocked[n] = true
-			var p := map.path_to(units[uid]["node"], best, blocked)
-			move_unit(uid, best)
-			return {"type": "move", "uid": uid, "node": best, "path": p}
 	return {"type": "pass"}
+
+func _pool_of(uid: int) -> Array:
+	return Roster.FIGURES[units[uid]["rindex"]]["attack"]
+
+func _enemy_team(team: String) -> String:
+	return "enemy" if team == "player" else "player"
+
+func _dist(n1: int, n2: int) -> float:
+	return map.pos_of(n1).distance_to(map.pos_of(n2))
+
+func _node_occupant(node: int) -> int:
+	return int(board.get(node, -1))
+
+func _bot_path(uid: int, node: int) -> Array:
+	var blocked := {}
+	for n in board.keys():
+		if n != units[uid]["node"]:
+			blocked[n] = true
+	return map.path_to(units[uid]["node"], node, blocked)
+
+## P(attacker's pool beats defender's pool), exact over all weighted segment pairs.
+func _win_prob(a: Array, b: Array) -> float:
+	var ta := _wsum(a)
+	var tb := _wsum(b)
+	if ta <= 0.0 or tb <= 0.0:
+		return 0.0
+	var wins := 0.0
+	for sa in a:
+		for sb in b:
+			if Combat.resolve(sa, sb) > 0:
+				wins += float(sa.get("w", 1.0)) * float(sb.get("w", 1.0))
+	return wins / (ta * tb)
+
+## P(attacker wins AND it is a KO, i.e. a White/Gold damage win).
+func _ko_prob(a: Array, b: Array) -> float:
+	var ta := _wsum(a)
+	var tb := _wsum(b)
+	if ta <= 0.0 or tb <= 0.0:
+		return 0.0
+	var k := 0.0
+	for sa in a:
+		var col := String(sa.get("col", ""))
+		if col != "white" and col != "gold":
+			continue
+		for sb in b:
+			if Combat.resolve(sa, sb) > 0:
+				k += float(sa.get("w", 1.0)) * float(sb.get("w", 1.0))
+	return k / (ta * tb)
+
+func _wsum(pool: Array) -> float:
+	var t := 0.0
+	for s in pool:
+		t += float(s.get("w", 1.0))
+	return t
+
+## True if every neighbour of `node` is held by a live `by_team` unit (so an enemy
+## standing on `node` is surrounded). `extra` counts as also held by `by_team`.
+func _all_neighbours_held(node: int, by_team: String, extra: int = -1) -> bool:
+	var nbs: Array = map.adj[node]
+	if nbs.is_empty():
+		return false
+	for nb in nbs:
+		if nb == extra:
+			continue
+		var occ := _node_occupant(nb)
+		if occ == -1 or units[occ]["team"] != by_team or not units[occ]["alive"]:
+			return false
+	return true
+
+func _best_bench(team: String) -> int:
+	var best: int = bench[team][0]
+	var bs := -INF
+	for uid in bench[team]:
+		var s := _self_strength(units[uid]["rindex"])
+		if s > bs:
+			bs = s
+			best = uid
+	return best
+
+## Rough offensive value of a figure's pool (for picking what to deploy).
+func _self_strength(rindex: int) -> float:
+	var pool: Array = Roster.FIGURES[rindex]["attack"]
+	var t := 0.0
+	var sc := 0.0
+	for s in pool:
+		var w := float(s.get("w", 1.0))
+		t += w
+		var col := String(s.get("col", ""))
+		if col == "white" or col == "gold":
+			sc += w * float(s.get("pow", 0))
+		elif col == "purple":
+			sc += w * (25.0 + 15.0 * float(s.get("stars", 1)))
+		elif col == "blue":
+			sc += w * 20.0
+	return sc / t if t > 0.0 else 0.0
