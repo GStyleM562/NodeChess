@@ -586,9 +586,11 @@ func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 	await get_tree().create_timer(0.45).timeout
 	var msg := _combat_msg(a_name, b_name, rec)
 	# 1) the wheel (announce + spin + result)
+	var data_a: Dictionary = Roster.FIGURES[_gs.units[att_uid]["rindex"]]
+	var data_b: Dictionary = Roster.FIGURES[_gs.units[def_uid]["rindex"]]
 	await _overlay.play(a_name, b_name, rec["seg_a"], rec["seg_b"], msg[0], msg[1],
-		Roster.FIGURES[_gs.units[att_uid]["rindex"]]["attack"],
-		Roster.FIGURES[_gs.units[def_uid]["rindex"]]["attack"], a_col, b_col)
+		data_a["attack"], data_b["attack"], a_col, b_col,
+		String(data_a.get("type", "Ruleta")), String(data_b.get("type", "Ruleta")))
 	# 2) the close-up action shot
 	await _combat_cutaway(att_uid, def_uid, rec)
 	# 2.5) displacement (push / pull / swap), if any
