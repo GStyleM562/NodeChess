@@ -181,19 +181,49 @@ func attack(att_uid: int, def_uid: int) -> Dictionary:
 		var winner_uid: int = att_uid if int(oc["result"]) > 0 else def_uid
 		var loser_uid: int = def_uid if int(oc["result"]) > 0 else att_uid
 		var ws: Dictionary = oc["win_seg"]
+		var wcol := String(ws.get("col", ""))
 		var fx := String(ws.get("fx", ""))
 		if FX_STATUS.has(fx):
 			apply_status(loser_uid, FX_STATUS[fx], STATUS_DUR)
 			applied = {"status": FX_STATUS[fx], "target": loser_uid, "fx": fx}
+		# PASSIVE — Venom Hex: a Purple win also Weakens the loser.
+		if wcol == "purple" and has_passive(winner_uid, "venom_hex"):
+			apply_status(loser_uid, "weakened", STATUS_DUR)
+			if applied.is_empty():
+				applied = {"status": "weakened", "target": loser_uid, "fx": "Venom Hex"}
 		if ws.has("disp"):
 			disp = _apply_displacement(winner_uid, loser_uid, ws)
+		# PASSIVE — Counter-Stone: a defending Blue win Pushes the attacker 1.
+		if wcol == "blue" and winner_uid == def_uid and has_passive(def_uid, "counter_stone"):
+			disp = _apply_displacement(def_uid, att_uid, {"disp": "push", "n": 1})
+	else:
+		# PASSIVE — Hold the Line: a tie while defending Immobilizes the attacker.
+		if has_passive(def_uid, "hold_the_line"):
+			apply_status(att_uid, "immobilized", STATUS_DUR)
+			applied = {"status": "immobilized", "target": att_uid, "fx": "Hold the Line"}
 	return {
 		"att": att_uid, "def": def_uid, "seg_a": seg_a, "seg_b": seg_b,
 		"result": int(oc["result"]), "win_col": oc["win_col"], "effect": oc["effect"],
 		"ko": ko_uid, "status": applied, "disp": disp,
 	}
 
+# --- passives --------------------------------------------------------------
+func has_passive(uid: int, pid: String) -> bool:
+	return pid in Roster.FIGURES[units[uid]["rindex"]].get("passives", [])
+
+## Bedrock (self) or a neighbouring ally's Bulwark aura -> immune to push/pull/swap.
+func _displacement_immune(uid: int) -> bool:
+	if has_passive(uid, "bedrock"):
+		return true
+	for nb in map.adj[units[uid]["node"]]:
+		var occ := int(board.get(nb, -1))
+		if occ != -1 and units[occ]["alive"] and units[occ]["team"] == units[uid]["team"] and has_passive(occ, "bulwark"):
+			return true
+	return false
+
 func _apply_displacement(winner_uid: int, loser_uid: int, seg: Dictionary) -> Dictionary:
+	if _displacement_immune(loser_uid):
+		return {"type": "immune", "uid": loser_uid}
 	var w: Dictionary = units[winner_uid]
 	var l: Dictionary = units[loser_uid]
 	var typ := String(seg.get("disp", ""))
@@ -210,6 +240,8 @@ func _apply_displacement(winner_uid: int, loser_uid: int, seg: Dictionary) -> Di
 	# push / pull along the graph, guided by node positions
 	var win_pos := map.pos_of(w["node"])
 	var steps := int(seg.get("n", 1))
+	if has_passive(winner_uid, "arcane_pull"):   # PASSIVE — Arcane Pull: +1 distance
+		steps += 1
 	var cur: int = l["node"]
 	for i in steps:
 		var cur_pos := map.pos_of(cur)

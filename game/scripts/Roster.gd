@@ -8,6 +8,7 @@ class_name Roster
 const FIGURES := [
 	{
 		"id": "stone_golem", "name": "Stone Golem", "stamina": 1, "type": "Ruleta",
+		"passives": ["bedrock", "counter_stone"],
 		"glb": "res://assets/figures/stone_golem/stone_golem.glb",
 		"size": 1.30, "complete": true,
 		"clips": {
@@ -23,6 +24,7 @@ const FIGURES := [
 	},
 	{
 		"id": "ironclad_knight", "name": "Ironclad Knight", "stamina": 2, "type": "Dado (D6)",
+		"passives": ["hold_the_line", "bulwark"],
 		"glb": "res://assets/figures/ironclad_knight/ironclad_knight.glb",
 		"size": 1.00, "complete": true,
 		"clips": {
@@ -52,6 +54,7 @@ const FIGURES := [
 	},
 	{
 		"id": "rift_mage", "name": "Rift Mage", "stamina": 2, "type": "Suma 2d6",
+		"passives": ["arcane_pull"],
 		"glb": "res://assets/figures/rift_mage/rift_mage.glb",
 		"size": 0.95, "complete": true,
 		"clips": {
@@ -70,6 +73,7 @@ const FIGURES := [
 	},
 	{
 		"id": "venom_witch", "name": "Venom Witch", "stamina": 2, "type": "Ruleta",
+		"passives": ["venom_hex"],
 		"glb": "res://assets/figures/venom_witch/witch/witch.glb",
 		"size": 1.00, "complete": true,
 		"clips": {
