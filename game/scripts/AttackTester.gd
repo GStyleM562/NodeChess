@@ -114,7 +114,7 @@ func _on_launch() -> void:
 	var d: Dictionary = Roster.FIGURES[_index]
 	var idx := _roll_index(d["attack"])
 	var result: Dictionary = d["attack"][idx]
-	await _presenter.present(String(d.get("type", "")), d["attack"], result, idx)
+	await _presenter.present(String(d.get("type", "")), d["attack"], result, idx, d)
 	var extra := "   [" + String(result["fx"]) + "]" if result.has("fx") else ""
 	_result_label.text = "Resultado: " + Combat.label(result) + extra
 	_result_label.modulate = Combat.color_of(result).lightened(0.2)

@@ -22,7 +22,7 @@ const FACE_FRONT := [
 	Vector3(0, PI / 2, 0), Vector3(PI / 2, 0, 0), Vector3(-PI / 2, 0, 0),
 ]
 
-func present(type: String, pool: Array, result: Dictionary, idx: int = -1) -> void:
+func present(type: String, pool: Array, result: Dictionary, idx: int = -1, opts: Dictionary = {}) -> void:
 	clear()
 	if idx < 0:
 		idx = maxi(0, pool.find(result))
@@ -33,6 +33,8 @@ func present(type: String, pool: Array, result: Dictionary, idx: int = -1) -> vo
 			await _die(pool, idx)
 		"Suma 2d6":
 			await _dice2(pool, idx)
+		"Doble Moneda":
+			await _double_coin(pool, result, opts)
 		_:
 			await _reel(pool, result)
 
@@ -84,33 +86,103 @@ func _set_shape(p: Panel, seg: Dictionary, circle: bool) -> void:
 		(lbl as Label).text = Combat.label(seg)
 		(lbl as Label).modulate = col.lightened(0.45)
 
-# --------------------------------------------------------------- coin (toss)
+# --------------------------------------------------------------- 3D coin (toss)
+## A coin with VOLUME (like the 3D die): a gold disc that tosses, flips showing its
+## two faces (each an attack), and lands on the result.
 func _coin(pool: Array, result: Dictionary) -> void:
 	var faces := _two_faces(pool)
-	var coin := _mk_shape(faces[0], 170, true)
-	add_child(coin)
-	await get_tree().process_frame
-	coin.pivot_offset = coin.size * 0.5
-	var base := size * 0.5 - coin.size * 0.5
-	coin.position = base
-	var arc := 175.0
-	var n := 12
-	for i in n:
-		var phase := float(i + 1) / float(n)
-		var y := base.y - arc * sin(PI * phase)
-		var face: Dictionary = result if i == n - 1 else faces[i % 2]
-		var t1 := create_tween().set_parallel(true)
-		t1.tween_property(coin, "scale:y", 0.07, 0.06)
-		t1.tween_property(coin, "position:y", (coin.position.y + y) * 0.5, 0.06)
-		await t1.finished
-		_set_shape(coin, face, true)
-		var t2 := create_tween().set_parallel(true)
-		t2.tween_property(coin, "scale:y", 1.0, 0.06)
-		t2.tween_property(coin, "position:y", y, 0.06)
-		await t2.finished
-	var land := create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BOUNCE)
-	land.tween_property(coin, "position:y", base.y, 0.3)
-	await land.finished
+	var back: Dictionary = faces[1] if faces[0] == result else faces[0]
+	var vp := _new_die_viewport(Vector2i(340, 340), 5.5, 32.0)
+	var coin := _add_coin(vp["sv"], result, back, Vector3.ZERO, 1.9)
+	await _center(vp["container"], Vector2(340, 340))
+	await _toss_tween(coin, 1.5).finished
+
+## Two coins (Coin Trickster, "Doble Moneda"). Each lands on the face that produced
+## the combined result (result.ai / result.bi index into the figure's coin_a/coin_b).
+func _double_coin(pool: Array, result: Dictionary, opts: Dictionary) -> void:
+	var ca: Array = opts.get("coin_a", [])
+	var cb: Array = opts.get("coin_b", [])
+	if ca.size() < 2 or cb.size() < 2:
+		await _coin(pool, result)
+		return
+	var ai := int(result.get("ai", 0))
+	var bi := int(result.get("bi", 0))
+	var vp := _new_die_viewport(Vector2i(470, 300), 5.6, 38.0)
+	var a := _add_coin(vp["sv"], ca[ai], ca[1 - ai], Vector3(-1.35, 0, 0), 1.55)
+	var b := _add_coin(vp["sv"], cb[bi], cb[1 - bi], Vector3(1.35, 0, 0), 1.55)
+	await _center(vp["container"], Vector2(470, 300))
+	var t1 := _toss_tween(a, 1.45)
+	var t2 := _toss_tween(b, 1.7)
+	await t1.finished
+	await t2.finished
+
+func _add_coin(sv: SubViewport, front: Dictionary, back: Dictionary, pos: Vector3, diameter: float) -> Node3D:
+	var coin := Node3D.new()
+	coin.position = pos
+	sv.add_child(coin)
+	var r := diameter * 0.5
+	var body := MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = r
+	cyl.bottom_radius = r
+	cyl.height = r * 0.22
+	cyl.radial_segments = 32
+	body.mesh = cyl
+	body.rotation = Vector3(PI / 2, 0, 0)               # lay the disc flat toward the camera
+	var bmat := StandardMaterial3D.new()
+	bmat.albedo_color = Color(0.86, 0.72, 0.32)
+	bmat.metallic = 0.7
+	bmat.roughness = 0.35
+	body.material_override = bmat
+	coin.add_child(body)
+	_coin_face(coin, front, Vector3(0, 0, 1), r)
+	_coin_face(coin, back, Vector3(0, 0, -1), r)
+	return coin
+
+func _coin_face(coin: Node3D, seg: Dictionary, dir: Vector3, r: float) -> void:
+	var col := Combat.color_of(seg)
+	var disc := MeshInstance3D.new()
+	var dm := CylinderMesh.new()
+	dm.top_radius = r * 0.9
+	dm.bottom_radius = r * 0.9
+	dm.height = 0.02
+	dm.radial_segments = 32
+	disc.mesh = dm
+	disc.rotation = Vector3(PI / 2, 0, 0)
+	disc.position = dir * (r * 0.12)
+	var dmat := StandardMaterial3D.new()
+	dmat.albedo_color = col.darkened(0.15)
+	dmat.metallic = 0.25
+	dmat.roughness = 0.55
+	disc.material_override = dmat
+	coin.add_child(disc)
+	var lbl := Label3D.new()
+	lbl.text = Combat.label(seg)
+	lbl.modulate = col.lightened(0.55)
+	lbl.outline_size = 12
+	lbl.outline_modulate = Color(0, 0, 0, 0.75)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.font_size = 64
+	lbl.pixel_size = 0.005
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	lbl.width = (r * 1.6) / 0.005
+	lbl.position = dir * (r * 0.13 + 0.01)
+	if dir.z < 0.0:
+		lbl.rotation = Vector3(0, PI, 0)
+	coin.add_child(lbl)
+
+## Returns the flip Tween; runs a vertical toss arc in parallel; lands front-up.
+func _toss_tween(coin: Node3D, dur: float) -> Tween:
+	coin.rotation.x = PI                                # start showing the back
+	var spin := create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	spin.tween_property(coin, "rotation:x", TAU * 4.0, dur)
+	spin.finished.connect(func(): coin.rotation.x = 0.0)
+	var base_y := coin.position.y
+	var arc := create_tween()
+	arc.tween_property(coin, "position:y", base_y + 0.5, dur * 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	arc.tween_property(coin, "position:y", base_y, dur * 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	return spin
 
 func _two_faces(pool: Array) -> Array:
 	var s := pool.duplicate()

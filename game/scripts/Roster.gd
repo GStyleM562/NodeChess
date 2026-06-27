@@ -17,8 +17,14 @@ const PASSIVES := {
 	"blink": {"name": "Blink", "desc": "Parpadeo: atraviesa a 1 enemigo al saltar (un solo salto; gasta el turno, sin encadenar)."},
 	"lunge": {"name": "Lunge", "desc": "Si te moviste 2+ nodos antes de atacar, repites un Fallo."},
 	"bloodthirst": {"name": "Bloodthirst", "desc": "Al noquear a un enemigo, te mueves 1 nodo gratis."},
-	"aerial": {"name": "Aerial", "desc": "Vuelo: ignora el terreno (cosmético por ahora)."},
+	"aerial": {"name": "Aerial", "desc": "Vuelo: atraviesa figuras al moverse (no da inmunidad a KO por rodear)."},
 	"dive": {"name": "Dive", "desc": "Tras volar 3+ nodos, tu Empuje 1 se vuelve Empuje 2."},
+	# --- hidden passives (unlocked on Rank Up) ---
+	"venom_aura": {"name": "Venom Aura (oculta)", "desc": "Aura: los enemigos adyacentes tienen −1 stamina."},
+	"burning_aura": {"name": "Burning Aura (oculta)", "desc": "Aura: al inicio de tu turno, los enemigos adyacentes quedan Debilitados."},
+	"kindling_resolve": {"name": "Kindling Resolve", "desc": "Al subir de rango: limpia tus debuffs (el Rank Up ya lo hace)."},
+	"phase": {"name": "Phase", "desc": "Phase: atraviesa figuras al moverse (como Aerial)."},
+	"loaded_dice": {"name": "Loaded Dice", "desc": "Una vez por partida: repite una de sus monedas (pendiente de UI)."},
 }
 
 const FIGURES := [
@@ -103,6 +109,21 @@ const FIGURES := [
 			{"col": "blue", "name": "Hex Ward", "w": 15}, {"col": "white", "name": "Venom Bolt", "pow": 40, "w": 20},
 			{"col": "red", "w": 25},
 		],
+		# Rank Up (on KO): Venom Witch -> Plague Matron. Stronger plague, unlocks Venom Aura.
+		# Future model: res://assets/figures/venom_witch/matron/matron.glb (folder ready).
+		"ranks": [
+			{
+				"name": "Plague Matron", "type": "Ruleta", "stamina": 2,
+				"passives": ["venom_hex", "hexstep", "venom_aura"],
+				"hidden": ["venom_aura"],
+				"attack": [
+					{"col": "purple", "name": "Fear Hex", "stars": 1, "fx": "Miedo", "w": 18},
+					{"col": "purple", "name": "Plague Cloud", "stars": 2, "fx": "Debilitado", "w": 27},
+					{"col": "blue", "name": "Hex Ward", "w": 15}, {"col": "white", "name": "Venom Bolt", "pow": 55, "w": 20},
+					{"col": "red", "w": 20},
+				],
+			},
+		],
 	},
 	{
 		"id": "storm_valkyrie", "name": "Storm Valkyrie", "stamina": 4, "type": "Ruleta", # anim incomplete (1 clip)
@@ -116,6 +137,66 @@ const FIGURES := [
 			{"col": "white", "name": "Spear Thrust", "pow": 50, "w": 30}, {"col": "gold", "name": "Wing Buffet", "pow": 30, "w": 20},
 			{"col": "purple", "name": "Gale Cry", "stars": 1, "fx": "Empuje", "disp": "push", "n": 1, "w": 15}, {"col": "blue", "name": "Storm Guard", "w": 10},
 			{"col": "red", "w": 25},
+		],
+	},
+	{
+		# PLACEHOLDER MODEL (reuses Ironclad's GLB). Real model later in
+		# res://assets/figures/emberborn/{squire,champion,warlord}/ (folders ready).
+		"id": "emberborn", "name": "Emberborn", "stamina": 3, "type": "Dado (D6)",
+		"passives": ["kindling_resolve"], "placeholder": true,
+		"glb": "res://assets/figures/ironclad_knight/ironclad_knight.glb",
+		"size": 1.00, "complete": true,
+		"clips": {
+			"idle": "Idle_5", "move_walk": "Walking", "move_run": "Running",
+			"attack": "Attack", "attack_heavy": "Axe_Spin_Attack",
+			"defend": "Shield_Push_Left", "hit": "Hit_Reaction_1", "ko": "Dead",
+		},
+		"attack": [
+			{"col": "white", "name": "Ember Jab", "pow": 40, "w": 1}, {"col": "white", "name": "Flame Slash", "pow": 60, "w": 1},
+			{"col": "red", "w": 1}, {"col": "purple", "name": "Cinder Burst", "stars": 1, "w": 1},
+			{"col": "gold", "name": "Blaze Kick", "pow": 30, "w": 1}, {"col": "white", "name": "Fire Slash", "pow": 80, "w": 1},
+		],
+		"ranks": [
+			{
+				"name": "Flame Champion", "type": "Dado (D6)", "stamina": 2,
+				"passives": ["kindling_resolve"],
+				"attack": [
+					{"col": "white", "name": "Flame Slash", "pow": 60, "w": 1}, {"col": "white", "name": "Fire Slash", "pow": 80, "w": 1},
+					{"col": "purple", "name": "Cinder Burst", "stars": 1, "w": 1}, {"col": "gold", "name": "Inferno Strike", "pow": 40, "w": 1},
+					{"col": "white", "name": "Searing Blow", "pow": 100, "w": 1}, {"col": "white", "name": "Blazing Arc", "pow": 90, "w": 1},
+				],
+			},
+			{
+				"name": "Infernal Warlord", "type": "Dado (D6)", "stamina": 2,
+				"passives": ["kindling_resolve", "burning_aura"], "hidden": ["burning_aura"],
+				"attack": [
+					{"col": "white", "name": "Fire Slash", "pow": 80, "w": 1}, {"col": "gold", "name": "Hellfire Smash", "pow": 50, "w": 1},
+					{"col": "purple", "name": "Molten Curse", "stars": 2, "fx": "Debilitado", "w": 1}, {"col": "white", "name": "Searing Blow", "pow": 100, "w": 1},
+					{"col": "gold", "name": "Cataclysm", "pow": 60, "w": 1}, {"col": "white", "name": "Apocalypse Edge", "pow": 120, "w": 1},
+				],
+			},
+		],
+	},
+	{
+		# PLACEHOLDER MODEL (reuses Nightblade's GLB). Real model later in
+		# res://assets/figures/coin_trickster/ (folder ready).
+		"id": "coin_trickster", "name": "Coin Trickster", "stamina": 3, "type": "Doble Moneda",
+		"passives": ["loaded_dice"], "placeholder": true,
+		"glb": "res://assets/figures/nightblade/nightblade.glb",
+		"size": 0.95, "complete": true,
+		"clips": {
+			"idle": "Idle_10", "move_walk": "Walking", "move_run": "Running",
+			"attack": "Double_Combo_Attack", "attack_heavy": "Triple_Combo_Attack",
+			"defend": "Block8", "hit": "Hit_Reaction_1", "ko": "Fall_Dead_from_Abdominal_Injury",
+		},
+		# Double Coin: two coins (A/B), each with two faces; the combo picks the result.
+		"coin_a": [{"col": "white", "name": "Filo", "pow": 60}, {"col": "purple", "name": "Sombra", "stars": 1}],
+		"coin_b": [{"col": "gold", "name": "Doblón", "pow": 40}, {"col": "blue", "name": "Guarda"}],
+		"attack": [
+			{"col": "white", "name": "Jackpot Strike", "pow": 100, "w": 1, "ai": 0, "bi": 0},
+			{"col": "blue", "name": "Lucky Guard", "w": 1, "ai": 0, "bi": 1},
+			{"col": "gold", "name": "Golden Flick", "pow": 50, "w": 1, "ai": 1, "bi": 0},
+			{"col": "purple", "name": "Wild Card", "stars": 2, "w": 1, "ai": 1, "bi": 1},
 		],
 	},
 ]

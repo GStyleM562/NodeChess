@@ -47,7 +47,7 @@ func add_to_bench(team: String, rindex: int) -> int:
 	units[uid] = {
 		"uid": uid, "rindex": rindex, "team": team, "node": -1,
 		"stamina": int(Roster.FIGURES[rindex].get("stamina", 2)), "alive": true,
-		"statuses": {},
+		"statuses": {}, "rank": 0,
 	}
 	bench[team].append(uid)
 	return uid
@@ -100,7 +100,7 @@ func can_act(team: String) -> bool:
 	return units_on_board(team).size() > 0 or can_deploy(team)
 
 func reachable_for(uid: int) -> Dictionary:
-	return move_targets(uid, int(units[uid]["stamina"]))
+	return move_targets(uid, effective_stamina(uid))
 
 ## All nodes this unit can reach with `budget` stamina (node -> cost). Includes
 ## JUMPS: with >= 2 stamina, a unit standing next to an enemy may hop OVER it,
@@ -213,7 +213,7 @@ func move_unit(uid: int, node: int) -> void:
 	_check_goal(u)
 
 func _roll_for(uid: int, is_attacker := false) -> Dictionary:
-	var pool: Array = Roster.FIGURES[units[uid]["rindex"]]["attack"]
+	var pool: Array = pool_for(uid)
 	var s: Dictionary = Combat.roll(pool).duplicate(true)
 	if has_status(uid, "weakened"):
 		if s.has("pow"):
@@ -252,9 +252,13 @@ func attack(att_uid: int, def_uid: int, att_moved: int = 0) -> Dictionary:
 	var ko_uid := -1
 	var applied := {}
 	var disp := {}
+	var ranked := -1
 	if oc["ko"]:
 		ko_uid = def_uid if int(oc["result"]) > 0 else att_uid
 		_ko(ko_uid)
+		var winner_k: int = att_uid if int(oc["result"]) > 0 else def_uid
+		if _try_rank_up(winner_k):      # RANK UP: scoring a KO evolves the figure
+			ranked = winner_k
 	elif int(oc["result"]) != 0:
 		var winner_uid: int = att_uid if int(oc["result"]) > 0 else def_uid
 		var loser_uid: int = def_uid if int(oc["result"]) > 0 else att_uid
@@ -285,12 +289,65 @@ func attack(att_uid: int, def_uid: int, att_moved: int = 0) -> Dictionary:
 	return {
 		"att": att_uid, "def": def_uid, "seg_a": seg_a, "seg_b": seg_b,
 		"result": int(oc["result"]), "win_col": oc["win_col"], "effect": oc["effect"],
-		"ko": ko_uid, "status": applied, "disp": disp,
+		"ko": ko_uid, "status": applied, "disp": disp, "rankup": ranked,
 	}
+
+# --- rank up / evolution ---------------------------------------------------
+## Effective figure data at the unit's current rank (base, or a "ranks" override).
+func rank_data(uid: int) -> Dictionary:
+	var base: Dictionary = Roster.FIGURES[units[uid]["rindex"]]
+	var r := int(units[uid].get("rank", 0))
+	var ranks: Array = base.get("ranks", [])
+	if r >= 1 and r - 1 < ranks.size():
+		var st: Dictionary = ranks[r - 1]
+		return {
+			"name": st.get("name", base["name"]), "attack": st.get("attack", base["attack"]),
+			"type": st.get("type", base.get("type", "Ruleta")),
+			"stamina": st.get("stamina", base.get("stamina", 2)),
+			"passives": st.get("passives", base.get("passives", [])),
+		}
+	return {
+		"name": base["name"], "attack": base["attack"], "type": base.get("type", "Ruleta"),
+		"stamina": base.get("stamina", 2), "passives": base.get("passives", []),
+	}
+
+func pool_for(uid: int) -> Array:
+	return rank_data(uid)["attack"]
+
+func type_for(uid: int) -> String:
+	return String(rank_data(uid)["type"])
+
+func name_for(uid: int) -> String:
+	var r := int(units[uid].get("rank", 0))
+	return String(rank_data(uid)["name"]) + ("  +%d" % r if r > 0 else "")
+
+## On a KO, the figure that scored it gains a rank (if it has a next stage). Rank
+## Up swaps its attack pool/type/stamina/passives and removes status effects.
+func _try_rank_up(uid: int) -> bool:
+	if not units[uid]["alive"]:
+		return false
+	var ranks: Array = Roster.FIGURES[units[uid]["rindex"]].get("ranks", [])
+	var r := int(units[uid].get("rank", 0))
+	if r >= ranks.size():
+		return false
+	units[uid]["rank"] = r + 1
+	units[uid]["statuses"] = {}
+	units[uid]["stamina"] = int(rank_data(uid)["stamina"])
+	return true
+
+## Movement budget after auras (Venom Aura: adjacent enemy -> -1 stamina).
+func effective_stamina(uid: int) -> int:
+	var s := int(units[uid]["stamina"])
+	for nb in map.adj[units[uid]["node"]]:
+		var occ := int(board.get(nb, -1))
+		if occ != -1 and units[occ]["alive"] and units[occ]["team"] != units[uid]["team"] and has_passive(occ, "venom_aura"):
+			s -= 1
+			break
+	return maxi(0, s)
 
 # --- passives --------------------------------------------------------------
 func has_passive(uid: int, pid: String) -> bool:
-	return pid in Roster.FIGURES[units[uid]["rindex"]].get("passives", [])
+	return pid in (rank_data(uid)["passives"] as Array)
 
 ## Bedrock (self) or a neighbouring ally's Bulwark aura -> immune to push/pull/swap.
 func _displacement_immune(uid: int) -> bool:
@@ -368,8 +425,16 @@ func end_turn() -> void:
 	_process_ko_returns()
 	turn_team = "enemy" if turn_team == "player" else "player"
 	_grant_energy(turn_team)
+	_apply_turn_start_auras(turn_team)
 	if winner == "" and not can_act(turn_team):
 		winner = "enemy" if turn_team == "player" else "player"
+
+## Burning Aura: at the start of the team's turn, its aura-bearers Weaken adjacent enemies.
+func _apply_turn_start_auras(team: String) -> void:
+	for uid in units_on_board(team):
+		if has_passive(uid, "burning_aura"):
+			for foe in adjacent_enemies(uid):
+				apply_status(foe, "weakened", STATUS_DUR)
 
 # --- energy / modifiers / buff nodes ---------------------------------------
 func _grant_energy(team: String) -> void:
@@ -530,7 +595,7 @@ func _bot_easy(team: String) -> Dictionary:
 	return {"type": "pass"}
 
 func _pool_of(uid: int) -> Array:
-	return Roster.FIGURES[units[uid]["rindex"]]["attack"]
+	return pool_for(uid)
 
 func _enemy_team(team: String) -> String:
 	return "enemy" if team == "player" else "player"

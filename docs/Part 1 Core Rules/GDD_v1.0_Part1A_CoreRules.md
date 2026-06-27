@@ -425,7 +425,7 @@ A figure may jump an enemy.
 
 Movement immediately ends.
 
-Combat may begin.
+A jump consumes ALL remaining stamina and ENDS the figure's actions: it may jump over only ONE enemy, cannot jump again, cannot keep moving, and **cannot attack** afterwards. (Final ruling — overrides any earlier "combat may begin" text.)
 
 Example
 
@@ -437,9 +437,7 @@ Destination
 
 Jump
 
-Combat
-
-End Turn
+End Turn  (no attack after a jump)
 
 ---
 

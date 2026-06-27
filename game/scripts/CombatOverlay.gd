@@ -68,7 +68,8 @@ func _mk(t: String, sz: int, col: Color) -> Label:
 func play(name_a: String, name_b: String, seg_a: Dictionary, seg_b: Dictionary,
 		msg: String, msg_col: Color, pool_a: Array, pool_b: Array,
 		col_a: Color = Color(1, 1, 1), col_b: Color = Color(1, 1, 1),
-		type_a: String = "Ruleta", type_b: String = "Ruleta") -> void:
+		type_a: String = "Ruleta", type_b: String = "Ruleta",
+		fig_a: Dictionary = {}, fig_b: Dictionary = {}) -> void:
 	_matchup.text = name_a + "   VS   " + name_b
 	_presenter.clear()
 	_roller.text = ""
@@ -82,11 +83,11 @@ func play(name_a: String, name_b: String, seg_a: Dictionary, seg_b: Dictionary,
 
 	_roller.text = "⚔  Ataca: " + name_a
 	_roller.modulate = col_a
-	await _presenter.present(type_a, pool_a, seg_a)
+	await _presenter.present(type_a, pool_a, seg_a, -1, fig_a)
 
 	_roller.text = "🛡  Defiende: " + name_b
 	_roller.modulate = col_b
-	await _presenter.present(type_b, pool_b, seg_b)
+	await _presenter.present(type_b, pool_b, seg_b, -1, fig_b)
 
 	_roller.text = ""
 	_result.text = msg

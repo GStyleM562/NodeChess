@@ -27,6 +27,7 @@ var _combat_cam: Camera3D
 var _overlay: CombatOverlay
 var _vis := {}                # uid -> Figure3D
 var _status_lbls := {}        # uid -> Label3D (status indicator over the figure)
+var _name_lbls := {}          # uid -> Label3D (figure name + rank over the figure)
 var _node_mi := {}
 var _node_mat := {}
 var _highlighted := []
@@ -161,6 +162,20 @@ func _spawn_vis(uid: int) -> void:
 	lbl.visible = false
 	fig.add_child(lbl)
 	_status_lbls[uid] = lbl
+	# Name tag above each figure (so placeholder/shared models are identifiable, and
+	# the "+N" rank shows after a Rank Up).
+	var nlbl := Label3D.new()
+	nlbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	nlbl.no_depth_test = true
+	nlbl.pixel_size = 0.0034
+	nlbl.font_size = 52
+	nlbl.outline_size = 16
+	nlbl.outline_modulate = Color(0, 0, 0, 0.9)
+	nlbl.modulate = _team_color(u["team"])
+	nlbl.position = Vector3(0, 2.55, 0)
+	nlbl.text = _gs.name_for(uid)
+	fig.add_child(nlbl)
+	_name_lbls[uid] = nlbl
 	_vis[uid] = fig
 
 func _add_team_ring(fig: Figure3D, team: String) -> void:
@@ -385,7 +400,7 @@ func _begin_deploy(uid: int) -> void:
 func _activate_unit(uid: int) -> void:
 	_deploy_uid = -1
 	_active_uid = uid
-	_remaining = int(_gs.units[uid]["stamina"])
+	_remaining = _gs.effective_stamina(uid)
 	_jumped = false
 	_refresh_active_highlights()
 	_update_status()
@@ -448,7 +463,7 @@ func _player_deploy(uid: int, node: int) -> void:
 	_gs.deploy(uid, node)
 	_spawn_vis(uid)
 	_active_uid = uid
-	_remaining = maxi(0, int(_gs.units[uid]["stamina"]) - 1)  # deploy costs 1
+	_remaining = maxi(0, _gs.effective_stamina(uid) - 1)  # deploy costs 1
 	_committed = true
 	_refresh_bench_ui()
 	await _resolve_surround()
@@ -656,8 +671,8 @@ func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 	var data_a: Dictionary = Roster.FIGURES[_gs.units[att_uid]["rindex"]]
 	var data_b: Dictionary = Roster.FIGURES[_gs.units[def_uid]["rindex"]]
 	await _overlay.play(a_name, b_name, rec["seg_a"], rec["seg_b"], msg[0], msg[1],
-		data_a["attack"], data_b["attack"], a_col, b_col,
-		String(data_a.get("type", "Ruleta")), String(data_b.get("type", "Ruleta")))
+		_gs.pool_for(att_uid), _gs.pool_for(def_uid), a_col, b_col,
+		_gs.type_for(att_uid), _gs.type_for(def_uid), data_a, data_b)
 	# 2) the close-up action shot
 	await _combat_cutaway(att_uid, def_uid, rec)
 	# 2.5) displacement (push / pull / swap), if any
@@ -670,8 +685,20 @@ func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 		_vis[ko].queue_free()
 		_vis.erase(ko)
 		_status_lbls.erase(ko)
+		_name_lbls.erase(ko)
+	# RANK UP: the figure that scored the KO evolves (update its name tag).
+	var ranked: int = int(rec.get("rankup", -1))
+	if ranked != -1:
+		_show_rankup(ranked)
 	_refresh_status_labels()
 	await _resolve_surround()
+
+func _show_rankup(uid: int) -> void:
+	if _name_lbls.has(uid) and is_instance_valid(_name_lbls[uid]):
+		_name_lbls[uid].text = _gs.name_for(uid)
+	if _vis.has(uid) and is_instance_valid(_vis[uid]):
+		(_vis[uid] as Figure3D).play_clip("attack_heavy")
+	_status.text = "¡RANK UP!  " + _gs.name_for(uid)
 
 ## KO any figures that combat/movement just surrounded (enemies on every side).
 func _resolve_surround() -> void:
@@ -687,6 +714,7 @@ func _resolve_surround() -> void:
 			_vis[uid].queue_free()
 			_vis.erase(uid)
 			_status_lbls.erase(uid)
+			_name_lbls.erase(uid)
 	_refresh_status_labels()
 
 func _animate_displacement(disp: Dictionary) -> void:
@@ -721,8 +749,7 @@ func _animate_displacement(disp: Dictionary) -> void:
 					f.play_clip("idle")
 
 func _named(uid: int) -> String:
-	var n: String = Roster.FIGURES[_gs.units[uid]["rindex"]]["name"]
-	return n + ("  (tú)" if _gs.units[uid]["team"] == "player" else "  (rival)")
+	return _gs.name_for(uid) + ("  (tú)" if _gs.units[uid]["team"] == "player" else "  (rival)")
 
 func _team_color(team: String) -> Color:
 	return Color(0.45, 0.7, 1.0) if team == "player" else Color(1.0, 0.5, 0.45)
