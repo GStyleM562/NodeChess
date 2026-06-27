@@ -473,8 +473,9 @@ func _player_move(node: int) -> void:
 	_refresh_bench_ui()
 	_update_status()
 	_gs.move_unit(_active_uid, node)
-	# PASSIVE — Blink: Rift Mage phases through an enemy for the normal cost (no penalty).
-	if is_jump and not _gs.has_passive(_active_uid, "blink"):
+	# A jump (over ONE enemy) always uses up all stamina and ends this figure's
+	# actions — you cannot jump again nor keep moving (no chaining through units).
+	if is_jump:
 		_remaining = 0
 		_jumped = true
 	else:

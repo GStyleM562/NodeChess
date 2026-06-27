@@ -14,7 +14,7 @@ const PASSIVES := {
 	"venom_hex": {"name": "Venom Hex", "desc": "Tus victorias Púrpura también aplican Debilitado."},
 	"hexstep": {"name": "Hexstep", "desc": "Al defender en empate, retrocede 1 nodo."},
 	"arcane_pull": {"name": "Arcane Pull", "desc": "+1 al alcance de tus empujes/jalones/intercambios."},
-	"blink": {"name": "Blink", "desc": "Atraviesa 1 enemigo al moverte, sin la penalización del salto."},
+	"blink": {"name": "Blink", "desc": "Parpadeo: atraviesa a 1 enemigo al saltar (un solo salto; gasta el turno, sin encadenar)."},
 	"lunge": {"name": "Lunge", "desc": "Si te moviste 2+ nodos antes de atacar, repites un Fallo."},
 	"bloodthirst": {"name": "Bloodthirst", "desc": "Al noquear a un enemigo, te mueves 1 nodo gratis."},
 	"aerial": {"name": "Aerial", "desc": "Vuelo: ignora el terreno (cosmético por ahora)."},

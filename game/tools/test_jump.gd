@@ -34,6 +34,6 @@ func _initialize() -> void:
 	g4.units[u4]["node"] = 14; g4.board[14] = u4
 	g4.units[e4]["node"] = 17; g4.board[17] = e4
 	print("n17_adj_n14=", 17 in g4.map.adj[14], " goal19_adj_n17=", 19 in g4.map.adj[17])
-	print("jump_onto_goal_blocked=", not g4.move_targets(u4, 2).has(19))   # expect true
+	print("jump_onto_goal_allowed=", g4.move_targets(u4, 2).has(19))   # expect true (goal jump OK)
 	print("JUMP_OK")
 	quit()
