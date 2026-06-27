@@ -10,6 +10,7 @@ var _cam: Camera3D
 var _name_label: Label
 var _type_label: Label
 var _attacks_box: VBoxContainer
+var _passives_box: VBoxContainer
 
 func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
@@ -76,14 +77,27 @@ func _build_ui() -> void:
 
 	var panel := PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	panel.offset_top = -372
+	panel.offset_top = -468
 	panel.offset_bottom = -72
 	panel.offset_left = 10
 	panel.offset_right = -10
 	layer.add_child(panel)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	panel.add_child(scroll)
 	var vb := VBoxContainer.new()
+	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vb.add_theme_constant_override("separation", 6)
-	panel.add_child(vb)
+	scroll.add_child(vb)
+
+	var phdr := Label.new()
+	phdr.text = "Pasivas:"
+	phdr.add_theme_font_size_override("font_size", 20)
+	vb.add_child(phdr)
+	_passives_box = VBoxContainer.new()
+	_passives_box.add_theme_constant_override("separation", 4)
+	vb.add_child(_passives_box)
+
 	var hdr := Label.new()
 	hdr.text = "Ataques (probabilidad):"
 	hdr.add_theme_font_size_override("font_size", 20)
@@ -129,6 +143,7 @@ func _spawn(i: int) -> void:
 	_name_label.text = "%d/%d   %s" % [i + 1, Roster.FIGURES.size(), data["name"]]
 	var warn := "   ⚠ anim incompleta" if not data.get("complete", true) else ""
 	_type_label.text = "Tipo de ataque: " + String(data.get("type", "?")) + warn
+	_build_passives(data.get("passives", []))
 	_build_attacks(data["attack"])
 
 func _build_attacks(pool: Array) -> void:
@@ -153,6 +168,24 @@ func _build_attacks(pool: Array) -> void:
 		lbl.text = txt
 		row.add_child(lbl)
 		_attacks_box.add_child(row)
+
+func _build_passives(ids: Array) -> void:
+	for c in _passives_box.get_children():
+		c.queue_free()
+	if ids.is_empty():
+		var l := Label.new()
+		l.text = "—  (sin pasivas)"
+		l.modulate = Color(0.6, 0.6, 0.7)
+		l.add_theme_font_size_override("font_size", 16)
+		_passives_box.add_child(l)
+		return
+	for pid in ids:
+		var info: Dictionary = Roster.PASSIVES.get(pid, {})
+		var lbl := Label.new()
+		lbl.add_theme_font_size_override("font_size", 16)
+		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lbl.text = "• %s — %s" % [String(info.get("name", pid)), String(info.get("desc", ""))]
+		_passives_box.add_child(lbl)
 
 func _switch(d: int) -> void:
 	_index = wrapi(_index + d, 0, Roster.FIGURES.size())

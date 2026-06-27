@@ -124,6 +124,8 @@ func move_targets(uid: int, budget: int) -> Dictionary:
 			for f in map.adj[e]:
 				if f == u["node"] or board.has(f):
 					continue                              # land on a free node beyond it
+				if f == map.goal_player or f == map.goal_enemy:
+					continue                              # can't jump INTO a goal (must walk in)
 				if not reach.has(f) or int(reach[f]) > 2:
 					reach[f] = 2                          # a jump costs 2 stamina
 	return reach

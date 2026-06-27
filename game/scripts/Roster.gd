@@ -5,6 +5,22 @@ class_name Roster
 ## segments; every attack type expressed as a wheel). Duplicates allowed in a deck.
 ## Sheet: docs/Part 2/GDD_v1.0_Part2A_StarterRoster_MVP.md
 
+## Passive catalog: id -> { name, desc }. Figures reference ids in their "passives".
+const PASSIVES := {
+	"bedrock": {"name": "Bedrock", "desc": "Inmune a empujes, jalones e intercambios."},
+	"counter_stone": {"name": "Counter-Stone", "desc": "Al defender y ganar con Azul, empuja al atacante 1 nodo."},
+	"hold_the_line": {"name": "Hold the Line", "desc": "Al defender, un empate inmoviliza al atacante 1 turno."},
+	"bulwark": {"name": "Bulwark (aura)", "desc": "Tus aliados adyacentes no pueden ser desplazados."},
+	"venom_hex": {"name": "Venom Hex", "desc": "Tus victorias Púrpura también aplican Debilitado."},
+	"hexstep": {"name": "Hexstep", "desc": "Al defender en empate, retrocede 1 nodo."},
+	"arcane_pull": {"name": "Arcane Pull", "desc": "+1 al alcance de tus empujes/jalones/intercambios."},
+	"blink": {"name": "Blink", "desc": "Atraviesa 1 enemigo al moverte, sin la penalización del salto."},
+	"lunge": {"name": "Lunge", "desc": "Si te moviste 2+ nodos antes de atacar, repites un Fallo."},
+	"bloodthirst": {"name": "Bloodthirst", "desc": "Al noquear a un enemigo, te mueves 1 nodo gratis."},
+	"aerial": {"name": "Aerial", "desc": "Vuelo: ignora el terreno (cosmético por ahora)."},
+	"dive": {"name": "Dive", "desc": "Tras volar 3+ nodos, tu Empuje 1 se vuelve Empuje 2."},
+}
+
 const FIGURES := [
 	{
 		"id": "stone_golem", "name": "Stone Golem", "stamina": 1, "type": "Ruleta",

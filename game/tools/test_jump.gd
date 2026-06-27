@@ -26,5 +26,14 @@ func _initialize() -> void:
 	gs2.units[e2]["node"] = 8; gs2.board[8] = e2
 	var gmt := gs2.move_targets(g, int(gs2.units[g]["stamina"]))
 	print("golem_can_jump=", gmt.has(11))           # expect false
+
+	# A jump cannot land ON a goal node (blocker in front of a goal defends it).
+	var g4 := GameState.new(MapData.new())          # Rieles: goal_enemy = 19, adj[17] = [19,14]
+	var u4 := g4.add_to_bench("player", 5)
+	var e4 := g4.add_to_bench("enemy", 2)
+	g4.units[u4]["node"] = 14; g4.board[14] = u4
+	g4.units[e4]["node"] = 17; g4.board[17] = e4
+	print("n17_adj_n14=", 17 in g4.map.adj[14], " goal19_adj_n17=", 19 in g4.map.adj[17])
+	print("jump_onto_goal_blocked=", not g4.move_targets(u4, 2).has(19))   # expect true
 	print("JUMP_OK")
 	quit()
