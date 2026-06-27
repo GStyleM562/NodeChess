@@ -332,10 +332,12 @@ func rank_data(uid: int) -> Dictionary:
 			"type": st.get("type", base.get("type", "Ruleta")),
 			"stamina": st.get("stamina", base.get("stamina", 2)),
 			"passives": st.get("passives", base.get("passives", [])),
+			"coin_a": base.get("coin_a", []), "coin_b": base.get("coin_b", []),
 		}
 	return {
 		"name": base["name"], "attack": base["attack"], "type": base.get("type", "Ruleta"),
 		"stamina": base.get("stamina", 2), "passives": base.get("passives", []),
+		"coin_a": base.get("coin_a", []), "coin_b": base.get("coin_b", []),
 	}
 
 func pool_for(uid: int) -> Array:

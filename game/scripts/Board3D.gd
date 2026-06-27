@@ -49,6 +49,8 @@ var _energy_label: Label
 var _mods_box: HBoxContainer
 var _banner: PanelContainer
 var _banner_lbl: Label
+var _active_card_slot: Control
+var _hud_label: Label
 var _jumped := false           # active figure hopped an enemy this turn -> no attack
 
 func _ready() -> void:
@@ -284,6 +286,38 @@ func _build_ui() -> void:
 	_banner_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_banner.add_child(_banner_lbl)
 
+	# In-match figure counts (top, centered).
+	_hud_label = Label.new()
+	_hud_label.add_theme_font_size_override("font_size", 16)
+	_hud_label.modulate = Color(0.85, 0.9, 1.0)
+	_hud_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_hud_label.offset_top = 52
+	_hud_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layer.add_child(_hud_label)
+
+	# Active-figure CARD (bottom-left) — so figures read as cards, not just text.
+	_active_card_slot = Control.new()
+	_active_card_slot.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_active_card_slot.offset_left = 8
+	_active_card_slot.offset_top = -120
+	_active_card_slot.offset_right = 250
+	_active_card_slot.offset_bottom = -66
+	_active_card_slot.visible = false
+	layer.add_child(_active_card_slot)
+
+func _refresh_active_card() -> void:
+	if _active_card_slot == null:
+		return
+	for c in _active_card_slot.get_children():
+		c.queue_free()
+	if _active_uid == -1 or not _gs.units.has(_active_uid) or _over:
+		_active_card_slot.visible = false
+		return
+	_active_card_slot.visible = true
+	var card := FigureCard.new()
+	_active_card_slot.add_child(card)
+	card.setup(_gs.rank_data(_active_uid), 0, _team_color(_gs.units[_active_uid]["team"]), true)
+
 func _show_banner(text: String, col: Color) -> void:
 	if _banner == null:
 		return
@@ -330,6 +364,9 @@ func _update_status() -> void:
 		_status.text = "Tu turno — toca una figura, o despliega desde la banca."
 	_refresh_status_labels()
 	_refresh_energy_mods()
+	_refresh_active_card()
+	if _hud_label != null:
+		_hud_label.text = "Tú: %d   ·   Rival: %d" % [_gs.units_on_board("player").size(), _gs.units_on_board("enemy").size()]
 
 func _refresh_energy_mods() -> void:
 	if _energy_label != null:
@@ -695,8 +732,8 @@ func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 	await get_tree().create_timer(0.45).timeout
 	var msg := _combat_msg(a_name, b_name, rec)
 	# 1) the wheel (announce + spin + result)
-	var data_a: Dictionary = Roster.FIGURES[_gs.units[att_uid]["rindex"]]
-	var data_b: Dictionary = Roster.FIGURES[_gs.units[def_uid]["rindex"]]
+	var data_a: Dictionary = _gs.rank_data(att_uid)
+	var data_b: Dictionary = _gs.rank_data(def_uid)
 	await _overlay.play(a_name, b_name, rec["seg_a"], rec["seg_b"], msg[0], msg[1],
 		_gs.pool_for(att_uid), _gs.pool_for(def_uid), a_col, b_col,
 		_gs.type_for(att_uid), _gs.type_for(def_uid), data_a, data_b,

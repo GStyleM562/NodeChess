@@ -9,8 +9,8 @@ const AREA := Vector2(500, 268)
 
 var _root: Control
 var _title: Label
-var _name_a: Label
-var _name_b: Label
+var _card_a: CenterContainer
+var _card_b: CenterContainer
 var _presA: AttackPresenter
 var _presB: AttackPresenter
 var _result: Label
@@ -46,8 +46,9 @@ func _build() -> void:
 	_title = _mk("¡Combate!", 30, Color(1, 0.9, 0.6))
 	vb.add_child(_title)
 
-	_name_a = _mk("", 22, Color(0.45, 0.7, 1.0))
-	vb.add_child(_name_a)
+	_card_a = CenterContainer.new()
+	_card_a.custom_minimum_size = Vector2(AREA.x, 66)
+	vb.add_child(_card_a)
 	_presA = AttackPresenter.new()
 	_presA.custom_minimum_size = AREA
 	_presA.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -55,8 +56,9 @@ func _build() -> void:
 
 	vb.add_child(_mk("— VS —", 22, Color(1, 1, 1)))
 
-	_name_b = _mk("", 22, Color(1.0, 0.5, 0.45))
-	vb.add_child(_name_b)
+	_card_b = CenterContainer.new()
+	_card_b.custom_minimum_size = Vector2(AREA.x, 66)
+	vb.add_child(_card_b)
 	_presB = AttackPresenter.new()
 	_presB.custom_minimum_size = AREA
 	_presB.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -75,6 +77,16 @@ func _mk(t: String, sz: int, col: Color) -> Label:
 	l.custom_minimum_size = Vector2(AREA.x, 0)
 	return l
 
+func _build_card(slot: CenterContainer, fig: Dictionary, fallback: String, col: Color) -> void:
+	for c in slot.get_children():
+		c.queue_free()
+	if fig.is_empty():
+		slot.add_child(_mk(fallback, 20, col))
+		return
+	var card := FigureCard.new()
+	slot.add_child(card)
+	card.setup(fig, 0, col, true)
+
 func _on_pa() -> void:
 	_pa_done = true
 
@@ -87,10 +99,8 @@ func play(name_a: String, name_b: String, seg_a: Dictionary, seg_b: Dictionary,
 		type_a: String = "Ruleta", type_b: String = "Ruleta",
 		fig_a: Dictionary = {}, fig_b: Dictionary = {},
 		idx_a: int = -1, idx_b: int = -1) -> void:
-	_name_a.text = "⚔  " + name_a
-	_name_a.modulate = col_a
-	_name_b.text = "🛡  " + name_b
-	_name_b.modulate = col_b
+	_build_card(_card_a, fig_a, "⚔  " + name_a, col_a)
+	_build_card(_card_b, fig_b, "🛡  " + name_b, col_b)
 	_presA.clear()
 	_presB.clear()
 	_root.visible = true
