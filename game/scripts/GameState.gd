@@ -21,6 +21,7 @@ const BUFF_STARS := 1
 ## Modifier cards: spend energy to activate. Equipped per player (see Loadout).
 const MODIFIERS := {
 	"power_surge": {"name": "Power Surge", "cost": 3, "desc": "Tu próximo ataque: +20 daño / +1★"},
+	"fury": {"name": "Fury", "cost": 5, "desc": "Tu próximo ataque: +40 daño / +2★"},
 	"cleanse": {"name": "Cleanse", "cost": 2, "desc": "Quita los debuffs de tus figuras"},
 	"adrenaline": {"name": "Adrenaline", "cost": 2, "desc": "Tu próximo ataque repite un Fallo"},
 }
@@ -122,8 +123,8 @@ func move_targets(uid: int, budget: int) -> Dictionary:
 			if occ == -1 or units[occ]["team"] == u["team"] or not units[occ]["alive"]:
 				continue                                  # only hop over a live enemy
 			for f in map.adj[e]:
-				if f == u["node"] or board.has(f):
-					continue                              # land on a free node beyond it
+				if f == u["node"] or board.has(f) or f in map.obstacles:
+					continue                              # land on a free, walkable node beyond it
 				if not reach.has(f) or int(reach[f]) > 2:
 					reach[f] = 2                          # a jump costs 2 stamina (one enemy only)
 	return reach
@@ -230,6 +231,8 @@ func _roll_for(uid: int, is_attacker := false) -> Dictionary:
 			s = Combat.roll(pool).duplicate(true)   # reroll one Miss
 		if pb.get("surge", false):
 			_boost_seg(s, BUFF_DMG, BUFF_STARS)
+		if pb.get("surge_big", false):
+			_boost_seg(s, 40, 2)
 		pending_buff[units[uid]["team"]] = {}
 	return s
 
@@ -460,6 +463,8 @@ func activate_modifier(team: String, mod_id: String) -> bool:
 	match mod_id:
 		"power_surge":
 			pending_buff[team]["surge"] = true
+		"fury":
+			pending_buff[team]["surge_big"] = true
 		"adrenaline":
 			pending_buff[team]["adrenaline"] = true
 		"cleanse":

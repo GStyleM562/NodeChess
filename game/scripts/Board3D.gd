@@ -14,6 +14,8 @@ const ROLE_COLOR := {
 	"goal_player": Color(0.30, 0.85, 0.50),
 	"goal_enemy": Color(0.98, 0.80, 0.25),
 	"buff": Color(1.0, 0.6, 0.2),
+	"obstacle": Color(0.10, 0.10, 0.12),
+	"teleporter": Color(0.55, 0.35, 1.0),
 }
 const HILITE_MOVE := Color(0.35, 1.0, 0.5)
 const HILITE_ATK := Color(1.0, 0.3, 0.3)

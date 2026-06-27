@@ -4,9 +4,11 @@ extends Control
 
 var _team: Array = []
 var _map_index := 0
+var _mods: Array = []
 var _team_box: HBoxContainer
 var _avail_box: VBoxContainer
 var _map_box: HBoxContainer
+var _modsel_box: GridContainer
 var _counter: Label
 var _play_btn: Button
 
@@ -15,6 +17,7 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_team = Loadout.player_team.duplicate()
 	_map_index = Loadout.map_index
+	_mods = Loadout.player_modifiers.duplicate()
 
 	var bg := ColorRect.new()
 	bg.color = Color(0.06, 0.07, 0.12)
@@ -51,6 +54,17 @@ func _ready() -> void:
 	_map_box.add_theme_constant_override("separation", 8)
 	root.add_child(_map_box)
 	_build_maps()
+
+	var mod_hdr := Label.new()
+	mod_hdr.text = "Modificadores (elige hasta 3):"
+	mod_hdr.add_theme_font_size_override("font_size", 18)
+	root.add_child(mod_hdr)
+	_modsel_box = GridContainer.new()
+	_modsel_box.columns = 2
+	_modsel_box.add_theme_constant_override("h_separation", 8)
+	_modsel_box.add_theme_constant_override("v_separation", 6)
+	root.add_child(_modsel_box)
+	_build_modsel()
 
 	var team_hdr := Label.new()
 	team_hdr.text = "Tu equipo (toca para quitar):"
@@ -111,6 +125,28 @@ func _select_map(i: int) -> void:
 	_map_index = i
 	_build_maps()
 
+func _build_modsel() -> void:
+	for c in _modsel_box.get_children():
+		c.queue_free()
+	for mid in GameState.MODIFIERS.keys():
+		var m: Dictionary = GameState.MODIFIERS[mid]
+		var b := Button.new()
+		b.toggle_mode = true
+		b.button_pressed = mid in _mods
+		b.text = "%s (%d⚡)" % [String(m["name"]), int(m["cost"])]
+		b.tooltip_text = String(m["desc"])
+		b.custom_minimum_size = Vector2(248, 44)
+		b.add_theme_font_size_override("font_size", 16)
+		b.pressed.connect(_toggle_mod.bind(mid))
+		_modsel_box.add_child(b)
+
+func _toggle_mod(mid: String) -> void:
+	if mid in _mods:
+		_mods.erase(mid)
+	elif _mods.size() < 3:
+		_mods.append(mid)
+	_build_modsel()
+
 func _build_available() -> void:
 	for ri in Roster.FIGURES.size():
 		var d: Dictionary = Roster.FIGURES[ri]
@@ -155,4 +191,5 @@ func _on_play() -> void:
 		return
 	Loadout.player_team = _team.duplicate()
 	Loadout.map_index = _map_index
+	Loadout.player_modifiers = _mods.duplicate()
 	get_tree().change_scene_to_file("res://scenes/board.tscn")

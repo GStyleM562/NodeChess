@@ -6,7 +6,7 @@ class_name MapData
 
 ## The three playable maps (same rules: goals top/bottom + connected, two entrances
 ## per side, a buff node, every node <= 3 connections, symmetric left/right).
-const NAMES := ["Rieles", "Reloj de Arena", "Plaza"]
+const NAMES := ["Rieles", "Reloj de Arena", "Plaza", "Túneles"]
 
 var nodes := []          # [{id, pos:Vector3, role:String}]
 var adj := {}            # id -> Array[int]
@@ -15,6 +15,8 @@ var entrances_enemy := []
 var goal_player := -1
 var goal_enemy := -1
 var buffs := []
+var obstacles := []      # impassable node ids (cannot move onto/through)
+var teleporters := []    # portal pairs [[a, b], ...] (already linked as graph edges)
 var map_name := ""
 
 func _init(layout := 0) -> void:
@@ -23,6 +25,8 @@ func _init(layout := 0) -> void:
 			_build_hourglass()
 		2:
 			_build_plaza()
+		3:
+			_build_duel(true)
 		_:
 			_build_duel()
 
@@ -50,8 +54,8 @@ func _edge(a: int, b: int) -> void:
 	if a not in adj[b]:
 		adj[b].append(a)
 
-func _build_duel() -> void:
-	map_name = NAMES[0]
+func _build_duel(tunnels := false) -> void:
+	map_name = NAMES[3] if tunnels else NAMES[0]
 	# v3 — Pokémon-Duel philosophy, tall (~5 cols × 8 rows). Long side RAILS,
 	# a central X of diagonals (no 4-way hub), connected goals, and EVERY node has
 	# at most 3 connections. Player at the bottom (-z), enemy at the top (+z).
@@ -106,6 +110,16 @@ func _build_duel() -> void:
 	# buff at an inner node (no central hub node exists now)
 	nodes[n8]["role"] = "buff"
 	buffs = [n8]
+
+	if tunnels:
+		# TELEPORTER portal: a graph edge linking two far nodes (a shortcut/portal).
+		_edge(n6, n13)
+		nodes[n6]["role"] = "teleporter"
+		nodes[n13]["role"] = "teleporter"
+		teleporters = [[n6, n13]]
+		# OBSTACLE: an impassable node (the bottom-centre branch is sealed off).
+		nodes[n3]["role"] = "obstacle"
+		obstacles = [n3]
 
 ## Shared 16-node layout: an X of crossing diagonals (no node at the crossing, so
 ## no degree-4 hub), 2 entrances per side, goals top/bottom. `P` = 16 positions,
@@ -164,7 +178,7 @@ func reachable(start: int, steps: int, blocked: Dictionary = {}) -> Dictionary:
 		if dist[cur] >= steps:
 			continue
 		for nb in adj[cur]:
-			if dist.has(nb) or blocked.has(nb):
+			if dist.has(nb) or blocked.has(nb) or obstacles.has(nb):
 				continue
 			dist[nb] = dist[cur] + 1
 			q.append(nb)
@@ -181,7 +195,7 @@ func path_to(start: int, target: int, blocked: Dictionary = {}) -> Array:
 	while not q.is_empty():
 		var cur: int = q.pop_front()
 		for nb in adj[cur]:
-			if prev.has(nb) or blocked.has(nb):
+			if prev.has(nb) or blocked.has(nb) or obstacles.has(nb):
 				continue
 			prev[nb] = cur
 			if nb == target:

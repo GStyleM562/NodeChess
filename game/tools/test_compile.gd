@@ -9,6 +9,7 @@ func _initialize() -> void:
 		"res://scripts/AttackTester.gd", "res://scripts/Board3D.gd",
 		"res://scripts/DeckBuilder.gd", "res://scripts/Loadout.gd",
 		"res://scripts/GameState.gd", "res://scripts/Combat.gd", "res://scripts/Roster.gd",
+		"res://scripts/Dex.gd", "res://scripts/MapData.gd", "res://scripts/MainMenu.gd",
 	]:
 		var s = load(path)
 		if s == null:

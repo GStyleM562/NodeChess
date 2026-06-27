@@ -11,6 +11,7 @@ var _name_label: Label
 var _type_label: Label
 var _attacks_box: VBoxContainer
 var _passives_box: VBoxContainer
+var _evos_box: VBoxContainer
 
 func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
@@ -98,6 +99,14 @@ func _build_ui() -> void:
 	_passives_box.add_theme_constant_override("separation", 4)
 	vb.add_child(_passives_box)
 
+	var ehdr := Label.new()
+	ehdr.text = "Evoluciones (Rank Up):"
+	ehdr.add_theme_font_size_override("font_size", 20)
+	vb.add_child(ehdr)
+	_evos_box = VBoxContainer.new()
+	_evos_box.add_theme_constant_override("separation", 4)
+	vb.add_child(_evos_box)
+
 	var hdr := Label.new()
 	hdr.text = "Ataques (probabilidad):"
 	hdr.add_theme_font_size_override("font_size", 20)
@@ -143,7 +152,8 @@ func _spawn(i: int) -> void:
 	_name_label.text = "%d/%d   %s" % [i + 1, Roster.FIGURES.size(), data["name"]]
 	var warn := "   ⚠ anim incompleta" if not data.get("complete", true) else ""
 	_type_label.text = "Tipo de ataque: " + String(data.get("type", "?")) + warn
-	_build_passives(data.get("passives", []))
+	_build_passives(data)
+	_build_evolutions(data)
 	_build_attacks(data["attack"])
 
 func _build_attacks(pool: Array) -> void:
@@ -169,9 +179,15 @@ func _build_attacks(pool: Array) -> void:
 		row.add_child(lbl)
 		_attacks_box.add_child(row)
 
-func _build_passives(ids: Array) -> void:
+func _build_passives(d: Dictionary) -> void:
 	for c in _passives_box.get_children():
 		c.queue_free()
+	var ids: Array = (d.get("passives", []) as Array).duplicate()
+	# Include hidden passives from evolution stages (catalog marks them "(oculta)").
+	for st in d.get("ranks", []):
+		for h in st.get("hidden", []):
+			if h not in ids:
+				ids.append(h)
 	if ids.is_empty():
 		var l := Label.new()
 		l.text = "—  (sin pasivas)"
@@ -186,6 +202,30 @@ func _build_passives(ids: Array) -> void:
 		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		lbl.text = "• %s — %s" % [String(info.get("name", pid)), String(info.get("desc", ""))]
 		_passives_box.add_child(lbl)
+
+func _build_evolutions(d: Dictionary) -> void:
+	for c in _evos_box.get_children():
+		c.queue_free()
+	var ranks: Array = d.get("ranks", [])
+	if ranks.is_empty():
+		var l := Label.new()
+		l.text = "—  (no evoluciona)"
+		l.modulate = Color(0.6, 0.6, 0.7)
+		l.add_theme_font_size_override("font_size", 16)
+		_evos_box.add_child(l)
+		return
+	_evo_row("Base: %s · %s · ST %d" % [d["name"], String(d.get("type", "?")), int(d.get("stamina", 2))])
+	for i in ranks.size():
+		var st: Dictionary = ranks[i]
+		_evo_row("+%d: %s · %s · ST %d" % [
+			i + 1, String(st.get("name", "?")), String(st.get("type", d.get("type", "?"))), int(st.get("stamina", d.get("stamina", 2)))])
+
+func _evo_row(text: String) -> void:
+	var lbl := Label.new()
+	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lbl.text = "• " + text
+	_evos_box.add_child(lbl)
 
 func _switch(d: int) -> void:
 	_index = wrapi(_index + d, 0, Roster.FIGURES.size())
