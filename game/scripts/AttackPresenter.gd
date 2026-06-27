@@ -1,7 +1,9 @@
 extends Control
 class_name AttackPresenter
-## Reusable, type-aware attack presentation. Drop it into any Control area, give it
-## a size, and `await present(type, pool, result)`:
+## Reusable, type-aware attack presentation. Emits `done` when the animation ends
+## (so two presenters can run at the same time and both be awaited).
+signal done
+## Drop it into any Control area, give it a size, and `await present(...)`:
 ##   Moneda     -> a coin toss (rises, two faces, lands on result)
 ##   Dado (D6)  -> a real 3D cube that rolls and lands on the attack face
 ##   Suma 2d6   -> two 3D pip dice that roll (their sum picks the attack)
@@ -30,13 +32,14 @@ func present(type: String, pool: Array, result: Dictionary, idx: int = -1, opts:
 		"Moneda":
 			await _coin(pool, result)
 		"Dado (D6)":
-			await _die(pool, idx)
+			await _die(pool, idx, result)
 		"Suma 2d6":
-			await _dice2(pool, idx)
+			await _dice2(pool, idx, result)
 		"Doble Moneda":
 			await _double_coin(pool, result, opts)
 		_:
 			await _reel(pool, result)
+	done.emit()
 
 func clear() -> void:
 	for c in get_children():
@@ -92,9 +95,10 @@ func _set_shape(p: Panel, seg: Dictionary, circle: bool) -> void:
 func _coin(pool: Array, result: Dictionary) -> void:
 	var faces := _two_faces(pool)
 	var back: Dictionary = faces[1] if faces[0] == result else faces[0]
-	var vp := _new_die_viewport(Vector2i(340, 340), 5.5, 32.0)
+	var sz := _vp_square()
+	var vp := _new_die_viewport(sz, 5.5, 32.0)
 	var coin := _add_coin(vp["sv"], result, back, Vector3.ZERO, 1.9)
-	await _center(vp["container"], Vector2(340, 340))
+	await _center(vp["container"], Vector2(sz))
 	await _toss_tween(coin, 1.5).finished
 
 ## Two coins (Coin Trickster, "Doble Moneda"). Each lands on the face that produced
@@ -107,10 +111,11 @@ func _double_coin(pool: Array, result: Dictionary, opts: Dictionary) -> void:
 		return
 	var ai := int(result.get("ai", 0))
 	var bi := int(result.get("bi", 0))
-	var vp := _new_die_viewport(Vector2i(470, 300), 5.6, 38.0)
+	var sz := _vp_wide()
+	var vp := _new_die_viewport(sz, 5.6, 38.0)
 	var a := _add_coin(vp["sv"], ca[ai], ca[1 - ai], Vector3(-1.35, 0, 0), 1.55)
 	var b := _add_coin(vp["sv"], cb[bi], cb[1 - bi], Vector3(1.35, 0, 0), 1.55)
-	await _center(vp["container"], Vector2(470, 300))
+	await _center(vp["container"], Vector2(sz))
 	var t1 := _toss_tween(a, 1.45)
 	var t2 := _toss_tween(b, 1.7)
 	await t1.finished
@@ -192,30 +197,61 @@ func _two_faces(pool: Array) -> Array:
 	return [s[0], s[0]]
 
 # --------------------------------------------------------------- 3D dice
-func _die(pool: Array, idx: int) -> void:
+func _die(pool: Array, idx: int, result: Dictionary) -> void:
 	var faces: Array = []
 	for f in 6:
 		faces.append(_attack_face(pool[f % pool.size()]))
-	var vp := _new_die_viewport(Vector2i(340, 340), 4.3, 36.0)
+	if idx >= 0 and idx < 6:
+		faces[idx] = _attack_face(result)            # the BUFFED result on the landing face
+	var sz := _vp_square()
+	var vp := _new_die_viewport(sz, 4.3, 36.0)
 	var cube := _add_cube(vp["sv"], faces, Vector3.ZERO, 1.7)
-	await _center(vp["container"], Vector2(340, 340))
+	await _center(vp["container"], Vector2(sz))
 	await _roll_tween(cube, idx, 1.5).finished
 
-func _dice2(pool: Array, idx: int) -> void:
+func _dice2(pool: Array, idx: int, result: Dictionary) -> void:
 	var target_sum := idx + 2
 	var d1 := clampi(randi_range(maxi(1, target_sum - 6), mini(6, target_sum - 1)), 1, 6)
 	var d2 := clampi(target_sum - d1, 1, 6)
 	var pips: Array = []
 	for v in range(1, 7):
 		pips.append({"text": str(v), "bg": Color(0.93, 0.93, 0.96), "fg": Color(0.12, 0.12, 0.16)})
-	var vp := _new_die_viewport(Vector2i(470, 290), 5.6, 38.0)
+	var sz := _vp_wide()
+	var vp := _new_die_viewport(sz, 5.6, 38.0)
 	var c1 := _add_cube(vp["sv"], pips, Vector3(-1.35, 0, 0), 1.45)
 	var c2 := _add_cube(vp["sv"], pips.duplicate(true), Vector3(1.35, 0, 0), 1.45)
-	await _center(vp["container"], Vector2(470, 290))
+	await _center(vp["container"], Vector2(sz))
 	var t1 := _roll_tween(c1, d1 - 1, 1.45)
 	var t2 := _roll_tween(c2, d2 - 1, 1.7)
 	await t1.finished
 	await t2.finished
+	# Tell the player which attack that sum produces.
+	_show_result_caption("Suma %d  →  %s" % [target_sum, Combat.label(result)], Combat.color_of(result))
+	await get_tree().create_timer(0.7).timeout
+
+## A caption near the bottom of the area (e.g. "Suma 8 → Gravity Hook ★★").
+func _show_result_caption(text: String, col: Color) -> void:
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.add_theme_font_size_override("font_size", 24)
+	lbl.modulate = col.lightened(0.35)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	lbl.offset_top = -38
+	lbl.offset_bottom = -4
+	add_child(lbl)
+
+## Viewport sizes that fit this control's area (large in the tester, smaller split in combat).
+func _vp_square() -> Vector2i:
+	var s := clampi(mini(int(size.x), int(size.y)) - 12, 200, 360)
+	return Vector2i(s, s)
+
+func _vp_wide() -> Vector2i:
+	var w := clampi(int(size.x) - 12, 280, 480)
+	var h := clampi(int(size.y) - 12, 190, 320)
+	if float(w) / float(h) < 1.5:
+		h = int(w / 1.5)
+	return Vector2i(w, h)
 
 func _attack_face(seg: Dictionary) -> Dictionary:
 	var col := Combat.color_of(seg)

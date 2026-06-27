@@ -42,14 +42,17 @@ func _initialize() -> void:
 	gs.board[3] = u2
 	gs.apply_status(u2, "fear")
 	gs.energy["player"] = 3
+	gs.mod_used["player"] = false                                           # new turn
 	gs.activate_modifier("player", "cleanse")
 	print("cleansed=", not gs.has_status(u2, "fear"))                       # true
+	print("one_per_turn=", not gs.can_use_modifier("player", "power_surge")) # false (already used this turn)
 
 	# surge consumed by the next attack
 	var d := gs.add_to_bench("enemy", 2)
 	gs.units[d]["node"] = 5
 	gs.board[5] = d
 	gs.energy["player"] = 5
+	gs.mod_used["player"] = false                                           # new turn
 	gs.activate_modifier("player", "power_surge")
 	gs.attack(u, d)
 	print("surge_consumed=", not bool(gs.pending_buff["player"].get("surge", false)))  # true

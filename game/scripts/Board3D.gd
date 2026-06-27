@@ -47,6 +47,8 @@ var _end_btn: Button
 var _bench_box: HBoxContainer
 var _energy_label: Label
 var _mods_box: HBoxContainer
+var _banner: PanelContainer
+var _banner_lbl: Label
 var _jumped := false           # active figure hopped an enemy this turn -> no attack
 
 func _ready() -> void:
@@ -266,6 +268,31 @@ func _build_ui() -> void:
 	_mods_box.add_theme_constant_override("separation", 8)
 	mods_panel.add_child(_mods_box)
 
+	# Modifier activation banner ("Ahora pasará tal cosa…").
+	_banner = PanelContainer.new()
+	_banner.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_banner.offset_top = 86
+	_banner.offset_bottom = 150
+	_banner.offset_left = 20
+	_banner.offset_right = -20
+	_banner.visible = false
+	layer.add_child(_banner)
+	_banner_lbl = Label.new()
+	_banner_lbl.add_theme_font_size_override("font_size", 22)
+	_banner_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_banner_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_banner_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_banner.add_child(_banner_lbl)
+
+func _show_banner(text: String, col: Color) -> void:
+	if _banner == null:
+		return
+	_banner_lbl.text = text
+	_banner_lbl.modulate = col
+	_banner.visible = true
+	var t := get_tree().create_timer(2.6)
+	t.timeout.connect(func(): if is_instance_valid(_banner): _banner.visible = false)
+
 func _refresh_bench_ui() -> void:
 	for c in _bench_box.get_children():
 		c.queue_free()
@@ -329,7 +356,8 @@ func _on_modifier(mid: String) -> void:
 	if _busy or _over or _gs.turn_team != "player":
 		return
 	if _gs.activate_modifier("player", mid):
-		_status.text = "Modificador activado: " + String(GameState.MODIFIERS[mid]["name"])
+		var m: Dictionary = GameState.MODIFIERS[mid]
+		_show_banner("Usaste %s — %s" % [String(m["name"]), String(m["desc"])], Color(1.0, 0.85, 0.3))
 		_update_status()
 
 # ---------------------------------------------------------------- input
@@ -468,12 +496,6 @@ func _player_deploy(uid: int, node: int) -> void:
 	_remaining = maxi(0, _gs.effective_stamina(uid) - 1)  # deploy costs 1
 	_committed = true
 	_refresh_bench_ui()
-	await _resolve_surround()
-	if _check_and_show_winner():
-		return
-	if _active_uid != -1 and not _gs.units[_active_uid]["alive"]:
-		await _end_player_turn()
-		return
 	_refresh_active_highlights()
 	_update_status()
 	await _maybe_auto_end()
@@ -501,12 +523,7 @@ func _player_move(node: int) -> void:
 	_busy = false
 	if _check_and_show_winner():
 		return
-	await _resolve_surround()
-	if _check_and_show_winner():
-		return
-	if _active_uid != -1 and not _gs.units[_active_uid]["alive"]:
-		await _end_player_turn()
-		return
+	# NOTE: surround KO is resolved at END of turn (you must STAY to surround) — not mid-move.
 	_refresh_active_highlights()
 	_update_status()
 	await _maybe_auto_end()
@@ -596,6 +613,9 @@ func _end_player_turn() -> void:
 	_reset_activation()
 	_busy = true
 	_refresh_bench_ui()
+	await _resolve_surround()      # surround KO resolves now that the figure STAYED
+	if _check_and_show_winner():
+		return
 	_gs.end_turn()
 	_update_status()
 	if _check_and_show_winner():
@@ -625,6 +645,11 @@ func _animate_bot(rec: Dictionary) -> void:
 			await _walk_path(int(rec["uid"]), rec.get("path", [int(rec["node"])]))
 			await _resolve_surround()
 		"attack":
+			var bmid := String(rec.get("modifier", ""))
+			if bmid != "" and GameState.MODIFIERS.has(bmid):
+				var m: Dictionary = GameState.MODIFIERS[bmid]
+				_show_banner("El rival usó %s — %s" % [String(m["name"]), String(m["desc"])], Color(1.0, 0.55, 0.4))
+				await get_tree().create_timer(1.5).timeout
 			await _play_combat(int(rec["att"]), int(rec["def"]), rec)
 		_:
 			await get_tree().create_timer(0.2).timeout
@@ -674,7 +699,8 @@ func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 	var data_b: Dictionary = Roster.FIGURES[_gs.units[def_uid]["rindex"]]
 	await _overlay.play(a_name, b_name, rec["seg_a"], rec["seg_b"], msg[0], msg[1],
 		_gs.pool_for(att_uid), _gs.pool_for(def_uid), a_col, b_col,
-		_gs.type_for(att_uid), _gs.type_for(def_uid), data_a, data_b)
+		_gs.type_for(att_uid), _gs.type_for(def_uid), data_a, data_b,
+		int(rec.get("idx_a", -1)), int(rec.get("idx_b", -1)))
 	# 2) the close-up action shot
 	await _combat_cutaway(att_uid, def_uid, rec)
 	# 2.5) displacement (push / pull / swap), if any

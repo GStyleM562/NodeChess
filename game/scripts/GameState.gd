@@ -36,6 +36,7 @@ var turn_no := 0
 var winner := ""
 var energy := {"player": 0, "enemy": 0}
 var pending_buff := {"player": {}, "enemy": {}}   # one-shot combat buffs from modifiers
+var mod_used := {"player": false, "enemy": false} # one modifier per turn
 var _att_moved_ctx := 0                           # nodes the attacker moved this turn (for Lunge/Dive)
 var _next_uid := 0
 
@@ -213,9 +214,16 @@ func move_unit(uid: int, node: int) -> void:
 	board[node] = uid
 	_check_goal(u)
 
-func _roll_for(uid: int, is_attacker := false) -> Dictionary:
+## Rolls an attack: returns { "seg": buffed segment (what the figure WILL do, with
+## buff-node/modifier bonuses already baked in), "idx": the pool face that came up
+## (so the die/reel lands on the right face) }.
+func _roll_full(uid: int, is_attacker := false) -> Dictionary:
 	var pool: Array = pool_for(uid)
-	var s: Dictionary = Combat.roll(pool).duplicate(true)
+	var bidx := _weighted_index(pool)
+	# MODIFIER — Adrenaline: reroll a Miss once (attacker), before other buffs.
+	if is_attacker and pending_buff[units[uid]["team"]].get("adrenaline", false) and String(pool[bidx].get("col", "")) == "red":
+		bidx = _weighted_index(pool)
+	var s: Dictionary = pool[bidx].duplicate(true)
 	if has_status(uid, "weakened"):
 		if s.has("pow"):
 			s["pow"] = maxi(0, int(s["pow"]) - 20)
@@ -224,17 +232,26 @@ func _roll_for(uid: int, is_attacker := false) -> Dictionary:
 	# BUFF NODE — a unit standing on a buff node rolls stronger.
 	if int(units[uid]["node"]) in map.buffs:
 		_boost_seg(s, BUFF_DMG, BUFF_STARS)
-	# MODIFIERS — one-shot attacker buffs (consumed on use).
+	# MODIFIERS — one-shot attacker buffs (baked into the shown number).
 	if is_attacker:
 		var pb: Dictionary = pending_buff[units[uid]["team"]]
-		if pb.get("adrenaline", false) and String(s.get("col", "")) == "red":
-			s = Combat.roll(pool).duplicate(true)   # reroll one Miss
 		if pb.get("surge", false):
 			_boost_seg(s, BUFF_DMG, BUFF_STARS)
 		if pb.get("surge_big", false):
 			_boost_seg(s, 40, 2)
 		pending_buff[units[uid]["team"]] = {}
-	return s
+	return {"seg": s, "idx": bidx}
+
+func _weighted_index(pool: Array) -> int:
+	var total := 0.0
+	for s in pool:
+		total += float(s.get("w", 1.0))
+	var pick := randf() * total
+	for i in pool.size():
+		pick -= float(pool[i].get("w", 1.0))
+		if pick <= 0.0:
+			return i
+	return pool.size() - 1
 
 func _boost_seg(s: Dictionary, dmg: int, stars: int) -> void:
 	if s.has("pow"):
@@ -245,12 +262,18 @@ func _boost_seg(s: Dictionary, dmg: int, stars: int) -> void:
 ## Resolve an attack. KO only on a damage (White/Gold) win. Purple win applies a
 ## status (and/or displacement); Blue win blocks. Returns the combat record.
 func attack(att_uid: int, def_uid: int, att_moved: int = 0) -> Dictionary:
-	var seg_a := _roll_for(att_uid, true)
+	var ra := _roll_full(att_uid, true)
+	var seg_a: Dictionary = ra["seg"]
+	var idx_a := int(ra["idx"])
 	# PASSIVE — Lunge: after moving 2+ nodes this turn, reroll a Miss once.
 	if String(seg_a.get("col", "")) == "red" and att_moved >= 2 and has_passive(att_uid, "lunge"):
-		seg_a = _roll_for(att_uid, true)
+		ra = _roll_full(att_uid, true)
+		seg_a = ra["seg"]
+		idx_a = int(ra["idx"])
 	_att_moved_ctx = att_moved
-	var seg_b := _roll_for(def_uid, false)
+	var rb := _roll_full(def_uid, false)
+	var seg_b: Dictionary = rb["seg"]
+	var idx_b := int(rb["idx"])
 	var oc := Combat.outcome(seg_a, seg_b)
 	var ko_uid := -1
 	var applied := {}
@@ -293,6 +316,7 @@ func attack(att_uid: int, def_uid: int, att_moved: int = 0) -> Dictionary:
 		"att": att_uid, "def": def_uid, "seg_a": seg_a, "seg_b": seg_b,
 		"result": int(oc["result"]), "win_col": oc["win_col"], "effect": oc["effect"],
 		"ko": ko_uid, "status": applied, "disp": disp, "rankup": ranked,
+		"idx_a": idx_a, "idx_b": idx_b,
 	}
 
 # --- rank up / evolution ---------------------------------------------------
@@ -428,6 +452,7 @@ func end_turn() -> void:
 	_process_ko_returns()
 	turn_team = "enemy" if turn_team == "player" else "player"
 	_grant_energy(turn_team)
+	mod_used[turn_team] = false                  # refresh the per-turn modifier
 	_apply_turn_start_auras(turn_team)
 	if winner == "" and not can_act(turn_team):
 		winner = "enemy" if turn_team == "player" else "player"
@@ -454,11 +479,12 @@ func controls_buff(team: String) -> bool:
 	return false
 
 func can_use_modifier(team: String, mod_id: String) -> bool:
-	return MODIFIERS.has(mod_id) and int(energy[team]) >= int(MODIFIERS[mod_id]["cost"])
+	return MODIFIERS.has(mod_id) and not bool(mod_used[team]) and int(energy[team]) >= int(MODIFIERS[mod_id]["cost"])
 
 func activate_modifier(team: String, mod_id: String) -> bool:
 	if not can_use_modifier(team, mod_id):
 		return false
+	mod_used[team] = true                        # only one modifier per turn
 	energy[team] = int(energy[team]) - int(MODIFIERS[mod_id]["cost"])
 	match mod_id:
 		"power_surge":
@@ -513,10 +539,13 @@ func bot_action(team: String) -> Dictionary:
 				atk_uid = uid
 				atk_foe = foe
 	if atk_uid != -1:
+		var used_mod := ""
 		if bot_difficulty >= 2 and best >= 0.6 and can_use_modifier(team, "power_surge"):
-			activate_modifier(team, "power_surge")     # spend energy to press an edge
+			if activate_modifier(team, "power_surge"):  # spend energy to press an edge
+				used_mod = "power_surge"
 		var rec := attack(atk_uid, atk_foe)
 		rec["type"] = "attack"
+		rec["modifier"] = used_mod
 		return rec
 
 	# 3) SURROUND SETUP — move beside an enemy so it ends fully surrounded by us.
