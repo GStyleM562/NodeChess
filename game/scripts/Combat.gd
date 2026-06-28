@@ -90,6 +90,36 @@ static func label(s: Dictionary) -> String:
 		return String(s.get("name", "Oro")) + " " + dmg
 	return String(s.get("name", "Daño")) + " " + dmg
 
+## Human reason WHY this resolved the way it did (for combat transparency).
+## Damage/★ only decide SAME colour; otherwise the colour hierarchy decides.
+static func win_reason(a: Dictionary, b: Dictionary) -> String:
+	var r := resolve(a, b)
+	if r == 0:
+		if String(a.get("col", "")) == "blue" and String(b.get("col", "")) == "blue":
+			return "ambos bloquean"
+		if String(a.get("col", "")) == "red" and String(b.get("col", "")) == "red":
+			return "ambos fallan"
+		return "empate"
+	var win: Dictionary = a if r > 0 else b
+	var lose: Dictionary = b if r > 0 else a
+	var wc := String(win.get("col", ""))
+	var lc := String(lose.get("col", ""))
+	if lc == "red":
+		return "el rival falló"
+	if wc == "blue":
+		return "Azul bloquea todo"
+	if wc == lc:
+		return "más ★" if wc == "purple" else "más daño"
+	return _cname(wc) + " vence a " + _cname(lc)
+
+static func _cname(c: String) -> String:
+	match c:
+		"white": return "Blanco"
+		"gold": return "Oro"
+		"purple": return "Púrpura"
+		"blue": return "Azul"
+		_: return "Rojo"
+
 static func color_of(s: Dictionary) -> Color:
 	match String(s.get("col", "red")):
 		"white": return Color(0.92, 0.94, 1.0)

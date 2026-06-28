@@ -834,19 +834,20 @@ func _team_color(team: String) -> Color:
 
 func _combat_msg(a_name: String, b_name: String, rec: Dictionary) -> Array:
 	var r: int = int(rec["result"])
+	var reason: String = Combat.win_reason(rec["seg_a"], rec["seg_b"])
 	if r == 0:
-		return ["Empate — nadie cae", Color(1, 1, 1)]
+		return ["Empate — nadie cae  (%s)" % reason, UITheme.TEXT]
 	var winner := a_name if r > 0 else b_name
 	var loser := b_name if r > 0 else a_name
 	if int(rec.get("ko", -1)) != -1:
-		return ["%s vence — %s ¡KO!" % [winner, loser], Color(0.6, 1.0, 0.7)]
+		return ["%s  ¡KO a %s!\n(%s)" % [winner, loser, reason], UITheme.SUCCESS]
 	match String(rec.get("win_col", "")):
 		"purple":
-			return ["%s gana (Morado) — %s: %s. ¡No cae!" % [winner, loser, rec.get("effect", "Estado")], Color(0.78, 0.55, 1.0)]
+			return ["%s gana — %s\n(%s · %s)" % [winner, String(rec.get("effect", "Estado")), reason, loser], UITheme.R_EPIC]
 		"blue":
-			return ["%s bloquea (Azul) — nadie cae" % winner, Color(0.45, 0.65, 1.0)]
+			return ["%s bloquea\n(%s)" % [winner, reason], UITheme.PRIMARY_EDGE]
 		_:
-			return ["%s gana — %s resiste" % [winner, loser], Color(1, 1, 1)]
+			return ["%s gana\n(%s)" % [winner, reason], UITheme.TEXT]
 
 func _combat_cutaway(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 	var fa: Figure3D = _vis.get(att_uid)
