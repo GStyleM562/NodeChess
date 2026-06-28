@@ -29,7 +29,7 @@ func _build() -> void:
 	add_child(_root)
 
 	var bg := ColorRect.new()
-	bg.color = Color(0, 0, 0, 0.86)
+	bg.color = Color(0.02, 0.03, 0.06, 0.9)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.add_child(bg)
 
@@ -43,9 +43,10 @@ func _build() -> void:
 	vb.add_theme_constant_override("separation", 6)
 	center.add_child(vb)
 
-	_title = _mk("¡Combate!", 30, Color(1, 0.9, 0.6))
+	_title = _mk("⚔  ¡COMBATE!  ⚔", 30, UITheme.GOLD)
 	vb.add_child(_title)
 
+	vb.add_child(_mk("ATACANTE", 14, UITheme.SUCCESS))
 	_card_a = CenterContainer.new()
 	_card_a.custom_minimum_size = Vector2(AREA.x, 66)
 	vb.add_child(_card_a)
@@ -54,8 +55,17 @@ func _build() -> void:
 	_presA.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vb.add_child(_presA)
 
-	vb.add_child(_mk("— VS —", 22, Color(1, 1, 1)))
+	var vs := _mk("VS", 22, UITheme.GOLD)
+	var vsp := PanelContainer.new()
+	vsp.add_theme_stylebox_override("panel", UITheme.pill(UITheme.SURFACE2, UITheme.BORDER.lightened(0.1), 14))
+	vsp.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vs.custom_minimum_size = Vector2(0, 0)
+	vsp.add_child(vs)
+	var vsc := CenterContainer.new()
+	vsc.add_child(vsp)
+	vb.add_child(vsc)
 
+	vb.add_child(_mk("DEFENSOR", 14, UITheme.DANGER))
 	_card_b = CenterContainer.new()
 	_card_b.custom_minimum_size = Vector2(AREA.x, 66)
 	vb.add_child(_card_b)
@@ -70,11 +80,10 @@ func _build() -> void:
 func _mk(t: String, sz: int, col: Color) -> Label:
 	var l := Label.new()
 	l.text = t
-	l.add_theme_font_size_override("font_size", sz)
-	l.modulate = col
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(AREA.x, 0)
+	UITheme.label(l, sz, col, true, 700)
 	return l
 
 func _build_card(slot: CenterContainer, fig: Dictionary, fallback: String, col: Color) -> void:

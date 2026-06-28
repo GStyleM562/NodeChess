@@ -8,18 +8,18 @@ extends Node3D
 ## Deferred: surround KO, KO-bench return, rank-up, energy/modifiers, real bot.
 
 const ROLE_COLOR := {
-	"normal": Color(0.20, 0.22, 0.30),
-	"entrance_player": Color(0.20, 0.45, 0.95),
-	"entrance_enemy": Color(0.95, 0.35, 0.30),
-	"goal_player": Color(0.30, 0.85, 0.50),
-	"goal_enemy": Color(0.98, 0.80, 0.25),
-	"buff": Color(1.0, 0.6, 0.2),
-	"obstacle": Color(0.10, 0.10, 0.12),
-	"teleporter": Color(0.55, 0.35, 1.0),
+	"normal": Color(0.086, 0.114, 0.2),        # #161D33
+	"entrance_player": Color(0.212, 0.82, 0.498),  # #36D17F
+	"entrance_enemy": Color(1.0, 0.322, 0.278),    # #FF5247
+	"goal_player": Color(0.212, 0.82, 0.498),
+	"goal_enemy": Color(1.0, 0.322, 0.278),
+	"buff": Color(1.0, 0.773, 0.239),          # #FFC53D
+	"obstacle": Color(0.055, 0.065, 0.1),
+	"teleporter": Color(0.722, 0.451, 1.0),    # #B873FF
 }
-const HILITE_MOVE := Color(0.35, 1.0, 0.5)
-const HILITE_ATK := Color(1.0, 0.3, 0.3)
-const HILITE_DEPLOY := Color(0.4, 0.8, 1.0)
+const HILITE_MOVE := Color(0.353, 0.627, 1.0)  # #5AA0FF
+const HILITE_ATK := Color(1.0, 0.322, 0.278)
+const HILITE_DEPLOY := Color(0.212, 0.82, 0.498)
 const FACE_OFFSET := 0.0
 const STATUS_ES := {"fear": "Miedo", "weakened": "Debilitado", "paralysis": "Paralizado", "immobilized": "Inmovilizado"}
 
@@ -94,7 +94,7 @@ func _build_environment() -> void:
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.05, 0.06, 0.10)
+	env.background_color = UITheme.BG_DEEP
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.55, 0.6, 0.8)
 	env.ambient_light_energy = 0.6
@@ -212,29 +212,34 @@ func _build_ui() -> void:
 	add_child(layer)
 	_status = Label.new()
 	_status.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_status.offset_left = 12
-	_status.offset_top = 10
-	_status.add_theme_font_size_override("font_size", 20)
-	_status.offset_right = -110
+	_status.offset_left = 56
+	_status.offset_top = 12
+	_status.offset_right = -56
+	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(_status, 16, UITheme.TEXT, true, 700)
 	layer.add_child(_status)
 
 	var menu_btn := Button.new()
-	menu_btn.text = "Menú"
+	menu_btn.text = "☰"
 	menu_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	menu_btn.offset_left = -100
+	menu_btn.offset_left = -52
 	menu_btn.offset_top = 8
 	menu_btn.offset_right = -10
-	menu_btn.offset_bottom = 46
+	menu_btn.offset_bottom = 48
+	UITheme.button_font(menu_btn, 20, UITheme.TEXT2, false, 700)
+	UITheme.style_surface(menu_btn, UITheme.SURFACE, UITheme.BORDER, 11)
 	menu_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 	layer.add_child(menu_btn)
 
 	_end_btn = Button.new()
 	_end_btn.text = "Terminar turno"
 	_end_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_end_btn.offset_left = -168
+	_end_btn.offset_left = -176
 	_end_btn.offset_top = -118
 	_end_btn.offset_right = -12
 	_end_btn.offset_bottom = -74
+	UITheme.button_font(_end_btn, 17, UITheme.TEXT2, true, 700)
+	UITheme.style_surface(_end_btn, Color(0.078, 0.102, 0.188), UITheme.BORDER, 14)
 	_end_btn.pressed.connect(_on_end_turn_pressed)
 	layer.add_child(_end_btn)
 
@@ -244,19 +249,22 @@ func _build_ui() -> void:
 	bench_panel.offset_bottom = -8
 	bench_panel.offset_left = 8
 	bench_panel.offset_right = -8
+	bench_panel.add_theme_stylebox_override("panel", UITheme.panel(Color(0.07, 0.08, 0.14, 0.95), UITheme.BORDER, 14, 1, 6))
 	layer.add_child(bench_panel)
 	_bench_box = HBoxContainer.new()
 	_bench_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	bench_panel.add_child(_bench_box)
 
 	# Energy readout (top-left) + equipped modifier cards (row above End Turn).
+	var en_pill := PanelContainer.new()
+	en_pill.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	en_pill.offset_left = 10
+	en_pill.offset_top = 48
+	en_pill.add_theme_stylebox_override("panel", UITheme.pill(Color(0.05, 0.08, 0.14, 0.95), UITheme.ENERGY.darkened(0.25), 9))
+	layer.add_child(en_pill)
 	_energy_label = Label.new()
-	_energy_label.add_theme_font_size_override("font_size", 22)
-	_energy_label.modulate = Color(1.0, 0.85, 0.35)
-	_energy_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	_energy_label.offset_left = 12
-	_energy_label.offset_top = 50
-	layer.add_child(_energy_label)
+	UITheme.label(_energy_label, 18, UITheme.ENERGY, true, 800)
+	en_pill.add_child(_energy_label)
 
 	var mods_panel := PanelContainer.new()
 	mods_panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -277,21 +285,21 @@ func _build_ui() -> void:
 	_banner.offset_bottom = 150
 	_banner.offset_left = 20
 	_banner.offset_right = -20
+	_banner.add_theme_stylebox_override("panel", UITheme.panel(Color(0.1, 0.09, 0.05, 0.97), UITheme.GOLD.darkened(0.2), 14, 2, 10))
 	_banner.visible = false
 	layer.add_child(_banner)
 	_banner_lbl = Label.new()
-	_banner_lbl.add_theme_font_size_override("font_size", 22)
 	_banner_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_banner_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_banner_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.label(_banner_lbl, 18, UITheme.GOLD, true, 700)
 	_banner.add_child(_banner_lbl)
 
 	# In-match figure counts (top, centered).
 	_hud_label = Label.new()
-	_hud_label.add_theme_font_size_override("font_size", 16)
-	_hud_label.modulate = Color(0.85, 0.9, 1.0)
+	UITheme.label(_hud_label, 15, UITheme.TEXT2, true, 700)
 	_hud_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_hud_label.offset_top = 52
+	_hud_label.offset_top = 78
 	_hud_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	layer.add_child(_hud_label)
 
@@ -339,9 +347,12 @@ func _refresh_bench_ui() -> void:
 		return
 	var disabled := _committed or _gs.turn_team != "player" or _busy or _over
 	for uid in bench:
+		var fd: Dictionary = Roster.FIGURES[_gs.units[uid]["rindex"]]
 		var b := Button.new()
-		b.text = Roster.FIGURES[_gs.units[uid]["rindex"]]["name"]
+		b.text = String(fd["name"])
 		b.disabled = disabled
+		UITheme.button_font(b, 14, UITheme.TEXT, true, 700)
+		UITheme.style_surface(b, UITheme.SURFACE2, FigureCard.rarity_color(fd), 10)
 		b.pressed.connect(_begin_deploy.bind(uid))
 		_bench_box.add_child(b)
 
@@ -383,9 +394,11 @@ func _refresh_energy_mods() -> void:
 			continue
 		var m: Dictionary = GameState.MODIFIERS[mid]
 		var b := Button.new()
-		b.text = "%s (%d⚡)" % [m["name"], int(m["cost"])]
+		b.text = "%s  ⚡%d" % [m["name"], int(m["cost"])]
 		b.tooltip_text = String(m["desc"])
 		b.disabled = not (can_play and _gs.can_use_modifier("player", mid))
+		UITheme.button_font(b, 14, UITheme.TEXT, true, 700)
+		UITheme.style_surface(b, UITheme.SURFACE, UITheme.ORANGE.darkened(0.1), 11)
 		b.pressed.connect(_on_modifier.bind(mid))
 		_mods_box.add_child(b)
 
@@ -902,13 +915,115 @@ func _show_winner(team: String) -> void:
 	_busy = true
 	_reset_activation()
 	_end_btn.visible = false
-	var l := Label.new()
-	l.set_anchors_preset(Control.PRESET_CENTER)
-	l.add_theme_font_size_override("font_size", 48)
-	l.text = "¡GANASTE!" if team == "player" else "Derrota…"
-	l.modulate = Color(0.6, 1, 0.7) if team == "player" else Color(1, 0.6, 0.6)
+	var win := team == "player"
 	var cl := CanvasLayer.new()
 	cl.layer = 20
 	add_child(cl)
-	cl.add_child(l)
-	_status.text = "Fin de la partida."
+	var bg := ColorRect.new()
+	bg.color = Color(0.02, 0.03, 0.06, 0.92)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cl.add_child(bg)
+	cl.add_child(_vic_glow(UITheme.GOLD if win else UITheme.DANGER))
+
+	var card := PanelContainer.new()
+	card.set_anchors_preset(Control.PRESET_CENTER)
+	card.offset_left = -210
+	card.offset_right = 210
+	card.offset_top = -300
+	card.offset_bottom = 300
+	card.add_theme_stylebox_override("panel", UITheme.panel(Color(0.09, 0.10, 0.18, 0.98), (UITheme.GOLD if win else UITheme.DANGER).darkened(0.1), 22, 2, 18))
+	cl.add_child(card)
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 12)
+	card.add_child(v)
+
+	v.add_child(_vic_lbl("★", 40, UITheme.GOLD if win else UITheme.MUTED, true, 800))
+	v.add_child(_vic_lbl("¡VICTORIA!" if win else "DERROTA", 42, (UITheme.GOLD if win else UITheme.DANGER), true, 800))
+	v.add_child(_vic_lbl("Buen duelo." if win else "La próxima es tuya.", 16, UITheme.TEXT2, false, 600))
+
+	# XP bar (placeholder)
+	v.add_child(_vic_lbl("Nivel 1", 14, UITheme.TEXT2, true, 700))
+	var xp := ProgressBar.new()
+	xp.custom_minimum_size = Vector2(360, 18)
+	xp.min_value = 0; xp.max_value = 100; xp.value = 64 if win else 28
+	xp.show_percentage = false
+	var xbg := StyleBoxFlat.new(); xbg.bg_color = Color(0.1, 0.13, 0.22); xbg.set_corner_radius_all(9)
+	var xfg := StyleBoxFlat.new(); xfg.bg_color = UITheme.GOLD; xfg.set_corner_radius_all(9)
+	xp.add_theme_stylebox_override("background", xbg)
+	xp.add_theme_stylebox_override("fill", xfg)
+	v.add_child(_center(xp))
+	v.add_child(_vic_lbl("+%d XP" % (120 if win else 35), 13, UITheme.GOLD, true, 700))
+
+	# reward chips
+	var chips := HBoxContainer.new()
+	chips.alignment = BoxContainer.ALIGNMENT_CENTER
+	chips.add_theme_constant_override("separation", 8)
+	chips.add_child(_vic_chip("🪙 +%d Monedas" % (85 if win else 12), UITheme.GOLD))
+	chips.add_child(_vic_chip("🏆 +%d Trofeos" % (30 if win else -18), UITheme.PRIMARY_EDGE))
+	v.add_child(chips)
+
+	# chest (placeholder, §11 Chest UX)
+	if win:
+		var chest := PanelContainer.new()
+		chest.add_theme_stylebox_override("panel", UITheme.panel(Color(0.12, 0.11, 0.06), UITheme.GOLD.darkened(0.2), 14, 2, 10))
+		var cv := VBoxContainer.new()
+		cv.alignment = BoxContainer.ALIGNMENT_CENTER
+		chest.add_child(cv)
+		cv.add_child(_vic_lbl("🎁  Cofre Raro", 18, UITheme.GOLD, true, 800))
+		cv.add_child(_vic_lbl("Desbloquea en 2h  ·  o con 💎", 12, UITheme.TEXT2, false, 600))
+		v.add_child(chest)
+
+	# buttons
+	var rematch := Button.new()
+	rematch.text = "↻  Revancha"
+	rematch.custom_minimum_size = Vector2(360, 54)
+	UITheme.button_font(rematch, 20, UITheme.TEXT2, true, 700)
+	UITheme.style_surface(rematch, UITheme.SURFACE, UITheme.BORDER, 14)
+	rematch.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/board.tscn"))
+	v.add_child(_center(rematch))
+	var claim := Button.new()
+	claim.text = "Reclamar y volver"
+	claim.custom_minimum_size = Vector2(360, 60)
+	UITheme.button_font(claim, 22, Color.WHITE, true, 800)
+	UITheme.style_primary(claim, UITheme.PRIMARY, 16)
+	claim.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+	v.add_child(_center(claim))
+
+	_status.text = ""
+
+func _vic_glow(col: Color) -> TextureRect:
+	var tr := TextureRect.new()
+	tr.set_anchors_preset(Control.PRESET_CENTER)
+	tr.offset_left = -260; tr.offset_right = 260; tr.offset_top = -320; tr.offset_bottom = 120
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var g := Gradient.new()
+	g.set_color(0, Color(col.r, col.g, col.b, 0.3))
+	g.set_color(1, Color(col.r, col.g, col.b, 0.0))
+	var gt := GradientTexture2D.new()
+	gt.gradient = g
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(1.0, 1.0)
+	tr.texture = gt
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_SCALE
+	return tr
+
+func _center(c: Control) -> CenterContainer:
+	var cc := CenterContainer.new()
+	cc.add_child(c)
+	return cc
+
+func _vic_lbl(t: String, sz: int, col: Color, title: bool, weight: int) -> Label:
+	var l := Label.new()
+	l.text = t
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(l, sz, col, title, weight)
+	return l
+
+func _vic_chip(t: String, col: Color) -> Control:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UITheme.pill(UITheme.SURFACE2, col.darkened(0.3), 10))
+	p.add_child(_vic_lbl(t, 13, col, true, 700))
+	return p

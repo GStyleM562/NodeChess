@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    @keyframes floaty { 0%,100%{ transform:translate(-50%,-54%);} 50%{ transform:translate(-50%,-60%);} }
+    @keyframes pulseGlow { 0%,100%{ opacity:.5; } 50%{ opacity:1; } }
+    @keyframes ringSpin { to { transform:rotate(360deg);} }
+    @keyframes readyPulse { 0%,100%{ box-shadow:0 0 0 0 rgba(54,209,127,.5);} 50%{ box-shadow:0 0 0 7px rgba(54,209,127,0);} }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    ::-webkit-scrollbar { width:0; height:0; }
+  </style>
+</helmet>
+<div style="position:relative; width:432px; height:936px; margin:0 auto; overflow:hidden; font-family:Manrope,system-ui,sans-serif; color:#F4F6FF; background:radial-gradient(125% 65% at 50% -10%, #1b2547 0%, rgba(27,37,71,0) 52%), radial-gradient(95% 55% at 50% 112%, #14213f 0%, rgba(20,33,63,0) 60%), #0B0E1A;">
+
+  <!-- ============================ HOME ============================ -->
+  <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+  <div style="position:absolute; inset:0; display:flex; flex-direction:column;">
+
+    <!-- status bar -->
+    <div style="height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 24px; font-family:Sora; font-size:14px; font-weight:700; color:#F4F6FF;">
+      <span>9:41</span>
+      <div style="display:flex; align-items:center; gap:7px; opacity:.92;">
+        <svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="4.5" width="3" height="7.5" rx="1"/><rect x="9" y="2" width="3" height="10" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1"/></svg>
+        <svg width="17" height="12" viewBox="0 0 17 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 4.2C4.5 1 12.5 1 16 4.2M3.4 6.6c2.6-2.2 7.6-2.2 10.2 0M6 9c1.4-1.1 3.6-1.1 5 0" stroke-linecap="round"/></svg>
+        <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3" stroke="currentColor" opacity=".5"/><rect x="2" y="2" width="16" height="8" rx="1.5" fill="currentColor"/><rect x="23" y="4" width="2" height="4" rx="1" fill="currentColor" opacity=".5"/></svg>
+      </div>
+    </div>
+
+    <!-- top bar -->
+    <div style="flex:0 0 auto; display:flex; align-items:center; gap:11px; padding:4px 18px 12px;">
+      <div style="position:relative; width:46px; height:46px; flex:0 0 auto;">
+        <div style="position:absolute; inset:-3px; border-radius:50%; background:conic-gradient(#FFC53D 0 72%, #2E3658 72% 100%);"></div>
+        <div style="position:absolute; inset:0; border-radius:50%; background:linear-gradient(160deg,#243056,#161B2E); border:2px solid #0B0E1A; display:flex; align-items:center; justify-content:center; font-family:Sora; font-weight:800; font-size:16px; color:#CBD5FF;">A</div>
+        <div style="position:absolute; bottom:-5px; left:50%; transform:translateX(-50%); background:#FFC53D; color:#1a1405; font-family:Sora; font-weight:800; font-size:11px; padding:1px 7px; border-radius:7px; border:1.5px solid #0B0E1A;">12</div>
+      </div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:Sora; font-weight:700; font-size:16px; line-height:1.1;">Comandante</div>
+        <div style="margin-top:5px; height:6px; border-radius:6px; background:#171d33; overflow:hidden;"><div style="width:62%; height:100%; border-radius:6px; background:linear-gradient(90deg,#2E6BFF,#5AA0FF);"></div></div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="display:flex; align-items:center; gap:6px; background:#12172a; border:1px solid #232C4A; border-radius:999px; padding:6px 10px 6px 7px;">
+          <svg width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#FFC53D"/><circle cx="12" cy="12" r="9" fill="none" stroke="#C8961F" stroke-width="1.5"/><text x="12" y="16" font-size="11" font-family="Sora" font-weight="800" fill="#7a5a0c" text-anchor="middle">$</text></svg>
+          <span style="font-family:Sora; font-weight:700; font-size:13px;">2,450</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; background:#12172a; border:1px solid #232C4A; border-radius:999px; padding:6px 10px 6px 7px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#5AC8FF"><path d="M12 2 5 9l7 13 7-13-7-7Z"/><path d="M12 2 5 9l7 13 7-13-7-7Z" fill="none" stroke="#2E9FE0" stroke-width="1.2"/></svg>
+          <span style="font-family:Sora; font-weight:700; font-size:13px;">60</span>
+        </div>
+        <button onClick="{{ goProfile }}" style="width:36px; height:36px; border-radius:11px; background:#12172a; border:1px solid #232C4A; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#A9B2D0;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a7.6 7.6 0 0 0 0-3l1.7-1.3-2-3.4-2 .8a7.6 7.6 0 0 0-2.6-1.5L14 2h-4l-.5 2.6A7.6 7.6 0 0 0 6.9 6.1l-2-.8-2 3.4 1.7 1.3a7.6 7.6 0 0 0 0 3l-1.7 1.3 2 3.4 2-.8a7.6 7.6 0 0 0 2.6 1.5L10 22h4l.5-2.6a7.6 7.6 0 0 0 2.6-1.5l2 .8 2-3.4-1.7-1.3Z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- scroll content -->
+    <div style="flex:1; min-height:0; overflow-y:auto; padding:0 18px 96px;">
+
+      <!-- centerpiece -->
+      <div style="position:relative; height:336px; margin:2px -4px 0;">
+        <div style="position:absolute; left:50%; top:46%; transform:translate(-50%,-50%); width:300px; height:300px; border-radius:50%; background:radial-gradient(circle, rgba(255,197,61,.26), rgba(255,197,61,0) 68%);"></div>
+        <div style="position:absolute; left:50%; top:42%; transform:translate(-50%,-50%); width:230px; height:230px; border-radius:50%; border:1px dashed rgba(255,197,61,.22); animation:ringSpin 32s linear infinite;"></div>
+        <button onClick="{{ goDex }}" style="position:absolute; top:6px; right:8px; z-index:3; display:flex; align-items:center; gap:5px; background:rgba(18,23,42,.7); border:1px solid #2E3658; color:#A9B2D0; border-radius:999px; padding:7px 12px; font-family:Manrope; font-weight:700; font-size:12px; cursor:pointer; backdrop-filter:blur(6px);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Cambiar
+        </button>
+        <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-54%); width:190px; height:250px; border-radius:96px 96px 38px 38px; background:linear-gradient(176deg,#FFE6A6 0%,#F0AE42 34%,#7a531d 64%,#241d2e 100%); box-shadow:0 34px 64px rgba(0,0,0,.55), inset 0 3px 0 rgba(255,255,255,.45), inset 0 -30px 50px rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; animation:floaty 4.5s ease-in-out infinite;">
+          <span style="font-family:Sora; font-weight:800; font-size:90px; color:rgba(255,255,255,.94); text-shadow:0 6px 22px rgba(0,0,0,.45);">SV</span>
+        </div>
+        <div style="position:absolute; left:50%; bottom:42px; transform:translateX(-50%); width:216px; height:40px; border-radius:50%; background:radial-gradient(ellipse, rgba(255,197,61,.5), rgba(255,197,61,0) 70%);"></div>
+        <div style="position:absolute; left:0; right:0; bottom:0; text-align:center;">
+          <div style="font-family:Sora; font-weight:800; font-size:27px; letter-spacing:.3px;">Storm Valkyrie</div>
+          <div style="display:inline-flex; align-items:center; gap:6px; margin-top:7px; background:linear-gradient(180deg,#3a2f12,#241d0d); border:1px solid #6b5417; border-radius:999px; padding:5px 13px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFC53D"><path d="m12 2 2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17.8 5.9 20.4l1.5-6.8L2.2 9l6.9-.7L12 2Z"/></svg>
+            <span style="font-family:Sora; font-weight:800; font-size:12px; letter-spacing:1px; color:#FFD98A;">LÍDER · LEGENDARIA</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- chests / gifts -->
+      <div style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 11px;">
+        <span style="font-family:Sora; font-weight:700; font-size:14px; color:#C7CEEA;">Cofres</span>
+        <span style="font-family:Manrope; font-weight:700; font-size:12px; color:#6B7596;">2 / 4 espacios</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:9px;">
+        <sc-for list="{{ gifts }}" as="g" hint-placeholder-count="4">
+          <div style="position:relative; border-radius:16px; padding:11px 6px 9px; background:#12162a; border:1px solid #222a45; display:flex; flex-direction:column; align-items:center; gap:8px;">
+            <div style="position:relative; width:48px; height:48px; border-radius:13px; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at 50% 30%, {{ g.rcol }}, rgba(0,0,0,.25)); box-shadow:inset 0 1px 0 rgba(255,255,255,.3), inset 0 -10px 16px rgba(0,0,0,.35);">
+              <sc-if value="{{ g.empty }}">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#46506f" stroke-width="2" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>
+              </sc-if>
+              <sc-if value="{{ g.notEmpty }}">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="3" y="9" width="18" height="11" rx="2" fill="rgba(0,0,0,.28)" stroke="rgba(255,255,255,.6)" stroke-width="1.4"/><path d="M3 9l2.4-4h13.2L21 9" fill="rgba(255,255,255,.15)" stroke="rgba(255,255,255,.6)" stroke-width="1.4"/><rect x="10.6" y="9" width="2.8" height="11" fill="rgba(255,255,255,.55)"/><circle cx="12" cy="13.5" r="1.5" fill="#fff"/></svg>
+              </sc-if>
+            </div>
+            <sc-if value="{{ g.ready }}"><div style="font-family:Sora; font-weight:800; font-size:11px; color:#36D17F;">{{ g.status }}</div></sc-if>
+            <sc-if value="{{ g.waiting }}"><div style="display:flex; align-items:center; gap:3px; font-family:Manrope; font-weight:700; font-size:11px; color:#A9B2D0;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/></svg>{{ g.status }}</div></sc-if>
+            <sc-if value="{{ g.empty }}"><div style="font-family:Manrope; font-weight:700; font-size:11px; color:#46506f;">{{ g.status }}</div></sc-if>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- secondary quick actions -->
+      <div style="display:flex; gap:9px; margin-top:13px;">
+        <button onClick="{{ goDex }}" style="flex:1; display:flex; align-items:center; gap:9px; background:#12162a; border:1px solid #222a45; border-radius:14px; padding:11px 13px; cursor:pointer; color:#F4F6FF;">
+          <span style="width:30px; height:30px; border-radius:9px; background:rgba(79,195,247,.14); display:flex; align-items:center; justify-content:center; color:#4FC3F7;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2" stroke-linecap="round"/></svg></span>
+          <span style="font-family:Sora; font-weight:700; font-size:13px;">Probar</span>
+        </button>
+        <button style="flex:1; position:relative; display:flex; align-items:center; gap:9px; background:#12162a; border:1px solid #222a45; border-radius:14px; padding:11px 13px; cursor:pointer; color:#F4F6FF;">
+          <span style="width:30px; height:30px; border-radius:9px; background:rgba(255,138,61,.14); display:flex; align-items:center; justify-content:center; color:#FF8A3D;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v18l7-5 7 5V3z"/></svg></span>
+          <span style="font-family:Sora; font-weight:700; font-size:13px;">Eventos</span>
+          <span style="position:absolute; top:-6px; right:-4px; background:#FF5247; color:#fff; font-family:Sora; font-weight:800; font-size:9px; padding:2px 6px; border-radius:7px; border:1.5px solid #0B0E1A;">NUEVO</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- PLAY (floating above nav) -->
+    <div style="position:absolute; left:18px; right:18px; bottom:92px; z-index:30;">
+      <button onClick="{{ goBattle }}" style="width:100%; height:70px; border:none; cursor:pointer; border-radius:20px; background:linear-gradient(180deg,#4d8bff 0%,#2E6BFF 52%,#1f4fd1 100%); box-shadow:0 14px 30px rgba(46,107,255,.46), inset 0 2px 0 rgba(255,255,255,.55), inset 0 -4px 0 rgba(0,0,0,.18); display:flex; align-items:center; justify-content:center; gap:13px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M7 4.5v15a1 1 0 0 0 1.5.87l13-7.5a1 1 0 0 0 0-1.74l-13-7.5A1 1 0 0 0 7 4.5Z"/></svg>
+        <span style="text-align:left;"><span style="display:block; font-family:Sora; font-weight:800; font-size:23px; color:#fff; line-height:1; letter-spacing:.5px;">JUGAR</span><span style="display:block; font-family:Manrope; font-weight:600; font-size:11.5px; color:rgba(255,255,255,.82); margin-top:3px;">Partida rápida · 1 v 1</span></span>
+      </button>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- placeholder screens (built next) -->
+  <sc-if value="{{ isDeck }}">
+  <div style="position:absolute; inset:0; display:flex; flex-direction:column;">
+    <!-- header -->
+    <div style="flex:0 0 auto; padding:20px 20px 14px; display:flex; align-items:flex-end; justify-content:space-between;">
+      <div>
+        <div style="font-family:Manrope; font-weight:700; font-size:12px; letter-spacing:1.5px; color:#6B7596; text-transform:uppercase;">Mazo activo</div>
+        <div style="font-family:Sora; font-weight:800; font-size:24px; margin-top:3px;">Arma tu equipo</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:7px; background:#12162a; border:1px solid #2a3357; border-radius:999px; padding:7px 13px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#36D17F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        <span style="font-family:Sora; font-weight:800; font-size:14px;"><span style="color:#36D17F;">{{ teamCount }}</span><span style="color:#6B7596;"> / 6</span></span>
+      </div>
+    </div>
+
+    <div style="flex:1; min-height:0; overflow-y:auto; padding:0 20px 96px;">
+      <!-- map selector -->
+      <div style="display:flex; align-items:center; justify-content:space-between; margin:2px 0 10px;">
+        <span style="font-family:Sora; font-weight:700; font-size:14px; color:#C7CEEA;">Mapa</span>
+      </div>
+      <div style="display:flex; gap:11px; overflow-x:auto; padding-bottom:4px; margin:0 -20px; padding-left:20px; padding-right:20px;">
+        <sc-for list="{{ maps }}" as="m" hint-placeholder-count="3">
+          <div style="flex:0 0 auto; width:150px; border-radius:16px; overflow:hidden; border:1px solid #232c4a; background:#10152a;">
+            <div style="position:relative; height:72px; background:linear-gradient(135deg,#1c2746,#0c1226);">
+              <div style="position:absolute; inset:0; background:radial-gradient(circle at 50% 120%, rgba(46,107,255,.32), rgba(46,107,255,0) 70%);"></div>
+              <svg style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);" width="70" height="46" viewBox="0 0 70 46" fill="none"><g stroke="#41507f" stroke-width="1.4"><path d="M35 6 18 16M35 6l17 10M18 16v14M52 16v14M18 30l17 10M52 30 35 40M18 16 8 23M52 16l10 7"/></g><g fill="#5878c8"><circle cx="35" cy="6" r="3.4"/><circle cx="18" cy="16" r="3"/><circle cx="52" cy="16" r="3"/><circle cx="18" cy="30" r="3"/><circle cx="52" cy="30" r="3"/><circle cx="35" cy="40" r="3.4"/></g><circle cx="35" cy="23" r="4" fill="#FFC53D"/></svg>
+              <sc-if value="{{ m.hot }}"><div style="position:absolute; top:8px; left:8px; background:#FF8A3D; color:#241200; font-family:Sora; font-weight:800; font-size:9px; letter-spacing:.5px; padding:2px 7px; border-radius:6px;">POPULAR</div></sc-if>
+            </div>
+            <div style="padding:9px 11px 11px;">
+              <div style="font-family:Sora; font-weight:700; font-size:14px;">{{ m.name }}</div>
+              <div style="font-family:Manrope; font-weight:600; font-size:11px; color:#6B7596; margin-top:2px;">{{ m.sub }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- team grid -->
+      <div style="display:flex; align-items:center; justify-content:space-between; margin:20px 0 11px;">
+        <span style="font-family:Sora; font-weight:700; font-size:14px; color:#C7CEEA;">Tu equipo</span>
+        <span style="font-family:Manrope; font-weight:700; font-size:12px; color:#6B7596;">Mantén para reordenar</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+        <sc-for list="{{ team }}" as="f" hint-placeholder-count="6">
+          <div onClick="{{ f.onOpen }}" style="position:relative; border-radius:15px; overflow:hidden; background:#11152a; border:1px solid #232c4a; cursor:pointer;">
+            <div style="position:absolute; top:0; left:0; right:0; height:3px; background:{{ f.rcol }};"></div>
+            <div style="position:relative; height:78px; background:radial-gradient(120% 95% at 50% 14%, {{ f.accent }}, rgba(8,10,20,.35) 74%); display:flex; align-items:center; justify-content:center;">
+              <span style="font-family:Sora; font-weight:800; font-size:32px; color:rgba(255,255,255,.94); text-shadow:0 3px 9px rgba(0,0,0,.45);">{{ f.mono }}</span>
+              <div style="position:absolute; bottom:5px; right:6px; display:flex; align-items:center; gap:2px; background:rgba(8,10,20,.66); border-radius:6px; padding:2px 5px;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="#4FC3F7"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+                <span style="font-family:Sora; font-weight:800; font-size:10px; color:#cfe6ff;">{{ f.stamina }}</span>
+              </div>
+            </div>
+            <div style="padding:7px 9px 9px;">
+              <div style="font-family:Sora; font-weight:700; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ f.short }}</div>
+              <div style="font-family:Manrope; font-weight:600; font-size:10.5px; color:#7c87a8; margin-top:1px;">{{ f.type }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- modifiers -->
+      <div style="display:flex; align-items:center; justify-content:space-between; margin:22px 0 5px;">
+        <span style="font-family:Sora; font-weight:700; font-size:14px; color:#C7CEEA;">Modificadores</span>
+        <span style="display:flex; align-items:center; gap:4px; font-family:Manrope; font-weight:700; font-size:11px; color:#4FC3F7;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="#4FC3F7"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>Cuestan energía en batalla
+        </span>
+      </div>
+      <div style="font-family:Manrope; font-weight:600; font-size:11.5px; color:#6B7596; margin-bottom:11px;">Equipa hasta 2 para usarlos durante la partida.</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <sc-for list="{{ modifiers }}" as="md" hint-placeholder-count="4">
+          <div style="position:relative; border-radius:15px; padding:12px 12px 13px; background:#11152a; border:1.5px solid {{ md.border }};">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <div style="width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; background:{{ md.col }}22;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="{{ md.col }}"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+              </div>
+              <div style="display:flex; align-items:center; gap:3px; background:#0c1124; border:1px solid #2a3357; border-radius:999px; padding:3px 8px;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="#4FC3F7"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+                <span style="font-family:Sora; font-weight:800; font-size:12px;">{{ md.cost }}</span>
+              </div>
+            </div>
+            <div style="font-family:Sora; font-weight:700; font-size:14px; margin-top:9px;">{{ md.name }}</div>
+            <div style="font-family:Manrope; font-weight:600; font-size:11px; color:#8a93b4; line-height:1.35; margin-top:3px;">{{ md.desc }}</div>
+            <sc-if value="{{ md.eq }}"><div style="position:absolute; top:10px; right:10px;"></div></sc-if>
+            <div style="margin-top:10px; display:flex; align-items:center; justify-content:center; gap:6px; border-radius:9px; padding:7px; font-family:Sora; font-weight:700; font-size:12px; background:{{ md.btnBg }}; color:{{ md.btnCol }}; border:1px solid {{ md.border }};">
+              <sc-if value="{{ md.eq }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Equipado</sc-if>
+              <sc-if value="{{ md.notEq }}">Equipar</sc-if>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- footer play -->
+    <div style="position:absolute; left:20px; right:20px; bottom:92px; z-index:30;">
+      <button onClick="{{ goBattle }}" style="width:100%; height:62px; border:none; cursor:pointer; border-radius:18px; background:linear-gradient(180deg,#4d8bff 0%,#2E6BFF 52%,#1f4fd1 100%); box-shadow:0 12px 26px rgba(46,107,255,.44), inset 0 2px 0 rgba(255,255,255,.5); display:flex; align-items:center; justify-content:center; gap:11px;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M7 4.5v15a1 1 0 0 0 1.5.87l13-7.5a1 1 0 0 0 0-1.74l-13-7.5A1 1 0 0 0 7 4.5Z"/></svg>
+        <span style="font-family:Sora; font-weight:800; font-size:19px; color:#fff; letter-spacing:.5px;">Jugar con este mazo</span>
+      </button>
+    </div>
+  </div>
+</sc-if>
+  <sc-if value="{{ isDex }}">
+  <div style="position:absolute; inset:0; display:flex; flex-direction:column;">
+    <div style="flex:0 0 auto; padding:20px 20px 12px;">
+      <div style="display:flex; align-items:flex-end; justify-content:space-between;">
+        <div>
+          <div style="font-family:Manrope; font-weight:700; font-size:12px; letter-spacing:1.5px; color:#6B7596; text-transform:uppercase;">Colección</div>
+          <div style="font-family:Sora; font-weight:800; font-size:24px; margin-top:3px;">Tus figuras</div>
+        </div>
+        <div style="font-family:Sora; font-weight:800; font-size:14px; color:#FFC53D;">8<span style="color:#6B7596;"> / 24</span></div>
+      </div>
+      <!-- search -->
+      <div style="display:flex; align-items:center; gap:9px; margin-top:13px; background:#11152a; border:1px solid #232c4a; border-radius:13px; padding:11px 13px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7596" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2" stroke-linecap="round"/></svg>
+        <span style="font-family:Manrope; font-weight:500; font-size:14px; color:#56608a;">Buscar figura…</span>
+      </div>
+      <!-- filter chips -->
+      <div style="display:flex; gap:8px; overflow-x:auto; margin:13px -20px 0; padding:0 20px 2px;">
+        <div style="flex:0 0 auto; font-family:Sora; font-weight:700; font-size:12.5px; color:#0B0E1A; background:#FFC53D; border-radius:999px; padding:7px 15px;">Todas</div>
+        <div style="flex:0 0 auto; font-family:Sora; font-weight:700; font-size:12.5px; color:#A9B2D0; background:#11152a; border:1px solid #232c4a; border-radius:999px; padding:7px 15px;">Ruleta</div>
+        <div style="flex:0 0 auto; font-family:Sora; font-weight:700; font-size:12.5px; color:#A9B2D0; background:#11152a; border:1px solid #232c4a; border-radius:999px; padding:7px 15px;">Dado</div>
+        <div style="flex:0 0 auto; font-family:Sora; font-weight:700; font-size:12.5px; color:#A9B2D0; background:#11152a; border:1px solid #232c4a; border-radius:999px; padding:7px 15px;">Moneda</div>
+        <div style="flex:0 0 auto; font-family:Sora; font-weight:700; font-size:12.5px; color:#A9B2D0; background:#11152a; border:1px solid #232c4a; border-radius:999px; padding:7px 15px;">2d6</div>
+      </div>
+    </div>
+
+    <div style="flex:1; min-height:0; overflow-y:auto; padding:14px 20px 96px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <sc-for list="{{ roster }}" as="f" hint-placeholder-count="8">
+          <div onClick="{{ f.onOpen }}" style="position:relative; border-radius:18px; overflow:hidden; background:#11152a; border:1px solid #222a45; cursor:pointer; box-shadow:0 6px 16px rgba(0,0,0,.25);">
+            <div style="position:absolute; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg, {{ f.rcol }}, {{ f.accent }});"></div>
+            <div style="position:relative; height:128px; background:radial-gradient(125% 100% at 50% 12%, {{ f.accent }}, rgba(8,10,20,.4) 76%); display:flex; align-items:center; justify-content:center;">
+              <div style="position:absolute; left:50%; top:46%; transform:translate(-50%,-50%); width:120px; height:120px; border-radius:50%; border:1px dashed rgba(255,255,255,.16);"></div>
+              <span style="font-family:Sora; font-weight:800; font-size:52px; color:rgba(255,255,255,.95); text-shadow:0 4px 14px rgba(0,0,0,.4); position:relative;">{{ f.mono }}</span>
+              <div style="position:absolute; top:9px; left:9px; display:flex; align-items:center; gap:3px; background:rgba(8,10,20,.6); border-radius:7px; padding:3px 7px;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="#4FC3F7"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+                <span style="font-family:Sora; font-weight:800; font-size:11px; color:#cfe6ff;">{{ f.stamina }}</span>
+              </div>
+              <div style="position:absolute; bottom:8px; right:9px; font-family:Sora; font-weight:800; font-size:9px; letter-spacing:.5px; color:{{ f.rcol }}; background:rgba(8,10,20,.6); border-radius:6px; padding:3px 7px; text-transform:uppercase;">{{ f.rarity }}</div>
+            </div>
+            <div style="padding:10px 12px 12px;">
+              <div style="font-family:Sora; font-weight:700; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ f.name }}</div>
+              <div style="display:flex; align-items:center; gap:6px; margin-top:5px;">
+                <span style="font-family:Manrope; font-weight:700; font-size:11px; color:#8a93b4;">{{ f.role }}</span>
+                <span style="width:3px; height:3px; border-radius:50%; background:#3a4567;"></span>
+                <span style="font-family:Manrope; font-weight:700; font-size:11px; color:#8a93b4;">{{ f.type }}</span>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</sc-if>
+  <sc-if value="{{ isDetail }}">
+  <div style="position:absolute; inset:0; display:flex; flex-direction:column; background:radial-gradient(120% 50% at 50% 0%, {{ detailFig.glow }}, rgba(11,14,26,0) 60%), #0B0E1A;">
+    <!-- header -->
+    <div style="flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:16px 18px 6px;">
+      <button onClick="{{ goDex }}" style="width:40px; height:40px; border-radius:12px; background:rgba(18,23,42,.7); border:1px solid #232c4a; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#F4F6FF; backdrop-filter:blur(6px);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></svg>
+      </button>
+      <div style="font-family:Manrope; font-weight:800; font-size:11px; letter-spacing:1.5px; color:{{ detailFig.rcol }}; text-transform:uppercase;">{{ detailFig.rarity }}</div>
+      <button style="width:40px; height:40px; border-radius:12px; background:rgba(18,23,42,.7); border:1px solid #232c4a; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#A9B2D0;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 21-1.4-1.3C5.4 15 2 11.9 2 8.1A4.6 4.6 0 0 1 12 5a4.6 4.6 0 0 1 10 3.1c0 3.8-3.4 6.9-8.6 11.6L12 21Z"/></svg>
+      </button>
+    </div>
+
+    <div style="flex:1; min-height:0; overflow-y:auto; padding:0 18px 110px;">
+      <!-- hero -->
+      <div style="position:relative; height:230px; display:flex; align-items:center; justify-content:center;">
+        <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-52%); width:200px; height:200px; border-radius:50%; background:radial-gradient(circle, {{ detailFig.accent }}44, rgba(0,0,0,0) 68%);"></div>
+        <div style="position:relative; width:150px; height:184px; border-radius:74px 74px 26px 26px; background:radial-gradient(125% 95% at 50% 12%, {{ detailFig.accent }}, rgba(10,12,24,.5) 78%); border:2px solid {{ detailFig.rcol }}; box-shadow:0 24px 48px rgba(0,0,0,.5), inset 0 2px 0 rgba(255,255,255,.35); display:flex; align-items:center; justify-content:center;">
+          <span style="font-family:Sora; font-weight:800; font-size:74px; color:rgba(255,255,255,.95); text-shadow:0 5px 18px rgba(0,0,0,.45);">{{ detailFig.mono }}</span>
+        </div>
+        <div style="position:absolute; left:50%; bottom:18px; transform:translateX(-50%); width:170px; height:30px; border-radius:50%; background:radial-gradient(ellipse, {{ detailFig.accent }}55, rgba(0,0,0,0) 70%);"></div>
+      </div>
+      <div style="text-align:center; margin-top:2px;">
+        <div style="font-family:Sora; font-weight:800; font-size:28px;">{{ detailFig.name }}</div>
+        <div style="display:inline-flex; align-items:center; gap:9px; margin-top:8px; font-family:Manrope; font-weight:700; font-size:13px; color:#A9B2D0;">
+          <span>{{ detailFig.role }}</span>
+          <span style="width:4px; height:4px; border-radius:50%; background:#3a4567;"></span>
+          <span>{{ detailFig.type }}</span>
+        </div>
+      </div>
+
+      <!-- stat strip -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:18px;">
+        <div style="display:flex; align-items:center; gap:11px; background:#11152a; border:1px solid #222a45; border-radius:14px; padding:12px 14px;">
+          <span style="width:36px; height:36px; border-radius:10px; background:rgba(79,195,247,.14); display:flex; align-items:center; justify-content:center;"><svg width="19" height="19" viewBox="0 0 24 24" fill="#4FC3F7"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg></span>
+          <div><div style="font-family:Sora; font-weight:800; font-size:18px; line-height:1;">{{ detailFig.stamina }}</div><div style="font-family:Manrope; font-weight:600; font-size:11px; color:#6B7596; margin-top:2px;">Stamina</div></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:11px; background:#11152a; border:1px solid #222a45; border-radius:14px; padding:12px 14px;">
+          <span style="width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:{{ detailFig.rcol }}22;"><svg width="19" height="19" viewBox="0 0 24 24" fill="{{ detailFig.rcol }}"><path d="m12 2 2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17.8 5.9 20.4l1.5-6.8L2.2 9l6.9-.7L12 2Z"/></svg></span>
+          <div><div style="font-family:Sora; font-weight:800; font-size:15px; line-height:1;">{{ detailFig.rarity }}</div><div style="font-family:Manrope; font-weight:600; font-size:11px; color:#6B7596; margin-top:2px;">Rareza</div></div>
+        </div>
+      </div>
+
+      <!-- tabs -->
+      <div style="display:flex; gap:6px; margin-top:18px; background:#0d1124; border:1px solid #1c2238; border-radius:14px; padding:5px;">
+        <button onClick="{{ setResumen }}" style="flex:1; border:none; cursor:pointer; border-radius:10px; padding:10px; font-family:Sora; font-weight:700; font-size:13px; background:{{ rBg }}; color:{{ rCol }};">Resumen</button>
+        <button onClick="{{ setCombate }}" style="flex:1; border:none; cursor:pointer; border-radius:10px; padding:10px; font-family:Sora; font-weight:700; font-size:13px; background:{{ cBg }}; color:{{ cCol }};">Combate</button>
+        <button onClick="{{ setEvo }}" style="flex:1; border:none; cursor:pointer; border-radius:10px; padding:10px; font-family:Sora; font-weight:700; font-size:13px; background:{{ eBg }}; color:{{ eCol }};">Evolución</button>
+      </div>
+
+      <!-- tab: resumen -->
+      <sc-if value="{{ tabResumen }}">
+        <div style="margin-top:16px;">
+          <div style="font-family:Sora; font-weight:700; font-size:14px; color:#C7CEEA; margin-bottom:11px;">Pasivas</div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <sc-for list="{{ detailFig.passives }}" as="p" hint-placeholder-count="2">
+              <div style="display:flex; gap:12px; background:#11152a; border:1px solid #222a45; border-radius:15px; padding:14px;">
+                <span style="flex:0 0 auto; width:40px; height:40px; border-radius:11px; display:flex; align-items:center; justify-content:center; background:{{ detailFig.accent }}1f;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{ detailFig.accent }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6l-8-4Z"/></svg></span>
+                <div style="flex:1;"><div style="font-family:Sora; font-weight:700; font-size:14.5px;">{{ p.n }}</div><div style="font-family:Manrope; font-weight:500; font-size:12.5px; color:#8a93b4; line-height:1.4; margin-top:3px;">{{ p.d }}</div></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- tab: combate -->
+      <sc-if value="{{ tabCombate }}">
+        <div style="margin-top:16px;">
+          <div style="font-family:Sora; font-weight:700; font-size:14px; color:#C7CEEA; margin-bottom:4px;">Ruleta de ataque</div>
+          <div style="font-family:Manrope; font-weight:500; font-size:12px; color:#6B7596; margin-bottom:14px;">El resultado decide el desenlace del combate.</div>
+          <div style="display:flex; align-items:center; gap:18px;">
+            <div style="position:relative; flex:0 0 auto; width:140px; height:140px;">
+              <div style="position:absolute; inset:0; border-radius:50%; background:{{ detailFig.wheel }}; box-shadow:0 0 0 6px #11152a, 0 0 0 7px #2a3357, 0 14px 28px rgba(0,0,0,.45);"></div>
+              <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:54px; height:54px; border-radius:50%; background:#0B0E1A; border:2px solid #2a3357; display:flex; align-items:center; justify-content:center; font-family:Sora; font-weight:800; font-size:22px; color:rgba(255,255,255,.92);">{{ detailFig.mono }}</div>
+              <div style="position:absolute; top:-7px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:8px solid transparent; border-right:8px solid transparent; border-top:13px solid #F4F6FF; filter:drop-shadow(0 2px 3px rgba(0,0,0,.5));"></div>
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column; gap:9px;">
+              <sc-for list="{{ detailFig.segs }}" as="sg" hint-placeholder-count="4">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <span style="width:14px; height:14px; border-radius:4px; flex:0 0 auto; background:{{ sg.c }};"></span>
+                  <span style="flex:1; font-family:Manrope; font-weight:700; font-size:13px; color:#cdd4ee;">{{ sg.l }}</span>
+                  <span style="font-family:Sora; font-weight:700; font-size:12px; color:#6B7596;">{{ sg.w }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <!-- combat hierarchy legend -->
+          <div style="margin-top:18px; background:#11152a; border:1px solid #222a45; border-radius:15px; padding:14px;">
+            <div style="font-family:Sora; font-weight:700; font-size:12.5px; color:#C7CEEA; margin-bottom:9px;">Jerarquía de colores</div>
+            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:7px; font-family:Manrope; font-weight:700; font-size:11.5px; color:#A9B2D0;">
+              <span style="color:#EBF0FF;">Blanco</span><span style="color:#46506f;">›</span>
+              <span style="color:#FFD140;">Oro</span><span style="color:#46506f;">›</span>
+              <span style="color:#B873FF;">Púrpura</span><span style="color:#46506f;">›</span>
+              <span style="color:#EBF0FF;">Blanco…</span>
+              <span style="margin-left:auto; display:flex; align-items:center; gap:5px; color:#599AFF;"><span style="width:10px; height:10px; border-radius:3px; background:#599AFF;"></span>Azul bloquea todo</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- tab: evolucion -->
+      <sc-if value="{{ tabEvo }}">
+        <div style="margin-top:16px;">
+          <div style="font-family:Sora; font-weight:700; font-size:14px; color:#C7CEEA; margin-bottom:4px;">Cadena de evolución</div>
+          <div style="font-family:Manrope; font-weight:500; font-size:12px; color:#6B7596; margin-bottom:16px;">Sube de rango anotando KOs en combate.</div>
+          <div style="display:flex; flex-direction:column; gap:11px;">
+            <sc-for list="{{ detailFig.evoView }}" as="ev" hint-placeholder-count="2">
+              <div style="display:flex; align-items:center; gap:13px; background:{{ ev.bg }}; border:1.5px solid {{ ev.bd }}; border-radius:16px; padding:12px 14px;">
+                <span style="flex:0 0 auto; width:52px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:radial-gradient(120% 95% at 50% 15%, {{ detailFig.accent }}, rgba(10,12,24,.5) 78%); font-family:Sora; font-weight:800; font-size:21px; color:#fff;">{{ ev.mono }}</span>
+                <div style="flex:1;"><div style="font-family:Sora; font-weight:700; font-size:15px;">{{ ev.name }}</div><div style="font-family:Manrope; font-weight:700; font-size:11px; color:{{ ev.rankCol }}; margin-top:2px;">{{ ev.rank }}</div></div>
+                <sc-if value="{{ ev.current }}"><span style="font-family:Sora; font-weight:800; font-size:10px; letter-spacing:.5px; color:#0B0E1A; background:#36D17F; border-radius:7px; padding:4px 9px;">ACTUAL</span></sc-if>
+                <sc-if value="{{ ev.locked }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#46506f" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+
+    <!-- bottom action -->
+    <div style="position:absolute; left:18px; right:18px; bottom:22px;">
+      <button onClick="{{ goDeck }}" style="width:100%; height:60px; border:none; cursor:pointer; border-radius:18px; background:linear-gradient(180deg,#4d8bff 0%,#2E6BFF 52%,#1f4fd1 100%); box-shadow:0 12px 26px rgba(46,107,255,.42), inset 0 2px 0 rgba(255,255,255,.5); display:flex; align-items:center; justify-content:center; gap:10px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span style="font-family:Sora; font-weight:800; font-size:17px; color:#fff;">Añadir al mazo</span>
+      </button>
+    </div>
+  </div>
+</sc-if>
+  <sc-if value="{{ isBattle }}">
+  <div style="position:absolute; inset:0; display:flex; flex-direction:column; background:radial-gradient(110% 40% at 50% 0%, #2a1620 0%, rgba(11,14,26,0) 50%), radial-gradient(110% 40% at 50% 100%, #102a22 0%, rgba(11,14,26,0) 50%), #090c17;">
+    <!-- top bar -->
+    <div style="flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:16px 18px 8px;">
+      <button onClick="{{ goHome }}" style="width:40px; height:40px; border-radius:12px; background:rgba(18,23,42,.7); border:1px solid #232c4a; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#A9B2D0;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div style="display:flex; align-items:center; gap:8px; background:rgba(54,209,127,.14); border:1px solid #2c5a43; border-radius:999px; padding:7px 15px;">
+        <span style="width:7px; height:7px; border-radius:50%; background:#36D17F; box-shadow:0 0 8px #36D17F;"></span>
+        <span style="font-family:Sora; font-weight:800; font-size:13px; color:#5ee6a0;">Tu turno</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="display:flex; align-items:center; gap:5px; background:rgba(54,209,127,.1); border:1px solid #2c5a43; border-radius:9px; padding:5px 9px;"><span style="font-family:Sora; font-weight:800; font-size:13px; color:#5ee6a0;">3</span></div>
+        <span style="font-family:Sora; font-weight:800; font-size:12px; color:#46506f;">vs</span>
+        <div style="display:flex; align-items:center; gap:5px; background:rgba(255,82,71,.1); border:1px solid #5a2c2c; border-radius:9px; padding:5px 9px;"><span style="font-family:Sora; font-weight:800; font-size:13px; color:#ff8077;">2</span></div>
+      </div>
+    </div>
+
+    <!-- board -->
+    <div style="flex:1; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+      <div style="position:relative; width:360px; height:524px; transform:scale(.96);">
+        <svg style="position:absolute; inset:0;" width="360" height="524" viewBox="0 0 360 524" fill="none">
+          <sc-for list="{{ edgeLines }}" as="e" hint-placeholder-count="20">
+            <line x1="{{ e.x1 }}" y1="{{ e.y1 }}" x2="{{ e.x2 }}" y2="{{ e.y2 }}" stroke="#212a47" stroke-width="3" stroke-linecap="round"></line>
+          </sc-for>
+        </svg>
+        <!-- nodes -->
+        <sc-for list="{{ nodeView }}" as="n" hint-placeholder-count="13">
+          <div style="position:absolute; left:{{ n.x }}px; top:{{ n.y }}px; width:{{ n.w }}px; height:{{ n.w }}px; transform:translate(-50%,-50%); border-radius:50%; background:{{ n.bg }}; border:{{ n.bd }}; box-shadow:{{ n.glow }}; display:flex; align-items:center; justify-content:center;">
+            <sc-if value="{{ n.isBuff }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="#3a2406"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg></sc-if>
+            <sc-if value="{{ n.isGoalE }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="#5a0f0b"><path d="M4 7l4 4 4-6 4 6 4-4v11H4V7Z"/></svg></sc-if>
+            <sc-if value="{{ n.isGoalP }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="#0c3a25"><path d="M4 7l4 4 4-6 4 6 4-4v11H4V7Z"/></svg></sc-if>
+          </div>
+        </sc-for>
+        <!-- range highlights -->
+        <sc-for list="{{ nodeView }}" as="n" hint-placeholder-count="13">
+          <sc-if value="{{ n.inRange }}"><div style="position:absolute; left:{{ n.x }}px; top:{{ n.y }}px; width:30px; height:30px; transform:translate(-50%,-50%); border-radius:50%; border:2px solid rgba(90,160,255,.55); box-shadow:0 0 12px rgba(46,107,255,.4); pointer-events:none;"></div></sc-if>
+        </sc-for>
+        <!-- tokens -->
+        <sc-for list="{{ tokenView }}" as="t" hint-placeholder-count="5">
+          <div style="position:absolute; left:{{ t.x }}px; top:{{ t.y }}px; width:{{ t.w }}px; height:{{ t.w }}px; transform:translate(-50%,-50%); z-index:5;">
+            <sc-if value="{{ t.active }}"><div style="position:absolute; inset:-6px; border-radius:50%; border:2px solid #FFC53D; box-shadow:0 0 16px rgba(255,197,61,.6); animation:pulseGlow 1.6s ease-in-out infinite;"></div></sc-if>
+            <div style="width:100%; height:100%; border-radius:50%; background:radial-gradient(circle at 50% 28%, {{ t.accent }}, rgba(8,10,20,.6) 78%); border:2.5px solid {{ t.ring }}; box-shadow:0 6px 14px rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; font-family:Sora; font-weight:800; font-size:15px; color:#fff;">{{ t.mono }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- bottom panel -->
+    <div style="flex:0 0 auto; padding:10px 18px 22px; background:linear-gradient(180deg, rgba(9,12,23,0), #090c17 28%);">
+      <!-- energy -->
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:11px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#4FC3F7"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+        <div style="flex:1; display:flex; gap:3px;">
+          <sc-for list="{{ energySegs }}" as="es" hint-placeholder-count="10">
+            <div style="flex:1; height:8px; border-radius:3px; background:{{ es.bg }};"></div>
+          </sc-for>
+        </div>
+        <span style="font-family:Sora; font-weight:800; font-size:13px;"><span style="color:#4FC3F7;">7</span><span style="color:#46506f;"> / 10</span></span>
+      </div>
+      <!-- modifiers -->
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <sc-for list="{{ battleMods }}" as="bm" hint-placeholder-count="2">
+          <button style="flex:1; display:flex; align-items:center; gap:8px; background:#10152a; border:1px solid {{ bm.col }}55; border-radius:13px; padding:9px 11px; cursor:pointer; color:#F4F6FF;">
+            <span style="width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:{{ bm.col }}22;"><svg width="15" height="15" viewBox="0 0 24 24" fill="{{ bm.col }}"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg></span>
+            <span style="flex:1; text-align:left; font-family:Sora; font-weight:700; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ bm.name }}</span>
+            <span style="display:flex; align-items:center; gap:2px; font-family:Sora; font-weight:800; font-size:12px; color:#4FC3F7;"><svg width="10" height="10" viewBox="0 0 24 24" fill="#4FC3F7"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>{{ bm.cost }}</span>
+          </button>
+        </sc-for>
+      </div>
+      <!-- active figure card + end turn -->
+      <div style="display:flex; gap:11px; align-items:stretch;">
+        <div style="flex:1; display:flex; align-items:center; gap:11px; background:linear-gradient(180deg,#141a30,#10152a); border:1px solid #2a3357; border-radius:16px; padding:10px;">
+          <div style="position:relative; flex:0 0 auto; width:52px; height:52px; border-radius:13px; background:radial-gradient(circle at 50% 26%, {{ activeFig.accent }}, rgba(8,10,20,.55) 78%); border:2px solid {{ activeFig.rcol }}; display:flex; align-items:center; justify-content:center; font-family:Sora; font-weight:800; font-size:21px; color:#fff;">{{ activeFig.mono }}</div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-family:Sora; font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ activeFig.name }}</div>
+            <div style="display:flex; align-items:center; gap:7px; margin-top:4px;">
+              <span style="display:flex; align-items:center; gap:3px; font-family:Sora; font-weight:800; font-size:11px; color:#cfe6ff; background:rgba(79,195,247,.14); border-radius:6px; padding:2px 6px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="#4FC3F7"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>{{ activeFig.stamina }}</span>
+              <span style="font-family:Manrope; font-weight:700; font-size:11px; color:#8a93b4;">{{ activeFig.type }}</span>
+            </div>
+          </div>
+        </div>
+        <button onClick="{{ goCombat }}" style="flex:0 0 auto; width:118px; border:none; cursor:pointer; border-radius:16px; background:linear-gradient(180deg,#ff9d52,#FF8A3D 52%,#e06a1f); box-shadow:0 10px 22px rgba(255,138,61,.4), inset 0 2px 0 rgba(255,255,255,.5); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; color:#2a1500;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2a1500" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3.5 21 10l-4 4-6.5-6.5"/><path d="m3 21 6-6M9 11l4 4"/></svg>
+          <span style="font-family:Sora; font-weight:800; font-size:13px;">Atacar</span>
+        </button>
+      </div>
+      <button onClick="{{ goHome }}" style="width:100%; margin-top:9px; height:42px; cursor:pointer; border-radius:12px; background:#141a30; border:1px solid #2a3357; color:#A9B2D0; font-family:Sora; font-weight:700; font-size:13px;">Terminar turno</button>
+    </div>
+  </div>
+</sc-if>
+  <sc-if value="{{ isCombat }}">
+  <div style="position:absolute; inset:0; display:flex; flex-direction:column; background:radial-gradient(80% 32% at 20% 14%, rgba(255,197,61,.16), rgba(0,0,0,0) 60%), radial-gradient(80% 32% at 80% 60%, rgba(184,115,255,.16), rgba(0,0,0,0) 60%), #060812;">
+    <!-- title -->
+    <div style="flex:0 0 auto; text-align:center; padding:30px 20px 8px;">
+      <div style="display:inline-flex; align-items:center; gap:10px;">
+        <span style="width:34px; height:2px; background:linear-gradient(90deg,rgba(255,197,61,0),#FFC53D);"></span>
+        <span style="font-family:Sora; font-weight:800; font-size:22px; letter-spacing:3px; color:#FFD98A; text-shadow:0 0 18px rgba(255,197,61,.5);">¡COMBATE!</span>
+        <span style="width:34px; height:2px; background:linear-gradient(90deg,#FFC53D,rgba(255,197,61,0));"></span>
+      </div>
+    </div>
+
+    <!-- split arena -->
+    <div style="flex:1; min-height:0; position:relative; display:flex; gap:12px; padding:10px 18px;">
+      <!-- attacker column -->
+      <div style="flex:1; display:flex; flex-direction:column; align-items:center;">
+        <div style="font-family:Manrope; font-weight:800; font-size:10px; letter-spacing:1.5px; color:#5ee6a0; margin-bottom:8px;">ATACANTE</div>
+        <!-- card -->
+        <div style="width:100%; border-radius:16px; overflow:hidden; background:#11152a; border:1.5px solid #FFC53D; box-shadow:0 0 22px rgba(255,197,61,.22);">
+          <div style="position:relative; height:84px; background:radial-gradient(120% 95% at 50% 14%, {{ att.accent }}, rgba(8,10,20,.4) 76%); display:flex; align-items:center; justify-content:center;">
+            <span style="font-family:Sora; font-weight:800; font-size:34px; color:#fff; text-shadow:0 3px 10px rgba(0,0,0,.4);">{{ att.mono }}</span>
+          </div>
+          <div style="padding:8px 10px 10px; text-align:center;">
+            <div style="font-family:Sora; font-weight:700; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ att.name }}</div>
+            <div style="font-family:Manrope; font-weight:700; font-size:10.5px; color:#8a93b4; margin-top:2px;">{{ att.type }}</div>
+          </div>
+        </div>
+        <!-- presentation: ruleta -->
+        <div style="margin-top:16px; position:relative; width:128px; height:128px;">
+          <div style="position:absolute; inset:0; border-radius:50%; background:{{ att.wheel }}; box-shadow:0 0 0 5px #11152a, 0 0 0 6px #FFC53D, 0 12px 26px rgba(0,0,0,.5);"></div>
+          <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:46px; height:46px; border-radius:50%; background:#060812; border:2px solid #FFC53D; display:flex; align-items:center; justify-content:center; font-family:Sora; font-weight:800; font-size:18px; color:#fff;">{{ att.mono }}</div>
+          <div style="position:absolute; top:-6px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-top:12px solid #fff;"></div>
+        </div>
+        <div style="margin-top:13px; display:inline-flex; align-items:center; gap:7px; background:#11152a; border:1px solid #2a3357; border-radius:999px; padding:6px 13px;">
+          <span style="width:11px; height:11px; border-radius:3px; background:{{ combatRes.attChip.c }};"></span>
+          <span style="font-family:Sora; font-weight:700; font-size:12.5px; color:#F4F6FF;">{{ combatRes.attChip.l }}</span>
+        </div>
+      </div>
+
+      <!-- defender column -->
+      <div style="flex:1; display:flex; flex-direction:column; align-items:center;">
+        <div style="font-family:Manrope; font-weight:800; font-size:10px; letter-spacing:1.5px; color:#ff8077; margin-bottom:8px;">DEFENSOR</div>
+        <div style="width:100%; border-radius:16px; overflow:hidden; background:#11152a; border:1.5px solid #46506f;">
+          <div style="position:relative; height:84px; background:radial-gradient(120% 95% at 50% 14%, {{ def.accent }}, rgba(8,10,20,.4) 76%); display:flex; align-items:center; justify-content:center;">
+            <span style="font-family:Sora; font-weight:800; font-size:34px; color:#fff; text-shadow:0 3px 10px rgba(0,0,0,.4);">{{ def.mono }}</span>
+          </div>
+          <div style="padding:8px 10px 10px; text-align:center;">
+            <div style="font-family:Sora; font-weight:700; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ def.name }}</div>
+            <div style="font-family:Manrope; font-weight:700; font-size:10.5px; color:#8a93b4; margin-top:2px;">{{ def.type }}</div>
+          </div>
+        </div>
+        <!-- presentation: moneda -->
+        <div style="margin-top:16px; position:relative; width:128px; height:128px; display:flex; align-items:center; justify-content:center;">
+          <div style="width:104px; height:104px; border-radius:50%; background:radial-gradient(circle at 38% 30%, #F4F8FF, #c3cde6 60%, #8a96b8); box-shadow:0 0 0 5px #11152a, 0 0 0 6px #46506f, 0 12px 26px rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center;">
+            <div style="width:78px; height:78px; border-radius:50%; border:3px solid rgba(120,132,168,.5); display:flex; align-items:center; justify-content:center;">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="#7884a8"><path d="m12 4 7 6-7 10-7-10 7-6Z"/><path d="M12 8.5 9.5 11l2.5 4 2.5-4L12 8.5Z" fill="#aeb8d4"/></svg>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:13px; display:inline-flex; align-items:center; gap:7px; background:#11152a; border:1px solid #2a3357; border-radius:999px; padding:6px 13px;">
+          <span style="width:11px; height:11px; border-radius:3px; background:{{ combatRes.defChip.c }};"></span>
+          <span style="font-family:Sora; font-weight:700; font-size:12.5px; color:#F4F6FF;">{{ combatRes.defChip.l }}</span>
+        </div>
+      </div>
+
+      <!-- VS badge -->
+      <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:6;">
+        <div style="width:54px; height:54px; border-radius:50%; background:linear-gradient(180deg,#222c4e,#11152a); border:2px solid #44507a; display:flex; align-items:center; justify-content:center; font-family:Sora; font-weight:800; font-size:17px; color:#F4F6FF; box-shadow:0 8px 20px rgba(0,0,0,.6);">VS</div>
+      </div>
+    </div>
+
+    <!-- result -->
+    <div style="flex:0 0 auto; padding:6px 18px 24px;">
+      <div style="border-radius:18px; padding:16px; text-align:center; background:linear-gradient(180deg, rgba(255,197,61,.14), rgba(255,197,61,.03)); border:1px solid rgba(255,197,61,.4); box-shadow:0 0 24px rgba(255,197,61,.14);">
+        <div style="display:inline-flex; align-items:center; gap:8px;">
+          <sc-if value="{{ combatRes.ko }}"><span style="font-family:Sora; font-weight:800; font-size:11px; letter-spacing:1px; color:#0B0E1A; background:#FFC53D; border-radius:7px; padding:3px 9px;">K.O.</span></sc-if>
+          <span style="font-family:Sora; font-weight:800; font-size:20px; color:#FFD98A;">¡Storm Valkyrie gana!</span>
+        </div>
+        <div style="font-family:Manrope; font-weight:600; font-size:13px; color:#c9b27a; margin-top:5px;">{{ combatRes.winText }}</div>
+      </div>
+      <button onClick="{{ goWin }}" style="width:100%; margin-top:13px; height:58px; border:none; cursor:pointer; border-radius:18px; background:linear-gradient(180deg,#4d8bff 0%,#2E6BFF 52%,#1f4fd1 100%); box-shadow:0 12px 26px rgba(46,107,255,.42), inset 0 2px 0 rgba(255,255,255,.5); display:flex; align-items:center; justify-content:center; gap:10px;">
+        <span style="font-family:Sora; font-weight:800; font-size:17px; color:#fff;">Continuar</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+    </div>
+  </div>
+</sc-if>
+  <sc-if value="{{ isWin }}">
+  <div style="position:absolute; inset:0; display:flex; flex-direction:column; background:radial-gradient(95% 45% at 50% 6%, rgba(255,197,61,.24), rgba(0,0,0,0) 56%), #070a14;">
+    <div style="flex:1; min-height:0; overflow-y:auto; padding:0 22px 20px; display:flex; flex-direction:column; align-items:center;">
+      <!-- winner -->
+      <div style="position:relative; margin-top:40px; width:150px; height:172px;">
+        <div style="position:absolute; left:50%; top:48%; transform:translate(-50%,-50%); width:230px; height:230px; border-radius:50%; background:radial-gradient(circle, rgba(255,197,61,.32), rgba(0,0,0,0) 66%);"></div>
+        <div style="position:absolute; left:50%; top:46%; transform:translate(-50%,-50%); width:210px; height:210px; border-radius:50%; border:1px dashed rgba(255,197,61,.3); animation:ringSpin 26s linear infinite;"></div>
+        <div style="position:relative; width:150px; height:172px; border-radius:74px 74px 26px 26px; background:radial-gradient(125% 95% at 50% 12%, #FFC53D, rgba(10,12,24,.5) 78%); border:2px solid #FFE6A6; box-shadow:0 24px 48px rgba(0,0,0,.5), inset 0 2px 0 rgba(255,255,255,.4); display:flex; align-items:center; justify-content:center; animation:floaty 4.5s ease-in-out infinite;">
+          <span style="font-family:Sora; font-weight:800; font-size:66px; color:#fff; text-shadow:0 5px 18px rgba(0,0,0,.45);">SV</span>
+        </div>
+      </div>
+      <div style="font-family:Sora; font-weight:800; font-size:42px; letter-spacing:2px; color:#FFD98A; text-shadow:0 0 26px rgba(255,197,61,.5); margin-top:18px;">¡VICTORIA!</div>
+      <div style="font-family:Manrope; font-weight:600; font-size:14px; color:#A9B2D0; margin-top:4px;">Tu Valkyrie alcanzó la meta enemiga</div>
+
+      <!-- XP -->
+      <div style="width:100%; margin-top:26px; background:#10152a; border:1px solid #222a45; border-radius:16px; padding:15px 16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:9px;">
+          <span style="font-family:Sora; font-weight:700; font-size:13px;">Nivel 12</span>
+          <span style="font-family:Sora; font-weight:800; font-size:13px; color:#FFC53D;">+120 XP</span>
+        </div>
+        <div style="height:9px; border-radius:6px; background:#171d33; overflow:hidden;"><div style="width:68%; height:100%; border-radius:6px; background:linear-gradient(90deg,#FFC53D,#FF8A3D); box-shadow:0 0 10px rgba(255,197,61,.5);"></div></div>
+      </div>
+
+      <!-- reward chips -->
+      <div style="width:100%; display:grid; grid-template-columns:1fr 1fr; gap:11px; margin-top:11px;">
+        <div style="display:flex; align-items:center; gap:11px; background:#10152a; border:1px solid #222a45; border-radius:15px; padding:13px 15px;">
+          <span style="width:38px; height:38px; border-radius:11px; background:rgba(255,197,61,.14); display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#FFC53D"/><text x="12" y="16" font-size="11" font-family="Sora" font-weight="800" fill="#7a5a0c" text-anchor="middle">$</text></svg></span>
+          <div><div style="font-family:Sora; font-weight:800; font-size:18px; line-height:1; color:#FFD98A;">+85</div><div style="font-family:Manrope; font-weight:600; font-size:11px; color:#6B7596; margin-top:2px;">Monedas</div></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:11px; background:#10152a; border:1px solid #222a45; border-radius:15px; padding:13px 15px;">
+          <span style="width:38px; height:38px; border-radius:11px; background:rgba(90,160,255,.14); display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="#5AA0FF"><path d="M6 4h12v3a4 4 0 0 1-8 0M8 4v3a4 4 0 0 0 8 0M9 13h6v3H9zM7 20h10v-2H7z"/><path d="M18 5h2a2 2 0 0 1-2 3M6 5H4a2 2 0 0 0 2 3" fill="none" stroke="#5AA0FF" stroke-width="1.4"/></svg></span>
+          <div><div style="font-family:Sora; font-weight:800; font-size:18px; line-height:1; color:#9cc4ff;">+30</div><div style="font-family:Manrope; font-weight:600; font-size:11px; color:#6B7596; margin-top:2px;">Trofeos</div></div>
+        </div>
+      </div>
+
+      <!-- chest reward (§11) -->
+      <div style="width:100%; margin-top:11px; position:relative; background:linear-gradient(180deg,#1a2036,#10152a); border:1px solid #3a4567; border-radius:18px; padding:16px; display:flex; align-items:center; gap:15px; overflow:hidden;">
+        <div style="position:absolute; right:-30px; top:-30px; width:120px; height:120px; border-radius:50%; background:radial-gradient(circle, rgba(183,192,216,.18), rgba(0,0,0,0) 70%);"></div>
+        <div style="position:relative; width:60px; height:60px; border-radius:15px; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at 50% 30%, #cfd8ec, #7e88a6); box-shadow:inset 0 1px 0 rgba(255,255,255,.4), inset 0 -10px 16px rgba(0,0,0,.3); animation:readyPulse 2s ease-in-out infinite;">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><rect x="3" y="9" width="18" height="11" rx="2" fill="rgba(0,0,0,.22)" stroke="#fff" stroke-width="1.4"/><path d="M3 9l2.4-4h13.2L21 9" fill="rgba(255,255,255,.18)" stroke="#fff" stroke-width="1.4"/><rect x="10.6" y="9" width="2.8" height="11" fill="rgba(255,255,255,.6)"/><circle cx="12" cy="13.5" r="1.6" fill="#fff"/></svg>
+        </div>
+        <div style="flex:1; position:relative;">
+          <div style="font-family:Sora; font-weight:700; font-size:16px;">Cofre de Plata</div>
+          <div style="font-family:Manrope; font-weight:600; font-size:12px; color:#8a93b4; margin-top:2px;">Desbloquea en 2h · o ábrelo con 18 💎</div>
+        </div>
+        <span style="position:relative; font-family:Sora; font-weight:800; font-size:12px; color:#0B0E1A; background:#FFC53D; border-radius:9px; padding:8px 13px;">Abrir</span>
+      </div>
+    </div>
+
+    <!-- actions -->
+    <div style="flex:0 0 auto; padding:8px 22px 26px; display:flex; gap:11px;">
+      <button onClick="{{ goBattle }}" style="flex:0 0 auto; width:120px; height:56px; cursor:pointer; border-radius:16px; background:#141a30; border:1px solid #2a3357; color:#cdd4ee; font-family:Sora; font-weight:700; font-size:14px;">Revancha</button>
+      <button onClick="{{ goHome }}" style="flex:1; height:56px; border:none; cursor:pointer; border-radius:16px; background:linear-gradient(180deg,#4d8bff 0%,#2E6BFF 52%,#1f4fd1 100%); box-shadow:0 12px 26px rgba(46,107,255,.42), inset 0 2px 0 rgba(255,255,255,.5); display:flex; align-items:center; justify-content:center;">
+        <span style="font-family:Sora; font-weight:800; font-size:16px; color:#fff;">Reclamar y volver</span>
+      </button>
+    </div>
+  </div>
+</sc-if>
+  <sc-if value="{{ isSimple }}"><div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:#6B7596; font-family:Sora;">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#2E3658" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>
+    <div style="font-family:Sora; font-weight:700; font-size:17px; color:#A9B2D0;">{{ simpleTitle }}</div>
+    <div style="font-family:Manrope; font-size:13px;">Próximamente</div>
+  </div></sc-if>
+
+  <!-- ============================ BOTTOM NAV ============================ -->
+  <sc-if value="{{ showNav }}" hint-placeholder-val="{{ true }}">
+  <nav style="position:absolute; left:0; right:0; bottom:0; height:80px; display:flex; align-items:stretch; padding:6px 8px 14px; gap:2px; background:linear-gradient(180deg, rgba(11,14,26,0) 0%, #0B0E1A 40%); backdrop-filter:blur(10px); border-top:1px solid #1a2036; z-index:50;">
+    <button onClick="{{ goHome }}" style="flex:1; background:none; border:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:9px; position:relative; color:{{ nHome.col }};">
+      <sc-if value="{{ nHome.active }}"><div style="position:absolute; top:0; width:28px; height:3px; border-radius:3px; background:#5AA0FF; box-shadow:0 0 10px #2E6BFF;"></div></sc-if>
+      <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/></svg>
+      <span style="font-family:Manrope; font-size:11px; font-weight:700;">Inicio</span>
+    </button>
+    <button onClick="{{ goDeck }}" style="flex:1; background:none; border:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:9px; position:relative; color:{{ nDeck.col }};">
+      <sc-if value="{{ nDeck.active }}"><div style="position:absolute; top:0; width:28px; height:3px; border-radius:3px; background:#5AA0FF; box-shadow:0 0 10px #2E6BFF;"></div></sc-if>
+      <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="10" height="14" rx="2"/><path d="M8 6.5h2M8 9.5h2"/><path d="M16.5 6 20 7.2a1.5 1.5 0 0 1 .9 1.9l-3.4 9.4"/></svg>
+      <span style="font-family:Manrope; font-size:11px; font-weight:700;">Mazos</span>
+    </button>
+    <button onClick="{{ goDex }}" style="flex:1; background:none; border:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:9px; position:relative; color:{{ nDex.col }};">
+      <sc-if value="{{ nDex.active }}"><div style="position:absolute; top:0; width:28px; height:3px; border-radius:3px; background:#5AA0FF; box-shadow:0 0 10px #2E6BFF;"></div></sc-if>
+      <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg>
+      <span style="font-family:Manrope; font-size:11px; font-weight:700;">Colección</span>
+    </button>
+    <button onClick="{{ goShop }}" style="flex:1; background:none; border:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:9px; position:relative; color:{{ nShop.col }};">
+      <sc-if value="{{ nShop.active }}"><div style="position:absolute; top:0; width:28px; height:3px; border-radius:3px; background:#5AA0FF; box-shadow:0 0 10px #2E6BFF;"></div></sc-if>
+      <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 7h13l-1 13.2a1 1 0 0 1-1 .8H7.5a1 1 0 0 1-1-.8L5.5 7Z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>
+      <span style="font-family:Manrope; font-size:11px; font-weight:700;">Tienda</span>
+    </button>
+    <button onClick="{{ goProfile }}" style="flex:1; background:none; border:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:9px; position:relative; color:{{ nProf.col }};">
+      <sc-if value="{{ nProf.active }}"><div style="position:absolute; top:0; width:28px; height:3px; border-radius:3px; background:#5AA0FF; box-shadow:0 0 10px #2E6BFF;"></div></sc-if>
+      <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+      <span style="font-family:Manrope; font-size:11px; font-weight:700;">Perfil</span>
+    </button>
+  </nav>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:432,&quot;height&quot;:936},&quot;leaderId&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;valkyrie&quot;,&quot;options&quot;:[&quot;valkyrie&quot;,&quot;golem&quot;,&quot;knight&quot;,&quot;night&quot;,&quot;mage&quot;,&quot;venom&quot;,&quot;ember&quot;,&quot;coin&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Contenido&quot;}}">
+class Component extends DCLogic {
+  state = { screen:'home', detail:'valkyrie', detailTab:'resumen', dbTab:'equipo', combat:1 };
+
+  roster = [
+    { id:'golem', name:'Stone Golem', short:'Golem', type:'Ruleta', stamina:1, rarity:'Común', rcol:'#8A93AD', accent:'#C6A977', mono:'SG', role:'Tanque',
+      wheel:'conic-gradient(from -90deg,#599AFF 0 44%,#EBF0FF 44% 66%,#FFD140 66% 76%,#E64D4D 76% 100%)',
+      segs:[{c:'#599AFF',l:'Bloqueo',w:'44%'},{c:'#EBF0FF',l:'Golpe 40',w:'22%'},{c:'#FFD140',l:'Crítico 60',w:'10%'},{c:'#E64D4D',l:'Fallo',w:'24%'}],
+      passives:[{n:'Bedrock',d:'Inmune a empuje, jalón e intercambio.'},{n:'Counter-Stone',d:'Al defender con Azul, empuja 1 nodo al atacante.'}],
+      evo:[{mono:'SG',name:'Stone Golem',rank:'Base'}] },
+    { id:'knight', name:'Ironclad Knight', short:'Knight', type:'Dado D6', stamina:2, rarity:'Rara', rcol:'#3D7DFF', accent:'#6FA8FF', mono:'IK', role:'Guardián',
+      wheel:'conic-gradient(from -90deg,#599AFF 0 34%,#EBF0FF 34% 60%,#FFD140 60% 74%,#E64D4D 74% 100%)',
+      segs:[{c:'#599AFF',l:'Bloqueo',w:'34%'},{c:'#EBF0FF',l:'Golpe 50',w:'26%'},{c:'#FFD140',l:'Crítico 70',w:'14%'},{c:'#E64D4D',l:'Fallo',w:'26%'}],
+      passives:[{n:'Hold the Line',d:'Empate defendiendo: inmoviliza al atacante.'},{n:'Bulwark',d:'Aura: aliados vecinos inmunes a desplazamiento.'}],
+      evo:[{mono:'IK',name:'Ironclad Knight',rank:'Base'}] },
+    { id:'night', name:'Nightblade', short:'Nightblade', type:'Moneda', stamina:3, rarity:'Épica', rcol:'#B873FF', accent:'#B873FF', mono:'NB', role:'Asesino',
+      wheel:'conic-gradient(from -90deg,#EBF0FF 0 40%,#B873FF 40% 64%,#FFD140 64% 72%,#E64D4D 72% 100%)',
+      segs:[{c:'#EBF0FF',l:'Golpe 50',w:'40%'},{c:'#B873FF',l:'Miedo',w:'24%'},{c:'#FFD140',l:'Crítico 70',w:'8%'},{c:'#E64D4D',l:'Fallo',w:'28%'}],
+      passives:[{n:'Lunge',d:'Tras moverse 2+ nodos, repite un Fallo una vez.'},{n:'Bloodthirst',d:'Al causar un KO, obtiene impulso.'}],
+      evo:[{mono:'NB',name:'Nightblade',rank:'Base'}] },
+    { id:'mage', name:'Rift Mage', short:'Mage', type:'Suma 2d6', stamina:2, rarity:'Rara', rcol:'#3D7DFF', accent:'#4FC3F7', mono:'RM', role:'Control',
+      wheel:'conic-gradient(from -90deg,#EBF0FF 0 34%,#B873FF 34% 62%,#599AFF 62% 80%,#E64D4D 80% 100%)',
+      segs:[{c:'#EBF0FF',l:'Golpe 40',w:'34%'},{c:'#B873FF',l:'Jalón',w:'28%'},{c:'#599AFF',l:'Bloqueo',w:'18%'},{c:'#E64D4D',l:'Fallo',w:'20%'}],
+      passives:[{n:'Arcane Pull',d:'Sus jalones arrastran 1 nodo extra.'},{n:'Blink',d:'Puede intercambiar posición al ganar con Púrpura.'}],
+      evo:[{mono:'RM',name:'Rift Mage',rank:'Base'}] },
+    { id:'venom', name:'Venom Witch', short:'Witch', type:'Ruleta', stamina:2, rarity:'Épica', rcol:'#B873FF', accent:'#36D17F', mono:'VW', role:'Bruja',
+      wheel:'conic-gradient(from -90deg,#B873FF 0 38%,#EBF0FF 38% 58%,#36D17F 58% 78%,#E64D4D 78% 100%)',
+      segs:[{c:'#B873FF',l:'Veneno',w:'38%'},{c:'#EBF0FF',l:'Golpe 40',w:'20%'},{c:'#36D17F',l:'Debilitar',w:'20%'},{c:'#E64D4D',l:'Fallo',w:'22%'}],
+      passives:[{n:'Venom Hex',d:'Ganar con Púrpura también Debilita al rival.'},{n:'Hexstep',d:'Empate defendiendo: retrocede 1 nodo.'}],
+      evo:[{mono:'VW',name:'Venom Witch',rank:'Base'},{mono:'PM',name:'Plague Matron',rank:'Rango 1'}] },
+    { id:'valkyrie', name:'Storm Valkyrie', short:'Valkyrie', type:'Ruleta', stamina:4, rarity:'Legendaria', rcol:'#FFC53D', accent:'#FFC53D', mono:'SV', role:'Líder',
+      wheel:'conic-gradient(from -90deg,#EBF0FF 0 32%,#FFD140 32% 56%,#599AFF 56% 74%,#E64D4D 74% 100%)',
+      segs:[{c:'#EBF0FF',l:'Golpe 50',w:'32%'},{c:'#FFD140',l:'Crítico 80',w:'24%'},{c:'#599AFF',l:'Bloqueo',w:'18%'},{c:'#E64D4D',l:'Fallo',w:'26%'}],
+      passives:[{n:'Aerial',d:'Ignora obstáculos al moverse.'},{n:'Dive',d:'Tras moverse 3+ nodos, +1 a sus empujes.'}],
+      evo:[{mono:'SV',name:'Storm Valkyrie',rank:'Base'}] },
+    { id:'ember', name:'Emberborn', short:'Ember', type:'Dado D6', stamina:3, rarity:'Épica', rcol:'#B873FF', accent:'#FF7A3D', mono:'EB', role:'Brasa',
+      wheel:'conic-gradient(from -90deg,#EBF0FF 0 36%,#FF7A3D 36% 58%,#FFD140 58% 72%,#E64D4D 72% 100%)',
+      segs:[{c:'#EBF0FF',l:'Golpe 50',w:'36%'},{c:'#FF7A3D',l:'Quemar',w:'22%'},{c:'#FFD140',l:'Crítico 70',w:'14%'},{c:'#E64D4D',l:'Fallo',w:'28%'}],
+      passives:[{n:'Burning Aura',d:'Al iniciar tu turno, Debilita a enemigos vecinos.'}],
+      evo:[{mono:'EB',name:'Emberborn',rank:'Base'},{mono:'FC',name:'Flame Champion',rank:'Rango 1'},{mono:'IW',name:'Infernal Warlord',rank:'Rango 2'}] },
+    { id:'coin', name:'Coin Trickster', short:'Trickster', type:'Doble Moneda', stamina:3, rarity:'Rara', rcol:'#3D7DFF', accent:'#FFD140', mono:'CT', role:'Pícaro',
+      wheel:'conic-gradient(from -90deg,#FFD140 0 30%,#EBF0FF 30% 56%,#B873FF 56% 74%,#E64D4D 74% 100%)',
+      segs:[{c:'#FFD140',l:'Doble cara',w:'30%'},{c:'#EBF0FF',l:'Golpe 40',w:'26%'},{c:'#B873FF',l:'Truco',w:'18%'},{c:'#E64D4D',l:'Fallo',w:'26%'}],
+      passives:[{n:'Lucky Flip',d:'Si ambas monedas coinciden, repite el ataque.'}],
+      evo:[{mono:'CT',name:'Coin Trickster',rank:'Base'}] },
+  ];
+
+  modifiers = [
+    { id:'power_surge', name:'Power Surge', cost:3, desc:'Tu próximo ataque: +20 daño / +1★', col:'#FF8A3D', eq:true },
+    { id:'fury', name:'Fury', cost:5, desc:'Tu próximo ataque: +40 daño / +2★', col:'#FF5247', eq:false },
+    { id:'cleanse', name:'Cleanse', cost:2, desc:'Quita los debuffs de tus figuras', col:'#36D17F', eq:true },
+    { id:'adrenaline', name:'Adrenaline', cost:2, desc:'Tu próximo ataque repite un Fallo', col:'#4FC3F7', eq:false },
+  ];
+
+  maps = [
+    { id:'cross', name:'El Cruce', sub:'19 nodos · Buff central', hot:true },
+    { id:'triad', name:'Tríada', sub:'15 nodos · 3 entradas', hot:false },
+    { id:'gauntlet', name:'Guantelete', sub:'21 nodos · Largo', hot:false },
+  ];
+
+  gifts = [
+    { id:'wood', name:'Cofre Madera', rcol:'#C6A977', status:'¡Listo!', ready:true },
+    { id:'silver', name:'Cofre Plata', rcol:'#B7C0D8', status:'2h 14m', ready:false },
+    { id:'gold', name:'Cofre Oro', rcol:'#FFC53D', status:'6h 00m', ready:false },
+    { id:'slot', name:'Vacío', rcol:'#2E3658', status:'Vacío', empty:true },
+  ];
+
+  board = {
+    nodes:[
+      {x:180,y:34,kind:'goal-e'}, {x:96,y:104,kind:'entrance-e'}, {x:264,y:104,kind:'entrance-e'},
+      {x:180,y:150,kind:'normal'}, {x:96,y:210,kind:'normal'}, {x:264,y:210,kind:'normal'},
+      {x:180,y:236,kind:'buff'}, {x:96,y:316,kind:'normal'}, {x:264,y:316,kind:'normal'},
+      {x:180,y:362,kind:'normal'}, {x:96,y:422,kind:'entrance-p'}, {x:264,y:422,kind:'entrance-p'},
+      {x:180,y:492,kind:'goal-p'},
+    ],
+    edges:[[0,1],[0,2],[1,3],[2,3],[1,4],[2,5],[3,6],[4,6],[5,6],[4,7],[5,8],[6,9],[7,9],[8,9],[7,10],[8,11],[9,10],[9,11],[10,12],[11,12]],
+    tokens:[
+      {node:1, team:'enemy', mono:'IK', accent:'#6FA8FF'},
+      {node:5, team:'enemy', mono:'NB', accent:'#B873FF'},
+      {node:6, team:'player', mono:'SV', accent:'#FFC53D', active:true},
+      {node:9, team:'player', mono:'EB', accent:'#FF7A3D'},
+      {node:10, team:'player', mono:'IK', accent:'#6FA8FF'},
+    ],
+    range:[3,4,5,9],
+  };
+
+  go(s){ this.setState({ screen:s }); }
+  openDetail(id){ this.setState({ screen:'detail', detail:id, detailTab:'resumen' }); }
+
+  renderVals(){
+    const s = this.state;
+    const R = this.roster;
+    const byId = id => R.find(f=>f.id===id) || R[0];
+    const leader = byId(this.props.leaderId || 'valkyrie');
+    const dfBase = byId(s.detail);
+    const detailFig = { ...dfBase, glow: dfBase.accent+'22',
+      evoView: dfBase.evo.map((e,i)=>({ ...e, current:i===0, locked:i>0,
+        bg: i===0?'rgba(54,209,127,.08)':'#11152a', bd: i===0?'#2c5a43':'#222a45', rankCol: i===0?'#36D17F':'#6B7596' })) };
+    const tb=(k)=>({ bg: s.detailTab===k?'#222c4e':'transparent', col: s.detailTab===k?'#F4F6FF':'#6B7596' });
+    const tr=tb('resumen'), tc=tb('combate'), te=tb('evolucion');
+    const team = ['valkyrie','knight','ember','night','golem','mage'].map(byId);
+    const nav = (k)=>({ active: s.screen===k, col: s.screen===k ? '#5AA0FF' : '#6B7596' });
+    const gifts = this.gifts.map(g=>({ ...g, notEmpty: !g.empty, waiting: !g.ready && !g.empty }));
+    const simpleTitle = s.screen==='shop' ? 'Tienda' : 'Perfil';
+    return {
+      isHome:s.screen==='home', isDeck:s.screen==='deck', isDex:s.screen==='dex',
+      isDetail:s.screen==='detail', isBattle:s.screen==='battle', isCombat:s.screen==='combat', isWin:s.screen==='win',
+      isSimple: s.screen==='shop' || s.screen==='profile', simpleTitle,
+      showNav: ['home','deck','dex','shop','profile'].includes(s.screen),
+      roster: R.map(f=>({ ...f, onOpen:()=>this.openDetail(f.id) })),
+      leader, detailFig, gifts,
+      modifiers:this.modifiers.map(m=>({ ...m, notEq:!m.eq, border:m.eq?m.col:'#222a45', btnBg:m.eq?(m.col+'22'):'#0c1124', btnCol:m.eq?m.col:'#A9B2D0' })), maps:this.maps,
+      team, teamCount: team.length,
+      board:this.board,
+      energy:7, energyMax:10, turn:'Tu turno', figsP:3, figsE:2,
+      att:byId('valkyrie'), def:byId('night'),
+      edgeLines: this.board.edges.map(([a,b])=>({ x1:this.board.nodes[a].x, y1:this.board.nodes[a].y, x2:this.board.nodes[b].x, y2:this.board.nodes[b].y })),
+      nodeView: this.board.nodes.map((n,i)=>{
+        const inRange=this.board.range.includes(i);
+        const map={
+          'normal':{w:20,bg:'#161d33',bd:'2px solid #2a3357',glow:'none'},
+          'entrance-e':{w:23,bg:'rgba(255,82,71,.1)',bd:'2px dashed #FF5247',glow:'none'},
+          'entrance-p':{w:23,bg:'rgba(54,209,127,.1)',bd:'2px dashed #36D17F',glow:'none'},
+          'goal-e':{w:36,bg:'radial-gradient(circle,#FF5247,#7a1d18)',bd:'2px solid #ff8077',glow:'0 0 22px rgba(255,82,71,.6)'},
+          'goal-p':{w:36,bg:'radial-gradient(circle,#36D17F,#1a5a3a)',bd:'2px solid #74e7ab',glow:'0 0 22px rgba(54,209,127,.6)'},
+          'buff':{w:30,bg:'radial-gradient(circle,#FFD98A,#b97f1c)',bd:'2px solid #ffe6a6',glow:'0 0 22px rgba(255,197,61,.65)'},
+        };
+        const v=map[n.kind]||map.normal;
+        return { x:n.x, y:n.y, w:v.w, bg:v.bg, bd:v.bd, glow:v.glow, inRange,
+          isBuff:n.kind==='buff', isGoalE:n.kind==='goal-e', isGoalP:n.kind==='goal-p' };
+      }),
+      tokenView: this.board.tokens.map(t=>({ x:this.board.nodes[t.node].x, y:this.board.nodes[t.node].y,
+        accent:t.accent, mono:t.mono, ring: t.team==='player'?'#36D17F':'#FF5247', active:!!t.active, w: t.active?46:40 })),
+      energySegs: Array.from({length:10},(_,i)=>({ on:i<7, bg: i<7?'#4FC3F7':'#1a2238' })),
+      battleMods: this.modifiers.filter(m=>m.eq).map(m=>({ ...m, afford:m.cost<=7 })),
+      activeFig: byId('valkyrie'),
+      combatRes: { winColor:'#FFD140', winText:'Crítico · 80 de daño', ko:true,
+        attChip:{ c:'#FFD140', l:'Crítico 80' }, defChip:{ c:'#EBF0FF', l:'Golpe 50' } },
+      nHome:nav('home'), nDeck:nav('deck'), nDex:nav('dex'), nShop:nav('shop'), nProf:nav('profile'),
+      goHome:()=>this.go('home'), goDeck:()=>this.go('deck'), goDex:()=>this.go('dex'),
+      goShop:()=>this.go('shop'), goProfile:()=>this.go('profile'),
+      goBattle:()=>this.go('battle'), goCombat:()=>this.go('combat'), goWin:()=>this.go('win'),
+      tabResumen:s.detailTab==='resumen', tabCombate:s.detailTab==='combate', tabEvo:s.detailTab==='evolucion',
+      rBg:tr.bg, rCol:tr.col, cBg:tc.bg, cCol:tc.col, eBg:te.bg, eCol:te.col,
+      setResumen:()=>this.setState({detailTab:'resumen'}), setCombate:()=>this.setState({detailTab:'combate'}), setEvo:()=>this.setState({detailTab:'evolucion'}),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -328,6 +328,7 @@ func rank_data(uid: int) -> Dictionary:
 	if r >= 1 and r - 1 < ranks.size():
 		var st: Dictionary = ranks[r - 1]
 		return {
+			"id": base.get("id", ""),
 			"name": st.get("name", base["name"]), "attack": st.get("attack", base["attack"]),
 			"type": st.get("type", base.get("type", "Ruleta")),
 			"stamina": st.get("stamina", base.get("stamina", 2)),
@@ -335,6 +336,7 @@ func rank_data(uid: int) -> Dictionary:
 			"coin_a": base.get("coin_a", []), "coin_b": base.get("coin_b", []),
 		}
 	return {
+		"id": base.get("id", ""),
 		"name": base["name"], "attack": base["attack"], "type": base.get("type", "Ruleta"),
 		"stamina": base.get("stamina", 2), "passives": base.get("passives", []),
 		"coin_a": base.get("coin_a", []), "coin_b": base.get("coin_b", []),

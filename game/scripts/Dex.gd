@@ -36,7 +36,7 @@ func _build_env() -> void:
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.06, 0.07, 0.12)
+	env.background_color = UITheme.BG_DEEP
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.55, 0.6, 0.8)
 	env.ambient_light_energy = 0.75
@@ -67,13 +67,12 @@ func _build_ui() -> void:
 	top.offset_right = -12
 	layer.add_child(top)
 	_name_label = Label.new()
-	_name_label.add_theme_font_size_override("font_size", 30)
 	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(_name_label, 28, UITheme.TEXT, true, 800)
 	top.add_child(_name_label)
 	_type_label = Label.new()
-	_type_label.add_theme_font_size_override("font_size", 20)
-	_type_label.modulate = Color(0.8, 0.85, 1.0)
 	_type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(_type_label, 18, UITheme.PRIMARY_EDGE, true, 600)
 	top.add_child(_type_label)
 
 	var panel := PanelContainer.new()
@@ -82,6 +81,7 @@ func _build_ui() -> void:
 	panel.offset_bottom = -72
 	panel.offset_left = 10
 	panel.offset_right = -10
+	panel.add_theme_stylebox_override("panel", UITheme.panel(Color(0.08, 0.09, 0.16, 0.97), UITheme.BORDER, 16, 1, 10))
 	layer.add_child(panel)
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -91,26 +91,17 @@ func _build_ui() -> void:
 	vb.add_theme_constant_override("separation", 6)
 	scroll.add_child(vb)
 
-	var phdr := Label.new()
-	phdr.text = "Pasivas:"
-	phdr.add_theme_font_size_override("font_size", 20)
-	vb.add_child(phdr)
+	vb.add_child(_dex_hdr("PASIVAS"))
 	_passives_box = VBoxContainer.new()
 	_passives_box.add_theme_constant_override("separation", 4)
 	vb.add_child(_passives_box)
 
-	var ehdr := Label.new()
-	ehdr.text = "Evoluciones (Rank Up):"
-	ehdr.add_theme_font_size_override("font_size", 20)
-	vb.add_child(ehdr)
+	vb.add_child(_dex_hdr("EVOLUCIONES · RANK UP"))
 	_evos_box = VBoxContainer.new()
 	_evos_box.add_theme_constant_override("separation", 4)
 	vb.add_child(_evos_box)
 
-	var hdr := Label.new()
-	hdr.text = "Ataques (probabilidad):"
-	hdr.add_theme_font_size_override("font_size", 20)
-	vb.add_child(hdr)
+	vb.add_child(_dex_hdr("ATAQUES · probabilidad"))
 	_attacks_box = VBoxContainer.new()
 	_attacks_box.add_theme_constant_override("separation", 4)
 	vb.add_child(_attacks_box)
@@ -126,19 +117,31 @@ func _build_ui() -> void:
 	layer.add_child(nav)
 	var prev := Button.new()
 	prev.text = "◀"
-	prev.custom_minimum_size = Vector2(70, 46)
+	prev.custom_minimum_size = Vector2(64, 48)
+	UITheme.button_font(prev, 20, UITheme.TEXT, true, 700)
+	UITheme.style_surface(prev, UITheme.SURFACE, UITheme.BORDER, 12)
 	prev.pressed.connect(func(): _switch(-1))
 	nav.add_child(prev)
 	var menu := Button.new()
 	menu.text = "Menú"
-	menu.custom_minimum_size = Vector2(130, 46)
+	menu.custom_minimum_size = Vector2(140, 48)
+	UITheme.button_font(menu, 20, UITheme.TEXT2, true, 700)
+	UITheme.style_surface(menu, UITheme.SURFACE, UITheme.BORDER, 12)
 	menu.pressed.connect(_to_menu)
 	nav.add_child(menu)
 	var nxt := Button.new()
 	nxt.text = "▶"
-	nxt.custom_minimum_size = Vector2(70, 46)
+	nxt.custom_minimum_size = Vector2(64, 48)
+	UITheme.button_font(nxt, 20, UITheme.TEXT, true, 700)
+	UITheme.style_surface(nxt, UITheme.SURFACE, UITheme.BORDER, 12)
 	nxt.pressed.connect(func(): _switch(1))
 	nav.add_child(nxt)
+
+func _dex_hdr(text: String) -> Label:
+	var l := Label.new()
+	l.text = text
+	UITheme.label(l, 14, UITheme.MUTED, true, 700)
+	return l
 
 func _spawn(i: int) -> void:
 	if _current != null:

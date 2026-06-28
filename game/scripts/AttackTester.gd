@@ -15,7 +15,7 @@ func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var bg := ColorRect.new()
-	bg.color = Color(0.06, 0.07, 0.12)
+	bg.color = UITheme.BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
@@ -26,13 +26,12 @@ func _ready() -> void:
 	top.offset_right = -12
 	add_child(top)
 	_name_label = Label.new()
-	_name_label.add_theme_font_size_override("font_size", 30)
 	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(_name_label, 28, UITheme.TEXT, true, 800)
 	top.add_child(_name_label)
 	_type_label = Label.new()
-	_type_label.add_theme_font_size_override("font_size", 22)
-	_type_label.modulate = Color(0.8, 0.85, 1.0)
 	_type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(_type_label, 20, UITheme.PRIMARY_EDGE, true, 600)
 	top.add_child(_type_label)
 
 	_presenter = AttackPresenter.new()
@@ -52,15 +51,16 @@ func _ready() -> void:
 	add_child(bottom)
 
 	_result_label = Label.new()
-	_result_label.add_theme_font_size_override("font_size", 24)
 	_result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.label(_result_label, 22, UITheme.TEXT, true, 700)
 	bottom.add_child(_result_label)
 
 	_launch_btn = Button.new()
-	_launch_btn.text = "Lanzar ataque"
-	_launch_btn.custom_minimum_size = Vector2(300, 64)
-	_launch_btn.add_theme_font_size_override("font_size", 28)
+	_launch_btn.text = "🎲  Lanzar ataque"
+	_launch_btn.custom_minimum_size = Vector2(300, 66)
+	UITheme.button_font(_launch_btn, 26, Color.WHITE, true, 800)
+	UITheme.style_primary(_launch_btn, UITheme.PRIMARY, 16)
 	_launch_btn.pressed.connect(_on_launch)
 	bottom.add_child(_center(_launch_btn))
 
@@ -69,17 +69,23 @@ func _ready() -> void:
 	nav.add_theme_constant_override("separation", 16)
 	var prev := Button.new()
 	prev.text = "◀"
-	prev.custom_minimum_size = Vector2(70, 46)
+	prev.custom_minimum_size = Vector2(64, 48)
+	UITheme.button_font(prev, 20, UITheme.TEXT, true, 700)
+	UITheme.style_surface(prev, UITheme.SURFACE, UITheme.BORDER, 12)
 	prev.pressed.connect(func(): _switch(-1))
 	nav.add_child(prev)
 	var menu := Button.new()
 	menu.text = "Menú"
-	menu.custom_minimum_size = Vector2(130, 46)
+	menu.custom_minimum_size = Vector2(140, 48)
+	UITheme.button_font(menu, 20, UITheme.TEXT2, true, 700)
+	UITheme.style_surface(menu, UITheme.SURFACE, UITheme.BORDER, 12)
 	menu.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 	nav.add_child(menu)
 	var nxt := Button.new()
 	nxt.text = "▶"
-	nxt.custom_minimum_size = Vector2(70, 46)
+	nxt.custom_minimum_size = Vector2(64, 48)
+	UITheme.button_font(nxt, 20, UITheme.TEXT, true, 700)
+	UITheme.style_surface(nxt, UITheme.SURFACE, UITheme.BORDER, 12)
 	nxt.pressed.connect(func(): _switch(1))
 	nav.add_child(nxt)
 	bottom.add_child(nav)

@@ -20,7 +20,7 @@ func _ready() -> void:
 	_mods = Loadout.player_modifiers.duplicate()
 
 	var bg := ColorRect.new()
-	bg.color = Color(0.06, 0.07, 0.12)
+	bg.color = UITheme.BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
@@ -30,24 +30,21 @@ func _ready() -> void:
 	root.offset_right = -14
 	root.offset_top = 16
 	root.offset_bottom = -14
-	root.add_theme_constant_override("separation", 10)
+	root.add_theme_constant_override("separation", 8)
 	add_child(root)
 
 	var title := Label.new()
 	title.text = "Arma tu equipo"
-	title.add_theme_font_size_override("font_size", 32)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(title, 30, UITheme.TEXT, true, 800)
 	root.add_child(title)
 
 	_counter = Label.new()
-	_counter.add_theme_font_size_override("font_size", 20)
-	_counter.modulate = Color(0.8, 0.85, 1.0)
 	_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(_counter, 18, UITheme.SUCCESS, true, 700)
 	root.add_child(_counter)
 
-	var map_hdr := Label.new()
-	map_hdr.text = "Mapa:"
-	map_hdr.add_theme_font_size_override("font_size", 18)
+	var map_hdr := _hdr("MAPA")
 	root.add_child(map_hdr)
 	_map_box = HBoxContainer.new()
 	_map_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -55,10 +52,7 @@ func _ready() -> void:
 	root.add_child(_map_box)
 	_build_maps()
 
-	var mod_hdr := Label.new()
-	mod_hdr.text = "Modificadores (elige hasta 3):"
-	mod_hdr.add_theme_font_size_override("font_size", 18)
-	root.add_child(mod_hdr)
+	root.add_child(_hdr("MODIFICADORES  ·  elige hasta 3"))
 	_modsel_box = GridContainer.new()
 	_modsel_box.columns = 2
 	_modsel_box.add_theme_constant_override("h_separation", 8)
@@ -66,19 +60,13 @@ func _ready() -> void:
 	root.add_child(_modsel_box)
 	_build_modsel()
 
-	var team_hdr := Label.new()
-	team_hdr.text = "Tu equipo (toca para quitar):"
-	team_hdr.add_theme_font_size_override("font_size", 18)
-	root.add_child(team_hdr)
+	root.add_child(_hdr("TU EQUIPO  ·  toca para quitar"))
 	_team_box = HBoxContainer.new()
 	_team_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	_team_box.add_theme_constant_override("separation", 6)
 	root.add_child(_team_box)
 
-	var avail_hdr := Label.new()
-	avail_hdr.text = "Disponibles (toca para añadir):"
-	avail_hdr.add_theme_font_size_override("font_size", 18)
-	root.add_child(avail_hdr)
+	root.add_child(_hdr("DISPONIBLES  ·  toca para añadir"))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -95,18 +83,26 @@ func _ready() -> void:
 	root.add_child(nav)
 	var back := Button.new()
 	back.text = "Menú"
-	back.custom_minimum_size = Vector2(150, 56)
-	back.add_theme_font_size_override("font_size", 24)
+	back.custom_minimum_size = Vector2(140, 58)
+	UITheme.button_font(back, 22, UITheme.TEXT2, true, 700)
+	UITheme.style_surface(back, UITheme.SURFACE, UITheme.BORDER, 16)
 	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 	nav.add_child(back)
 	_play_btn = Button.new()
-	_play_btn.text = "Jugar"
-	_play_btn.custom_minimum_size = Vector2(220, 56)
-	_play_btn.add_theme_font_size_override("font_size", 26)
+	_play_btn.text = "▶  Jugar"
+	_play_btn.custom_minimum_size = Vector2(230, 58)
+	UITheme.button_font(_play_btn, 24, Color.WHITE, true, 800)
+	UITheme.style_primary(_play_btn, UITheme.PRIMARY, 16)
 	_play_btn.pressed.connect(_on_play)
 	nav.add_child(_play_btn)
 
 	_refresh()
+
+func _hdr(text: String) -> Label:
+	var l := Label.new()
+	l.text = text
+	UITheme.label(l, 14, UITheme.MUTED, true, 700)
+	return l
 
 func _build_maps() -> void:
 	for c in _map_box.get_children():
@@ -117,7 +113,11 @@ func _build_maps() -> void:
 		b.toggle_mode = true
 		b.button_pressed = (i == _map_index)
 		b.custom_minimum_size = Vector2(0, 46)
-		b.add_theme_font_size_override("font_size", 18)
+		UITheme.button_font(b, 16, UITheme.TEXT, true, 700)
+		if i == _map_index:
+			UITheme.style_primary(b, UITheme.PRIMARY, 12)
+		else:
+			UITheme.style_surface(b, UITheme.SURFACE, UITheme.BORDER, 12)
 		b.pressed.connect(_select_map.bind(i))
 		_map_box.add_child(b)
 
@@ -133,10 +133,14 @@ func _build_modsel() -> void:
 		var b := Button.new()
 		b.toggle_mode = true
 		b.button_pressed = mid in _mods
-		b.text = "%s (%d⚡)" % [String(m["name"]), int(m["cost"])]
+		b.text = "%s   ⚡%d" % [String(m["name"]), int(m["cost"])]
 		b.tooltip_text = String(m["desc"])
-		b.custom_minimum_size = Vector2(248, 44)
-		b.add_theme_font_size_override("font_size", 16)
+		b.custom_minimum_size = Vector2(244, 46)
+		UITheme.button_font(b, 15, UITheme.TEXT, true, 700)
+		if mid in _mods:
+			UITheme.style_primary(b, UITheme.ORANGE, 12)
+		else:
+			UITheme.style_surface(b, UITheme.SURFACE, UITheme.BORDER, 12)
 		b.pressed.connect(_toggle_mod.bind(mid))
 		_modsel_box.add_child(b)
 
@@ -151,9 +155,10 @@ func _build_available() -> void:
 	for ri in Roster.FIGURES.size():
 		var d: Dictionary = Roster.FIGURES[ri]
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(0, 54)
-		b.add_theme_font_size_override("font_size", 20)
-		b.text = "%s   ·   %s   ·   ST %d" % [d["name"], String(d.get("type", "?")), int(d.get("stamina", 1))]
+		b.custom_minimum_size = Vector2(0, 52)
+		UITheme.button_font(b, 18, UITheme.TEXT, false, 600)
+		UITheme.style_surface(b, UITheme.SURFACE, FigureCard.rarity_color(d), 12)
+		b.text = "%s   ·   %s   ·   ⚡%d" % [d["name"], String(d.get("type", "?")), int(d.get("stamina", 1))]
 		b.pressed.connect(_add.bind(ri))
 		_avail_box.add_child(b)
 
@@ -174,14 +179,18 @@ func _refresh() -> void:
 		c.queue_free()
 	for slot in Loadout.DECK_SIZE:
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(96, 64)
-		b.add_theme_font_size_override("font_size", 15)
+		b.custom_minimum_size = Vector2(96, 66)
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		if slot < _team.size():
-			b.text = Roster.FIGURES[_team[slot]]["name"]
+			var fd: Dictionary = Roster.FIGURES[_team[slot]]
+			b.text = String(fd["name"])
+			UITheme.button_font(b, 13, UITheme.TEXT, true, 700)
+			UITheme.style_surface(b, UITheme.SURFACE2, FigureCard.rarity_color(fd), 12)
 			b.pressed.connect(_remove.bind(slot))
 		else:
-			b.text = "vacío"
+			b.text = "+"
+			UITheme.button_font(b, 26, UITheme.MUTED, true, 700)
+			UITheme.style_surface(b, Color(0.07, 0.08, 0.13), UITheme.BORDER, 12)
 			b.disabled = true
 		_team_box.add_child(b)
 	_play_btn.disabled = not Loadout.valid(_team)
