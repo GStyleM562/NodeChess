@@ -32,6 +32,35 @@ const FX_OPTS := [
 # Passives that are unlocked only via Rank Up (cannot be equipped directly).
 const HIDDEN_PASSIVES := ["venom_aura", "burning_aura", "loaded_dice", "phase", "kindling_resolve"]
 
+# Help text shown by the ⓘ buttons (same order as COL_IDS).
+const COL_DESC := [
+	"Blanco — daño directo. Vence a Oro, pierde con Púrpura. Si gana: K.O.",
+	"Oro — daño/especial. Vence a Púrpura, puede perder con Blanco. Si gana: K.O.",
+	"Púrpura — especial (★1–3). Vence a Blanco, pierde con Oro. Aplica su efecto (no K.O.).",
+	"Azul — bloqueo defensivo. Vence a Blanco/Oro/Púrpura. Nunca noquea.",
+	"Rojo — Fallo. Siempre pierde.",
+]
+const FX_DESC := {
+	"Ninguno": "Sin efecto extra.",
+	"Miedo": "La víctima no puede atacar.",
+	"Debilitado": "−20 daño y −1★ en sus tiradas.",
+	"Paralizado": "No puede moverse ni atacar.",
+	"Inmovilizado": "No puede moverse.",
+	"Quemadura": "K.O. tras 6 turnos si no se limpia, y −10 daño mientras arde.",
+	"Veneno": "K.O. tras 8 turnos si no se limpia (más lento).",
+	"Congelado": "No mueve ni ataca; además su Azul no bloquea.",
+	"Silencio": "Sus ataques Púrpura fallan.",
+	"Confusión": "Al atacar, 50% de probabilidad de fallar.",
+	"Sueño": "No mueve ni ataca; despierta al entrar en combate.",
+	"Maldición": "Pierde todos los empates.",
+	"Marcado": "El rival recibe +20 daño / +1★ al atacarla.",
+	"Escudo Roto": "Su Azul no bloquea.",
+	"Empuje 1": "Empuja al rival 1 nodo.",
+	"Jalón 1": "Atrae al rival 1 nodo hacia ti.",
+	"Intercambio": "Intercambia posiciones con el rival.",
+}
+
+var _scroll: ScrollContainer
 var _name: LineEdit
 var _desc: LineEdit
 var _class: OptionButton
@@ -62,6 +91,8 @@ func _ready() -> void:
 	scroll.offset_bottom = -70
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	add_child(scroll)
+	_scroll = scroll
+	_setup_scroll(scroll)
 	var pad := MarginContainer.new()
 	pad.add_theme_constant_override("margin_left", 14)
 	pad.add_theme_constant_override("margin_right", 14)
@@ -208,12 +239,20 @@ func _build_passives(form: VBoxContainer) -> void:
 	for pid in Roster.PASSIVES.keys():
 		if pid in HIDDEN_PASSIVES:
 			continue
+		var item := HBoxContainer.new()
+		item.add_theme_constant_override("separation", 2)
 		var cb := CheckBox.new()
 		cb.text = String(Roster.PASSIVES[pid].get("name", pid))
+		cb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		cb.clip_text = true
 		cb.tooltip_text = String(Roster.PASSIVES[pid].get("desc", ""))
 		UITheme.button_font(cb, 12, UITheme.TEXT, false, 500)
 		cb.toggled.connect(func(_p): _revalidate())
-		grid.add_child(cb)
+		item.add_child(cb)
+		var pname := String(Roster.PASSIVES[pid].get("name", pid))
+		var pdesc := String(Roster.PASSIVES[pid].get("desc", ""))
+		item.add_child(_info_btn(func(): _show_info(pname, pdesc)))
+		grid.add_child(item)
 		_passive_boxes[pid] = cb
 
 func _build_pool(form: VBoxContainer) -> void:
@@ -281,6 +320,13 @@ func _add_row(seg: Dictionary) -> void:
 	line2.add_child(_labeled("Daño", pw))
 	line2.add_child(_labeled("★", st))
 	line2.add_child(_labeled("%", prob))
+	line2.add_child(_info_btn(func():
+		var ci := int(col.selected)
+		var fi := int(fx.selected)
+		var body: String = COL_DESC[ci] if ci >= 0 and ci < COL_DESC.size() else ""
+		if fi > 0 and fi < FX_OPTS.size():
+			body += "\n\nEfecto «%s»: %s" % [String(FX_OPTS[fi]["label"]), _fx_desc(String(FX_OPTS[fi]["label"]))]
+		_show_info("Segmento de ataque", body)))
 	var del := Button.new()
 	del.text = "✕"
 	UITheme.button_font(del, 14, UITheme.DANGER)
@@ -514,3 +560,88 @@ func _fx_index(seg: Dictionary) -> int:
 		if String(FX_OPTS[i].get("fx", "")) == fx:
 			return i
 	return 0
+
+func _fx_desc(label: String) -> String:
+	return String(FX_DESC.get(label, ""))
+
+# ---------------------------------------------------------------- scroll / info
+## Touch: dragging ANYWHERE pans the form. The input controls (dropdowns, spinboxes,
+## text fields) would otherwise swallow the drag, leaving only the black gaps usable.
+func _input(event: InputEvent) -> void:
+	if _scroll != null and event is InputEventScreenDrag:
+		_scroll.scroll_vertical -= int(event.relative.y)
+		get_viewport().set_input_as_handled()
+
+## Fatter, clearly-coloured vertical scrollbar so it is easy to grab on a phone.
+func _setup_scroll(scroll: ScrollContainer) -> void:
+	var vbar := scroll.get_v_scroll_bar()
+	vbar.custom_minimum_size.x = 18
+	var grab := StyleBoxFlat.new()
+	grab.bg_color = UITheme.PRIMARY_EDGE
+	grab.set_corner_radius_all(9)
+	grab.content_margin_left = 5
+	grab.content_margin_right = 5
+	vbar.add_theme_stylebox_override("grabber", grab)
+	var grab_h := StyleBoxFlat.new()
+	grab_h.bg_color = UITheme.PRIMARY_EDGE.lightened(0.18)
+	grab_h.set_corner_radius_all(9)
+	vbar.add_theme_stylebox_override("grabber_highlight", grab_h)
+	vbar.add_theme_stylebox_override("grabber_pressed", grab_h)
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color(1, 1, 1, 0.07)
+	track.set_corner_radius_all(9)
+	vbar.add_theme_stylebox_override("scroll", track)
+
+## A small ⓘ info button.
+func _info_btn(cb: Callable) -> Button:
+	var b := Button.new()
+	b.text = "ⓘ"
+	b.custom_minimum_size = Vector2(34, 30)
+	UITheme.button_font(b, 15, UITheme.PRIMARY_EDGE, false, 700)
+	UITheme.style_surface(b)
+	b.pressed.connect(cb)
+	return b
+
+## A simple modal that explains an attack colour/effect or a passive.
+func _show_info(title: String, body: String) -> void:
+	var old := get_node_or_null("InfoModal")
+	if old:
+		old.queue_free()
+	var modal := Control.new()
+	modal.name = "InfoModal"
+	modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(modal)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed:
+			modal.queue_free())
+	modal.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.add_child(cc)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(460, 0)
+	panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.PRIMARY_EDGE, 18, 2, 18))
+	cc.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	panel.add_child(vb)
+	var t := Label.new()
+	t.text = title
+	UITheme.label(t, 18, UITheme.GOLD, true, 800)
+	vb.add_child(t)
+	var b := Label.new()
+	b.text = body
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	b.custom_minimum_size = Vector2(420, 0)
+	UITheme.label(b, 14, UITheme.TEXT, false, 500)
+	vb.add_child(b)
+	var close := Button.new()
+	close.text = "Cerrar"
+	UITheme.button_font(close, 14, UITheme.TEXT, true, 700)
+	UITheme.style_primary(close, UITheme.PRIMARY)
+	close.pressed.connect(func(): modal.queue_free())
+	vb.add_child(close)

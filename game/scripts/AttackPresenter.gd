@@ -26,6 +26,11 @@ const FACE_FRONT := [
 
 func present(type: String, pool: Array, result: Dictionary, idx: int = -1, opts: Dictionary = {}) -> void:
 	clear()
+	# Let our rect settle before measuring `size` (for viewport sizing). Two presenters
+	# run concurrently; reading a not-yet-laid-out size makes the visual fly off-screen.
+	if size.x < 1.0 or size.y < 1.0:
+		await get_tree().process_frame
+	await get_tree().process_frame
 	if idx < 0:
 		idx = maxi(0, pool.find(result))
 	match type:
@@ -45,9 +50,19 @@ func clear() -> void:
 	for c in get_children():
 		c.queue_free()
 
+## Centre a child using ANCHORS so the engine keeps it centred across every
+## (re)layout. A one-shot `position = size*0.5 - sz*0.5` desyncs if `size` changes
+## afterwards (font load, concurrent presenter, deferred container sort) and the
+## visual ends up off-screen — anchors self-correct on resize, so it can't.
 func _center(ctrl: Control, sz: Vector2) -> void:
-	await get_tree().process_frame
-	ctrl.position = size * 0.5 - sz * 0.5
+	ctrl.anchor_left = 0.5
+	ctrl.anchor_right = 0.5
+	ctrl.anchor_top = 0.5
+	ctrl.anchor_bottom = 0.5
+	ctrl.offset_left = -sz.x * 0.5
+	ctrl.offset_right = sz.x * 0.5
+	ctrl.offset_top = -sz.y * 0.5
+	ctrl.offset_bottom = sz.y * 0.5
 
 # --------------------------------------------------------------- 2D shape (coin)
 func _mk_shape(seg: Dictionary, s: int, circle: bool) -> Panel:
