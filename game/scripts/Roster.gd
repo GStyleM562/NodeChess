@@ -27,7 +27,9 @@ const PASSIVES := {
 	"loaded_dice": {"name": "Loaded Dice", "desc": "Una vez por partida: repite una de sus monedas (pendiente de UI)."},
 }
 
-const FIGURES := [
+# A static var (not const) so custom figures from the Character Creator — and test
+# fixtures — can be appended at runtime. Built-in entries below are the MVP roster.
+static var FIGURES := [
 	{
 		"id": "stone_golem", "name": "Stone Golem", "stamina": 1, "type": "Ruleta",
 		"passives": ["bedrock", "counter_stone"],

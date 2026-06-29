@@ -21,7 +21,12 @@ const HILITE_MOVE := Color(0.353, 0.627, 1.0)  # #5AA0FF
 const HILITE_ATK := Color(1.0, 0.322, 0.278)
 const HILITE_DEPLOY := Color(0.212, 0.82, 0.498)
 const FACE_OFFSET := 0.0
-const STATUS_ES := {"fear": "Miedo", "weakened": "Debilitado", "paralysis": "Paralizado", "immobilized": "Inmovilizado"}
+const STATUS_ES := {
+	"fear": "Miedo", "weakened": "Debilitado", "paralysis": "Paralizado", "immobilized": "Inmovilizado",
+	"burn": "Quemadura", "poison": "Veneno", "freeze": "Congelado", "silence": "Silencio",
+	"confusion": "Confusión", "sleep": "Sueño", "curse": "Maldición", "marked": "Marcado",
+	"shield_break": "Escudo Roto",
+}
 
 var _gs: GameState
 var _cam: Camera3D
@@ -715,19 +720,49 @@ func _walk_vis(uid: int, target: Vector3) -> void:
 	fig.play_clip("idle")
 
 ## Walk the figure THROUGH each node of the path (follows the graph edges).
+## If a node is occupied by another figure (a JUMP), the figure leaps in an arc
+## OVER that figure to the landing node — instead of sliding straight through it.
 func _walk_path(uid: int, nodes: Array) -> void:
 	var fig: Figure3D = _vis.get(uid)
 	if fig == null or nodes.is_empty():
 		return
 	fig.play_clip("move_walk")
-	for nid in nodes:
-		var target := _gs.map.pos_of(int(nid))
-		_face(fig, target - fig.position)
-		var dur := maxf(0.16, fig.position.distance_to(target) * 0.34)
-		var tw := create_tween()
-		tw.tween_property(fig, "position", target, dur)
-		await tw.finished
+	var i := 0
+	while i < nodes.size():
+		var nid := int(nodes[i])
+		var blocked: bool = _gs.board.has(nid) and int(_gs.board[nid]) != uid
+		if blocked and i + 1 < nodes.size():
+			# Leap OVER the occupant to the node beyond it (no pass-through).
+			await _hop_over(fig, _gs.map.pos_of(nid), _gs.map.pos_of(int(nodes[i + 1])))
+			i += 2
+		else:
+			var target := _gs.map.pos_of(nid)
+			_face(fig, target - fig.position)
+			var dur := maxf(0.16, fig.position.distance_to(target) * 0.34)
+			var tw := create_tween()
+			tw.tween_property(fig, "position", target, dur)
+			await tw.finished
+			i += 1
 	fig.play_clip("idle")
+
+## A parabolic leap from the figure's current position, arcing up and OVER the
+## figure standing at `over_pos`, landing at `land_pos`. Reads clearly as "jumped
+## over it": faces the landing, plays the run clip, and rises above the occupant.
+func _hop_over(fig: Figure3D, over_pos: Vector3, land_pos: Vector3) -> void:
+	var start := fig.position
+	_face(fig, land_pos - start)
+	fig.play_clip("move_run" if fig.has_clip("move_run") else "move_walk")
+	var dur := maxf(0.45, start.distance_to(land_pos) * 0.3)
+	# Peak clears the occupant's head (relative to the lower of the two ends).
+	var arc_h := maxf(1.8, over_pos.y - minf(start.y, land_pos.y) + 1.4)
+	var tw := create_tween()
+	tw.tween_method(func(t: float):
+		var p := start.lerp(land_pos, t)
+		p.y += arc_h * 4.0 * t * (1.0 - t)   # 0 at ends, peak at the middle (over enemy)
+		fig.position = p
+	, 0.0, 1.0, dur)
+	await tw.finished
+	fig.position = land_pos
 
 # ---------------------------------------------------------------- combat
 func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:

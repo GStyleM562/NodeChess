@@ -7,10 +7,21 @@ class_name GameState
 ## secondary victory (no board figures AND cannot deploy), and a simple bot.
 ## Surround KO + KO-bench return come next.
 
-# Purple effect label (segment "fx") -> status id.
-const FX_STATUS := {"Miedo": "fear", "Debilitado": "weakened", "Paralizado": "paralysis", "Inmovilizado": "immobilized"}
-const STATUS_DUR := 4   # in game-turns (~2 rounds)
+# Purple effect label (segment "fx") -> status id. Designers set "fx" on a segment;
+# winning Purple applies the mapped status. The full status library (GDD §29):
+const FX_STATUS := {
+	"Miedo": "fear", "Debilitado": "weakened", "Paralizado": "paralysis", "Inmovilizado": "immobilized",
+	"Quemadura": "burn", "Veneno": "poison", "Congelado": "freeze", "Silencio": "silence",
+	"Confusión": "confusion", "Sueño": "sleep", "Maldición": "curse", "Marcado": "marked",
+	"Escudo Roto": "shield_break",
+}
+const STATUS_DUR := 4   # default status length, in game-turns (~2 rounds)
 const KO_COOLDOWN := 6  # game-turns before a KO'd figure returns to the bench
+# Damage-over-time statuses KO the figure when their timer elapses (unless cleansed
+# by Rank Up / the Cleanse modifier). There is no HP, so the timer IS the lethality.
+const BURN_TURNS := 6     # Quemadura: faster, also weakens the burning unit's damage
+const POISON_TURNS := 8   # Veneno: slower, stealthier
+const BURN_DMG_PEN := 10  # Burn shaves this much power off the burning unit's rolls
 
 # --- Plan B: energy + modifiers + buff nodes -------------------------------
 const ENERGY_MAX := 10
@@ -55,8 +66,15 @@ func add_to_bench(team: String, rindex: int) -> int:
 	return uid
 
 # --- statuses --------------------------------------------------------------
-func apply_status(uid: int, s: String, dur: int = STATUS_DUR) -> void:
-	units[uid]["statuses"][s] = turn_no + dur
+## dur < 0 → use the status' own default length (DOTs last longer than debuffs).
+func apply_status(uid: int, s: String, dur: int = -1) -> void:
+	units[uid]["statuses"][s] = turn_no + (dur if dur >= 0 else _status_dur(s))
+
+func _status_dur(s: String) -> int:
+	match s:
+		"burn": return BURN_TURNS
+		"poison": return POISON_TURNS
+		_: return STATUS_DUR
 
 func has_status(uid: int, s: String) -> bool:
 	var st: Dictionary = units[uid]["statuses"]
@@ -69,11 +87,19 @@ func status_list(uid: int) -> Array:
 			out.append(s)
 	return out
 
+## Frozen, Asleep and Paralyzed root the figure; Immobilized too.
 func can_move(uid: int) -> bool:
-	return not has_status(uid, "immobilized") and not has_status(uid, "paralysis")
+	for s in ["immobilized", "paralysis", "freeze", "sleep"]:
+		if has_status(uid, s):
+			return false
+	return true
 
+## Feared, Frozen, Asleep and Paralyzed figures cannot attack.
 func can_attack(uid: int) -> bool:
-	return not has_status(uid, "fear") and not has_status(uid, "paralysis")
+	for s in ["fear", "paralysis", "freeze", "sleep"]:
+		if has_status(uid, s):
+			return false
+	return true
 
 # --- queries ---------------------------------------------------------------
 func entrances(team: String) -> Array:
@@ -229,6 +255,18 @@ func _roll_full(uid: int, is_attacker := false) -> Dictionary:
 			s["pow"] = maxi(0, int(s["pow"]) - 20)
 		if s.has("stars"):
 			s["stars"] = maxi(1, int(s["stars"]) - 1)
+	# BURN — the flames sap the burning figure's damage.
+	if has_status(uid, "burn") and s.has("pow"):
+		s["pow"] = maxi(0, int(s["pow"]) - BURN_DMG_PEN)
+	# FROZEN / SHIELD BREAK — the figure cannot raise a Blue defence (it collapses to a Miss).
+	if String(s.get("col", "")) == "blue" and (has_status(uid, "freeze") or has_status(uid, "shield_break")):
+		s = {"col": "red", "name": String(s.get("name", "Bloqueo"))}
+	# SILENCE — the figure cannot cast Purple specials (they fizzle to a Miss).
+	elif String(s.get("col", "")) == "purple" and has_status(uid, "silence"):
+		s = {"col": "red", "name": String(s.get("name", "Silenciado"))}
+	# CONFUSION — an attacking, confused figure fumbles half the time.
+	if is_attacker and has_status(uid, "confusion") and randf() < 0.5:
+		s = {"col": "red", "name": "Confusión"}
 	# BUFF NODE — a unit standing on a buff node rolls stronger.
 	if int(units[uid]["node"]) in map.buffs:
 		_boost_seg(s, BUFF_DMG, BUFF_STARS)
@@ -274,7 +312,18 @@ func attack(att_uid: int, def_uid: int, att_moved: int = 0) -> Dictionary:
 	var rb := _roll_full(def_uid, false)
 	var seg_b: Dictionary = rb["seg"]
 	var idx_b := int(rb["idx"])
+	# MARKED — attacking a Marked figure hits harder (+20 dmg / +1★, baked in).
+	if has_status(def_uid, "marked"):
+		_boost_seg(seg_a, 20, 1)
 	var oc := Combat.outcome(seg_a, seg_b)
+	# CURSE — the cursed figure loses ties (the opponent wins, unless both rolled a Miss).
+	if int(oc["result"]) == 0:
+		var a_curse := has_status(att_uid, "curse")
+		var d_curse := has_status(def_uid, "curse")
+		if a_curse != d_curse:
+			var win_seg: Dictionary = seg_b if a_curse else seg_a
+			if String(win_seg.get("col", "")) != "red":
+				oc = _outcome_from_winner(win_seg, -1 if a_curse else 1)
 	var ko_uid := -1
 	var applied := {}
 	var disp := {}
@@ -292,7 +341,7 @@ func attack(att_uid: int, def_uid: int, att_moved: int = 0) -> Dictionary:
 		var wcol := String(ws.get("col", ""))
 		var fx := String(ws.get("fx", ""))
 		if FX_STATUS.has(fx):
-			apply_status(loser_uid, FX_STATUS[fx], STATUS_DUR)
+			apply_status(loser_uid, FX_STATUS[fx])   # DOTs use their own longer timer
 			applied = {"status": FX_STATUS[fx], "target": loser_uid, "fx": fx}
 		# PASSIVE — Venom Hex: a Purple win also Weakens the loser.
 		if wcol == "purple" and has_passive(winner_uid, "venom_hex"):
@@ -312,12 +361,30 @@ func attack(att_uid: int, def_uid: int, att_moved: int = 0) -> Dictionary:
 		# PASSIVE — Hexstep: the Witch retreats 1 node (away from the attacker) on a tie.
 		if has_passive(def_uid, "hexstep"):
 			disp = _apply_displacement(att_uid, def_uid, {"disp": "push", "n": 1})
+	# SLEEP — entering combat wakes a sleeping figure (the status is consumed).
+	for u in [att_uid, def_uid]:
+		if units[u]["alive"]:
+			units[u]["statuses"].erase("sleep")
 	return {
 		"att": att_uid, "def": def_uid, "seg_a": seg_a, "seg_b": seg_b,
 		"result": int(oc["result"]), "win_col": oc["win_col"], "effect": oc["effect"],
 		"ko": ko_uid, "status": applied, "disp": disp, "rankup": ranked,
 		"idx_a": idx_a, "idx_b": idx_b,
 	}
+
+## Build a combat outcome from a forced winning segment (mirrors Combat.outcome's
+## winner branch). Used when Curse overturns a tie.
+func _outcome_from_winner(win_seg: Dictionary, result: int) -> Dictionary:
+	var wc := String(win_seg.get("col", ""))
+	var ko := false
+	var eff := ""
+	if wc == "white" or wc == "gold":
+		ko = bool(win_seg.get("ko", true)); eff = "KO"
+	elif wc == "purple":
+		ko = bool(win_seg.get("ko", false)); eff = String(win_seg.get("fx", "Estado"))
+	elif wc == "blue":
+		eff = "Bloqueo"
+	return {"result": result, "ko": ko, "win_col": wc, "effect": eff, "win_seg": win_seg}
 
 # --- rank up / evolution ---------------------------------------------------
 ## Effective figure data at the unit's current rank (base, or a "ranks" override).
@@ -458,6 +525,7 @@ func end_turn() -> void:
 	_grant_energy(turn_team)
 	mod_used[turn_team] = false                  # refresh the per-turn modifier
 	_apply_turn_start_auras(turn_team)
+	_tick_dots(turn_team)                         # Burn/Poison may KO at turn start
 	if winner == "" and not can_act(turn_team):
 		winner = "enemy" if turn_team == "player" else "player"
 
@@ -467,6 +535,18 @@ func _apply_turn_start_auras(team: String) -> void:
 		if has_passive(uid, "burning_aura"):
 			for foe in adjacent_enemies(uid):
 				apply_status(foe, "weakened", STATUS_DUR)
+
+## Burn/Poison are lethal timers: when the timer elapses (and was not cleansed by
+## Rank Up or the Cleanse modifier) the figure is KO'd at the start of its turn.
+func _tick_dots(team: String) -> void:
+	for uid in units_on_board(team).duplicate():
+		if not units[uid]["alive"]:
+			continue
+		var st: Dictionary = units[uid]["statuses"]
+		for s in ["burn", "poison"]:
+			if st.has(s) and turn_no >= int(st[s]):
+				_ko(uid)
+				break
 
 # --- energy / modifiers / buff nodes ---------------------------------------
 func _grant_energy(team: String) -> void:

@@ -1,0 +1,516 @@
+extends Control
+## Character Creator — compose a figure from existing engine-supported building
+## blocks (5 attack types, 5 colours, the status/displacement library, the passive
+## catalog), validate it (FigureValidator / GDD §32) and save it (CustomFigures).
+## Saved figures merge into the Roster → Dex, Deck Builder and matches. A real 3D
+## model is wired in later; until then the figure borrows an existing model.
+##
+## The figure-building logic is a pure static (make_figure) so it can be unit-tested
+## without the UI (see tools/test_creator.gd).
+
+const COL_IDS := ["white", "gold", "purple", "blue", "red"]
+const COL_ES := ["Blanco (daño)", "Oro (daño)", "Púrpura (★)", "Azul (bloqueo)", "Rojo (fallo)"]
+const CLASSES := ["Balanced", "Agile", "Tank", "Debuffer", "Buffer", "Striker", "Controller", "Specialist"]
+const RARITIES := ["common", "rare", "epic", "legend", "mythic"]
+const RARITY_ES := ["Común", "Rara", "Épica", "Legendaria", "Mítica"]
+const TYPES := ["Ruleta", "Dado (D4)", "Dado (D6)", "Dado (D8)", "Dado (D10)", "Dado (D12)", "Moneda", "Doble Moneda", "Suma 2d6"]
+# fx label -> extra segment fields. Statuses match GameState.FX_STATUS; the last
+# three are displacements (carry "disp"/"n" instead of a status).
+const FX_OPTS := [
+	{"label": "Ninguno"},
+	{"label": "Miedo", "fx": "Miedo"}, {"label": "Debilitado", "fx": "Debilitado"},
+	{"label": "Paralizado", "fx": "Paralizado"}, {"label": "Inmovilizado", "fx": "Inmovilizado"},
+	{"label": "Quemadura", "fx": "Quemadura"}, {"label": "Veneno", "fx": "Veneno"},
+	{"label": "Congelado", "fx": "Congelado"}, {"label": "Silencio", "fx": "Silencio"},
+	{"label": "Confusión", "fx": "Confusión"}, {"label": "Sueño", "fx": "Sueño"},
+	{"label": "Maldición", "fx": "Maldición"}, {"label": "Marcado", "fx": "Marcado"},
+	{"label": "Escudo Roto", "fx": "Escudo Roto"},
+	{"label": "Empuje 1", "fx": "Empuje", "disp": "push", "n": 1},
+	{"label": "Jalón 1", "fx": "Jalón", "disp": "pull", "n": 1},
+	{"label": "Intercambio", "fx": "Intercambio", "disp": "swap"},
+]
+# Passives that are unlocked only via Rank Up (cannot be equipped directly).
+const HIDDEN_PASSIVES := ["venom_aura", "burning_aura", "loaded_dice", "phase", "kindling_resolve"]
+
+var _name: LineEdit
+var _desc: LineEdit
+var _class: OptionButton
+var _rarity: OptionButton
+var _type: OptionButton
+var _model: OptionButton
+var _stamina: SpinBox
+var _evolve: CheckBox
+var _passive_boxes := {}        # pid -> CheckBox
+var _rows: Array = []           # each: { panel, col, name, pow, stars, fx, prob }
+var _rows_box: VBoxContainer
+var _total_lbl: Label
+var _status_lbl: Label
+var _save_btn: Button
+var _model_ids: Array = []
+
+func _ready() -> void:
+	var bg := ColorRect.new()
+	bg.color = UITheme.BG_DEEP
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(bg)
+
+	_build_topbar()
+
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.offset_top = 60
+	scroll.offset_bottom = -70
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(scroll)
+	var pad := MarginContainer.new()
+	pad.add_theme_constant_override("margin_left", 14)
+	pad.add_theme_constant_override("margin_right", 14)
+	pad.add_theme_constant_override("margin_top", 8)
+	pad.add_theme_constant_override("margin_bottom", 8)
+	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(pad)
+	var form := VBoxContainer.new()
+	form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	form.add_theme_constant_override("separation", 12)
+	pad.add_child(form)
+
+	_build_identity(form)
+	_build_combat(form)
+	_build_passives(form)
+	_build_pool(form)
+
+	_build_footer()
+	_seed_default_pool()
+	_revalidate()
+
+# ---------------------------------------------------------------- top / footer
+func _build_topbar() -> void:
+	var bar := PanelContainer.new()
+	bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	bar.offset_bottom = 56
+	bar.add_theme_stylebox_override("panel", UITheme.panel(UITheme.BG, UITheme.BORDER, 0, 0, 8))
+	add_child(bar)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 10)
+	bar.add_child(hb)
+	var back := Button.new()
+	back.text = "←"
+	UITheme.button_font(back, 22, UITheme.TEXT)
+	UITheme.style_surface(back)
+	back.custom_minimum_size = Vector2(48, 40)
+	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+	hb.add_child(back)
+	var title := Label.new()
+	title.text = "Crear Personaje"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	UITheme.label(title, 22, UITheme.GOLD, true, 800)
+	hb.add_child(title)
+
+func _build_footer() -> void:
+	var bar := PanelContainer.new()
+	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	bar.offset_top = -66
+	bar.add_theme_stylebox_override("panel", UITheme.panel(UITheme.BG, UITheme.BORDER, 0, 1, 8))
+	add_child(bar)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 4)
+	bar.add_child(vb)
+	_status_lbl = Label.new()
+	_status_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.label(_status_lbl, 12, UITheme.TEXT2, false, 600)
+	vb.add_child(_status_lbl)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 8)
+	vb.add_child(hb)
+	_save_btn = Button.new()
+	_save_btn.text = "Guardar figura"
+	_save_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UITheme.button_font(_save_btn, 16, UITheme.TEXT, true, 800)
+	UITheme.style_primary(_save_btn, UITheme.SUCCESS)
+	_save_btn.pressed.connect(_on_save)
+	hb.add_child(_save_btn)
+
+# ---------------------------------------------------------------- sections
+func _section(parent: VBoxContainer, title: String) -> VBoxContainer:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.BORDER, 16, 1, 12))
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(p)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 8)
+	p.add_child(vb)
+	var t := Label.new()
+	t.text = title
+	UITheme.label(t, 14, UITheme.PRIMARY_EDGE, true, 800)
+	vb.add_child(t)
+	return vb
+
+func _field(parent: VBoxContainer, caption: String, control: Control) -> void:
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 8)
+	parent.add_child(hb)
+	var l := Label.new()
+	l.text = caption
+	l.custom_minimum_size = Vector2(96, 0)
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	UITheme.label(l, 12, UITheme.TEXT2, false, 600)
+	hb.add_child(l)
+	control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_child(control)
+
+func _build_identity(form: VBoxContainer) -> void:
+	var s := _section(form, "Identidad")
+	_name = LineEdit.new()
+	_name.placeholder_text = "Nombre"
+	_name.text_changed.connect(func(_t): _revalidate())
+	_field(s, "Nombre", _name)
+	_desc = LineEdit.new()
+	_desc.placeholder_text = "Descripción corta"
+	_field(s, "Descripción", _desc)
+	_class = _opt(CLASSES)
+	_field(s, "Clase", _class)
+	_rarity = _opt(RARITY_ES)
+	_rarity.select(2)   # Épica by default
+	_field(s, "Rareza", _rarity)
+
+func _build_combat(form: VBoxContainer) -> void:
+	var s := _section(form, "Combate")
+	_stamina = SpinBox.new()
+	_stamina.min_value = 0; _stamina.max_value = 6; _stamina.value = 2
+	_stamina.value_changed.connect(func(_v): _revalidate())
+	_field(s, "Estamina", _stamina)
+	_type = _opt(TYPES)
+	_type.select(0)
+	_type.item_selected.connect(func(_i): _revalidate())
+	_field(s, "Tipo ataque", _type)
+	# placeholder model (borrow an existing figure until a real GLB is added)
+	_model_ids = []
+	var names: Array = []
+	for f in Roster.FIGURES:
+		if not bool(f.get("custom", false)):
+			_model_ids.append(String(f.get("id", "")))
+			names.append(String(f.get("name", "?")))
+	_model = _opt(names)
+	_field(s, "Modelo (placeholder)", _model)
+	_evolve = CheckBox.new()
+	_evolve.text = "Evoluciona (Rank Up → etapa más fuerte)"
+	UITheme.button_font(_evolve, 13, UITheme.TEXT, false, 600)
+	s.add_child(_evolve)
+
+func _build_passives(form: VBoxContainer) -> void:
+	var s := _section(form, "Pasivas (máx. 3)")
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 4)
+	s.add_child(grid)
+	for pid in Roster.PASSIVES.keys():
+		if pid in HIDDEN_PASSIVES:
+			continue
+		var cb := CheckBox.new()
+		cb.text = String(Roster.PASSIVES[pid].get("name", pid))
+		cb.tooltip_text = String(Roster.PASSIVES[pid].get("desc", ""))
+		UITheme.button_font(cb, 12, UITheme.TEXT, false, 500)
+		cb.toggled.connect(func(_p): _revalidate())
+		grid.add_child(cb)
+		_passive_boxes[pid] = cb
+
+func _build_pool(form: VBoxContainer) -> void:
+	var s := _section(form, "Pool de ataque")
+	var hint := Label.new()
+	hint.text = "Cada segmento: color + (daño/★) + efecto + probabilidad. En Ruleta deben sumar 100%."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.label(hint, 11, UITheme.MUTED, false, 500)
+	s.add_child(hint)
+	_rows_box = VBoxContainer.new()
+	_rows_box.add_theme_constant_override("separation", 6)
+	s.add_child(_rows_box)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 8)
+	s.add_child(hb)
+	var add := Button.new()
+	add.text = "+ Segmento"
+	UITheme.button_font(add, 13, UITheme.TEXT, false, 700)
+	UITheme.style_surface(add)
+	add.pressed.connect(func(): _add_row({"col": "white", "pow": 40, "w": 10}); _revalidate())
+	hb.add_child(add)
+	_total_lbl = Label.new()
+	_total_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_total_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	UITheme.label(_total_lbl, 13, UITheme.GOLD, true, 800)
+	hb.add_child(_total_lbl)
+
+# ---------------------------------------------------------------- pool rows
+func _add_row(seg: Dictionary) -> void:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE2, UITheme.BORDER, 12, 1, 8))
+	_rows_box.add_child(p)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 4)
+	p.add_child(vb)
+
+	var line1 := HBoxContainer.new()
+	line1.add_theme_constant_override("separation", 6)
+	vb.add_child(line1)
+	var col := _opt(COL_ES)
+	col.select(COL_IDS.find(String(seg.get("col", "white"))))
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.item_selected.connect(func(_i): _revalidate())
+	line1.add_child(col)
+	var nm := LineEdit.new()
+	nm.placeholder_text = "Nombre ataque"
+	nm.text = String(seg.get("name", ""))
+	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line1.add_child(nm)
+
+	var line2 := HBoxContainer.new()
+	line2.add_theme_constant_override("separation", 6)
+	vb.add_child(line2)
+	var pw := _spin(0, 200, 5, int(seg.get("pow", 0)), "Daño")
+	var st := _spin(1, 3, 1, int(seg.get("stars", 1)), "★")
+	var fx := _opt(_fx_labels())
+	fx.select(_fx_index(seg))
+	fx.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var prob := _spin(0, 100, 5, int(seg.get("w", 10)), "%")
+	prob.get_line_edit().add_theme_color_override("font_color", UITheme.GOLD)
+	prob.value_changed.connect(func(_v): _revalidate())
+	pw.value_changed.connect(func(_v): _revalidate())
+	st.value_changed.connect(func(_v): _revalidate())
+	fx.item_selected.connect(func(_i): _revalidate())
+	line2.add_child(_labeled("Daño", pw))
+	line2.add_child(_labeled("★", st))
+	line2.add_child(_labeled("%", prob))
+	var del := Button.new()
+	del.text = "✕"
+	UITheme.button_font(del, 14, UITheme.DANGER)
+	UITheme.style_surface(del)
+	line2.add_child(del)
+	vb.add_child(fx)
+
+	var row := {"panel": p, "col": col, "name": nm, "pow": pw, "stars": st, "fx": fx, "prob": prob}
+	_rows.append(row)
+	del.pressed.connect(func():
+		_rows.erase(row)
+		p.queue_free()
+		_revalidate())
+
+func _seed_default_pool() -> void:
+	_add_row({"col": "white", "name": "Golpe", "pow": 60, "w": 50})
+	_add_row({"col": "blue", "name": "Guardia", "w": 30})
+	_add_row({"col": "red", "w": 20})
+
+# ---------------------------------------------------------------- figure build
+## Read the UI into a figure dict (delegates to the pure static builder).
+func build_figure() -> Dictionary:
+	var pool: Array = []
+	for row in _rows:
+		pool.append({
+			"col": COL_IDS[int(row["col"].selected)],
+			"name": String(row["name"].text),
+			"pow": int(row["pow"].value),
+			"stars": int(row["stars"].value),
+			"fx_index": int(row["fx"].selected),
+			"w": int(row["prob"].value),
+		})
+	var passives: Array = []
+	for pid in _passive_boxes.keys():
+		if _passive_boxes[pid].button_pressed:
+			passives.append(pid)
+	var model_ref := ""
+	if _model.selected >= 0 and _model.selected < _model_ids.size():
+		model_ref = String(_model_ids[_model.selected])
+	return make_figure({
+		"name": _name.text, "desc": _desc.text,
+		"class": CLASSES[_class.selected], "rarity": RARITIES[_rarity.selected],
+		"stamina": int(_stamina.value), "type": TYPES[_type.selected],
+		"passives": passives, "model_ref": model_ref, "evolve": _evolve.button_pressed,
+		"pool": pool,
+	})
+
+## Pure builder — no UI. `pool` rows carry col/name/pow/stars/fx_index/w.
+static func make_figure(p: Dictionary) -> Dictionary:
+	var attack := _build_pool_segments(p.get("pool", []))
+	var fig := {
+		"id": _slug(String(p.get("name", ""))),
+		"name": String(p.get("name", "")),
+		"desc": String(p.get("desc", "")),
+		"class": String(p.get("class", "Specialist")),
+		"rarity": String(p.get("rarity", "epic")),
+		"stamina": int(p.get("stamina", 2)),
+		"type": String(p.get("type", "Ruleta")),
+		"passives": p.get("passives", []),
+		"model_ref": String(p.get("model_ref", "")),
+		"attack": attack,
+	}
+	if bool(p.get("evolve", false)):
+		fig["ranks"] = [_boosted_stage(attack, fig["name"], fig["type"], int(fig["stamina"]), fig["passives"])]
+	return fig
+
+static func _build_pool_segments(rows: Array) -> Array:
+	var out: Array = []
+	for r in rows:
+		var col := String(r.get("col", "white"))
+		var seg := {"col": col, "w": float(r.get("w", 1))}
+		if String(r.get("name", "")) != "":
+			seg["name"] = String(r["name"])
+		if col == "white" or col == "gold":
+			if int(r.get("pow", 0)) > 0:
+				seg["pow"] = int(r["pow"])
+		elif col == "purple":
+			seg["stars"] = clampi(int(r.get("stars", 1)), 1, 3)
+		var fi := int(r.get("fx_index", 0))
+		if fi > 0 and fi < FX_OPTS.size():
+			var fxd: Dictionary = FX_OPTS[fi]
+			if fxd.has("fx"):
+				seg["fx"] = String(fxd["fx"])
+			if fxd.has("disp"):
+				seg["disp"] = String(fxd["disp"])
+			if fxd.has("n"):
+				seg["n"] = int(fxd["n"])
+		out.append(seg)
+	return out
+
+## A simple evolved stage: same shape, white/gold damage +20, name marked ✦.
+static func _boosted_stage(attack: Array, base_name: String, typ: String, stamina: int, passives: Array) -> Dictionary:
+	var pool: Array = []
+	for seg in attack:
+		var s: Dictionary = seg.duplicate(true)
+		if (String(s.get("col", "")) == "white" or String(s.get("col", "")) == "gold") and s.has("pow"):
+			s["pow"] = int(s["pow"]) + 20
+		pool.append(s)
+	return {"name": base_name + " ✦", "type": typ, "stamina": stamina, "passives": passives, "attack": pool}
+
+static func _slug(name: String) -> String:
+	var s := name.strip_edges().to_lower()
+	var out := ""
+	for i in s.length():
+		var c := s[i]
+		if (c >= "a" and c <= "z") or (c >= "0" and c <= "9"):
+			out += c
+		elif c == " " or c == "_" or c == "-":
+			out += "_"
+	out = out.strip_edges()
+	if out == "":
+		out = "fig"
+	return "custom_" + out
+
+# ---------------------------------------------------------------- validate/save
+func _revalidate() -> void:
+	var total := 0
+	for row in _rows:
+		total += int(row["prob"].value)
+	var is_wheel: bool = String(TYPES[_type.selected]).begins_with("Ruleta")
+	_total_lbl.text = ("Total: %d%%" % total) if is_wheel else ("Pesos: %d" % total)
+	_total_lbl.add_theme_color_override("font_color", UITheme.SUCCESS if (not is_wheel or total == 100) else UITheme.DANGER)
+
+	var fig: Dictionary = build_figure()
+	var r: Dictionary = FigureValidator.validate(fig)
+	var state := String(r["state"])
+	var msgs: Array = []
+	for e in r["errors"]:
+		msgs.append("✗ " + String(e))
+	for w in r["warnings"]:
+		msgs.append("⚠ " + String(w))
+	var head: String = {"VALID": "✓ Válido", "WARNING": "⚠ Válido con avisos", "INVALID": "✗ Inválido"}[state]
+	_status_lbl.text = head + ("  ·  " + "  ·  ".join(msgs) if not msgs.is_empty() else "")
+	_status_lbl.add_theme_color_override("font_color",
+		UITheme.SUCCESS if state == "VALID" else (UITheme.GOLD if state == "WARNING" else UITheme.DANGER))
+	_save_btn.disabled = state == "INVALID"
+
+func _on_save() -> void:
+	var fig: Dictionary = build_figure()
+	var r: Dictionary = FigureValidator.validate(fig)
+	if String(r["state"]) == "INVALID":
+		_revalidate()
+		return
+	# unique id if it already exists
+	var base_id := String(fig["id"])
+	var id := base_id
+	var n := 2
+	while CustomFigures.exists(id) or _builtin_has(id):
+		id = "%s_%d" % [base_id, n]
+		n += 1
+	fig["id"] = id
+	CustomFigures.add(fig)
+	CustomFigures.merge_into_roster()   # live this session too
+	_show_saved(String(fig["name"]))
+
+func _builtin_has(id: String) -> bool:
+	for f in Roster.FIGURES:
+		if String(f.get("id", "")) == id and not bool(f.get("custom", false)):
+			return true
+	return false
+
+func _show_saved(figname: String) -> void:
+	var ov := PanelContainer.new()
+	ov.set_anchors_preset(Control.PRESET_CENTER)
+	ov.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.SUCCESS, 18, 2, 18))
+	add_child(ov)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	ov.add_child(vb)
+	var t := Label.new()
+	t.text = "✓ ¡%s guardado!" % figname
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(t, 18, UITheme.SUCCESS, true, 800)
+	vb.add_child(t)
+	var sub := Label.new()
+	sub.text = "Ya aparece en Colección y Mazos."
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(sub, 12, UITheme.TEXT2, false, 600)
+	vb.add_child(sub)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 8)
+	vb.add_child(hb)
+	var dex := Button.new()
+	dex.text = "Ver en Colección"
+	UITheme.button_font(dex, 14, UITheme.TEXT, true, 700)
+	UITheme.style_primary(dex, UITheme.PRIMARY)
+	dex.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/dex.tscn"))
+	hb.add_child(dex)
+	var again := Button.new()
+	again.text = "Crear otro"
+	UITheme.button_font(again, 14, UITheme.TEXT, false, 700)
+	UITheme.style_surface(again)
+	again.pressed.connect(func(): ov.queue_free())
+	hb.add_child(again)
+
+# ---------------------------------------------------------------- widgets
+func _opt(items: Array) -> OptionButton:
+	var o := OptionButton.new()
+	for it in items:
+		o.add_item(String(it))
+	UITheme.button_font(o, 13, UITheme.TEXT, false, 600)
+	return o
+
+func _spin(lo: float, hi: float, step: float, val: int, _suffix: String) -> SpinBox:
+	var sp := SpinBox.new()
+	sp.min_value = lo; sp.max_value = hi; sp.step = step; sp.value = val
+	sp.custom_minimum_size = Vector2(64, 0)
+	return sp
+
+func _labeled(cap: String, control: Control) -> Control:
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 1)
+	var l := Label.new()
+	l.text = cap
+	UITheme.label(l, 9, UITheme.MUTED, false, 600)
+	vb.add_child(l)
+	vb.add_child(control)
+	return vb
+
+func _fx_labels() -> Array:
+	var out: Array = []
+	for o in FX_OPTS:
+		out.append(String(o["label"]))
+	return out
+
+func _fx_index(seg: Dictionary) -> int:
+	var fx := String(seg.get("fx", ""))
+	if fx == "":
+		return 0
+	for i in FX_OPTS.size():
+		if String(FX_OPTS[i].get("fx", "")) == fx:
+			return i
+	return 0

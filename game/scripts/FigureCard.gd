@@ -21,15 +21,20 @@ static func accent_of(data: Dictionary) -> Color:
 			best = s
 	return Combat.color_of(best)
 
+## Custom figures carry their own "rarity"; built-ins use the RARITY-by-id map.
+static func _rarity_key(data: Dictionary) -> String:
+	return String(data.get("rarity", RARITY.get(String(data.get("id", "")), "common")))
+
 static func rarity_color(data: Dictionary) -> Color:
-	match String(RARITY.get(String(data.get("id", "")), "common")):
-		"legend": return UITheme.R_LEGEND
+	match _rarity_key(data):
+		"mythic", "legend": return UITheme.R_LEGEND
 		"epic": return UITheme.R_EPIC
 		"rare": return UITheme.R_RARE
 		_: return UITheme.R_COMMON
 
 static func rarity_name(data: Dictionary) -> String:
-	match String(RARITY.get(String(data.get("id", "")), "common")):
+	match _rarity_key(data):
+		"mythic": return "MÍTICA"
 		"legend": return "LEGENDARIA"
 		"epic": return "ÉPICA"
 		"rare": return "RARA"
