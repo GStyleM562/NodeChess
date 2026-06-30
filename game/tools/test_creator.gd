@@ -75,6 +75,27 @@ func _initialize() -> void:
 	ok = _expect("rank-up uses configured stage", has_blue, true) and ok
 	ok = _expect("rank name = stage name", gs2.name_for(unit).begins_with("Stone Golem"), true) and ok
 
+	# rank-up swaps the 3D MODEL too (the stage carries its own glb)
+	var mfig := CC.make_figure({
+		"name": "Morpher", "type": "Ruleta", "passives": [], "model_ref": "stone_golem",
+		"pool": [{"col": "red", "w": 100}],
+		"stages": [{"name": "Witchy", "type": "Ruleta", "stamina": 2, "passives": [],
+			"attack": [{"col": "red", "w": 100}], "glb": "res://assets/figures/venom_witch/witch/witch.glb",
+			"clips": {"idle": "Idle_9"}, "size": 1.0, "evolves_id": "venom_witch"}],
+	})
+	CF.apply_live(mfig)
+	var gs3 := GameState.new(MapData.new())
+	var mui := -1
+	for i in Roster.FIGURES.size():
+		if String(Roster.FIGURES[i].get("id", "")) == String(mfig["id"]):
+			mui = i
+	var munit := gs3.add_to_bench("player", mui)
+	var base_glb := String(gs3.model_data(munit)["glb"])
+	gs3._try_rank_up(munit)
+	var rank_glb := String(gs3.model_data(munit)["glb"])
+	ok = _expect("model changes on rank-up", base_glb != rank_glb, true) and ok
+	ok = _expect("ranked model = stage glb", rank_glb.ends_with("witch.glb"), true) and ok
+
 	# UI smoke test (await a frame so the scene's _ready runs and builds controls)
 	var inst = load("res://scenes/character_creator.tscn").instantiate()
 	get_root().add_child(inst)

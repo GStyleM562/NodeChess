@@ -420,13 +420,23 @@ func rank_data(uid: int) -> Dictionary:
 			"stamina": st.get("stamina", base.get("stamina", 2)),
 			"passives": st.get("passives", base.get("passives", [])),
 			"coin_a": base.get("coin_a", []), "coin_b": base.get("coin_b", []),
+			# Model: the evolution stage's own model if it set one, else the base model.
+			"glb": st.get("glb", base.get("glb", "")),
+			"clips": st.get("clips", base.get("clips", {})),
+			"size": st.get("size", base.get("size", 1.0)),
 		}
 	return {
 		"id": base.get("id", ""),
 		"name": base["name"], "attack": base["attack"], "type": base.get("type", "Ruleta"),
 		"stamina": base.get("stamina", 2), "passives": base.get("passives", []),
 		"coin_a": base.get("coin_a", []), "coin_b": base.get("coin_b", []),
+		"glb": base.get("glb", ""), "clips": base.get("clips", {}), "size": base.get("size", 1.0),
 	}
+
+## The 3D model (glb/clips/size) to render for this unit AT ITS CURRENT RANK.
+func model_data(uid: int) -> Dictionary:
+	var rd := rank_data(uid)
+	return {"glb": rd.get("glb", ""), "clips": rd.get("clips", {}), "size": rd.get("size", 1.0)}
 
 func pool_for(uid: int) -> Array:
 	return rank_data(uid)["attack"]

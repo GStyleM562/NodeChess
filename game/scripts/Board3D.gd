@@ -187,10 +187,11 @@ func _make_line(a: Vector3, b: Vector3) -> void:
 # ---------------------------------------------------------------- figures
 func _spawn_vis(uid: int) -> void:
 	var u: Dictionary = _gs.units[uid]
-	var data: Dictionary = Roster.FIGURES[u["rindex"]]
+	var data: Dictionary = _gs.model_data(uid)   # rank-aware (ranked figures keep their model after KO)
 	var fig := Figure3D.new()
 	add_child(fig)
 	fig.setup(data["glb"], data["clips"], float(data.get("size", 1.0)))
+	fig.set_meta("glb", String(data["glb"]))
 	fig.position = _gs.map.pos_of(u["node"])
 	_face(fig, Vector3(0, 0, 1.0) if u["team"] == "player" else Vector3(0, 0, -1.0))
 	_add_team_ring(fig, u["team"])
@@ -364,6 +365,13 @@ func _refresh_active_card() -> void:
 	var card := FigureCard.new()
 	_active_card_slot.add_child(card)
 	card.setup(_gs.rank_data(_active_uid), 0, _team_color(_gs.units[_active_uid]["team"]), true)
+	# Tap this profile to see the figure's full description before acting.
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.tooltip_text = "Toca para ver la descripción"
+	var auid := _active_uid
+	card.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed:
+			_preview_figure(auid))
 
 func _show_banner(text: String, col: Color) -> void:
 	if _banner == null:
@@ -388,14 +396,14 @@ func _refresh_bench_ui() -> void:
 	var disabled := _committed or _gs.turn_team != "player" or _busy or _over
 	for uid in bench:
 		var fd: Dictionary = Roster.FIGURES[_gs.units[uid]["rindex"]]
-		var card := _make_bench_card(fd)
+		var card := _make_bench_card(fd, _gs.name_for(uid))   # rank-aware name (keeps "+N" after KO)
 		card.modulate = Color(1, 1, 1, 0.45) if disabled else Color(1, 1, 1, 1)
 		_bench_box.add_child(card)
 		_bench_cards.append({"uid": uid, "ctrl": card})
 
 ## A small bench thumbnail (rarity frame + monogram + name + stamina). Tap = preview,
 ## drag = deploy. The big card is shown in the preview / drag ghost.
-func _make_bench_card(fd: Dictionary) -> Control:
+func _make_bench_card(fd: Dictionary, display_name: String) -> Control:
 	var rar: Color = FigureCard.rarity_color(fd)
 	var accent: Color = FigureCard.accent_of(fd)
 	var p := PanelContainer.new()
@@ -411,7 +419,7 @@ func _make_bench_card(fd: Dictionary) -> Control:
 	ps.set_corner_radius_all(7)
 	port.add_theme_stylebox_override("panel", ps)
 	var ini := Label.new()
-	ini.text = _initials(String(fd.get("name", "?")))
+	ini.text = _initials(display_name)
 	ini.set_anchors_preset(Control.PRESET_FULL_RECT)
 	ini.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ini.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -422,7 +430,7 @@ func _make_bench_card(fd: Dictionary) -> Control:
 	vb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	vb.add_theme_constant_override("separation", 1)
 	var nm := Label.new()
-	nm.text = String(fd.get("name", "?"))
+	nm.text = display_name
 	nm.clip_text = true
 	nm.custom_minimum_size = Vector2(34, 0)
 	UITheme.label(nm, 10, UITheme.TEXT, true, 700)
@@ -485,12 +493,13 @@ func _bench_uid_at(pos: Vector2) -> int:
 func _activate_drag() -> void:
 	_drag_active = true
 	var fd: Dictionary = Roster.FIGURES[_gs.units[_drag_uid]["rindex"]]
-	var ghost := FigureCard.new()
-	ghost.modulate = Color(1, 1, 1, 0.93)
+	# Drag the SMALL card (like the bench thumb), just lifted a touch — not a big card.
+	var ghost := _make_bench_card(fd, _gs.name_for(_drag_uid))
+	ghost.modulate = Color(1, 1, 1, 0.96)
 	ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ghost.scale = Vector2(1.15, 1.15)
 	ghost.z_index = 100
 	_ui_layer.add_child(ghost)
-	ghost.setup(fd, 0, _team_color("player"), true)
 	_drag_ghost = ghost
 	for e in _gs.free_entrances("player"):
 		_set_highlight(e, HILITE_DEPLOY)
@@ -500,7 +509,7 @@ func _activate_drag() -> void:
 
 func _update_drag(pos: Vector2) -> void:
 	if is_instance_valid(_drag_ghost):
-		_drag_ghost.position = pos - Vector2(120, 34)
+		_drag_ghost.position = pos - Vector2(45, 28)
 
 func _drop_drag(pos: Vector2) -> void:
 	var nid := _node_under_cursor(pos)
@@ -521,7 +530,15 @@ func _end_drag() -> void:
 func _preview_figure(uid: int) -> void:
 	if _ui_layer == null:
 		return
-	var fd: Dictionary = Roster.FIGURES[_gs.units[uid]["rindex"]]
+	# Rank-aware: show the CURRENT stage's name / attacks / type / passives.
+	var base: Dictionary = Roster.FIGURES[_gs.units[uid]["rindex"]]
+	var rd: Dictionary = _gs.rank_data(uid)
+	var fd: Dictionary = base.duplicate(true)
+	fd["name"] = _gs.name_for(uid)
+	fd["attack"] = rd["attack"]
+	fd["type"] = rd["type"]
+	fd["stamina"] = rd["stamina"]
+	fd["passives"] = rd["passives"]
 	var ov := Control.new()
 	ov.name = "FigPreview"
 	ov.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -546,6 +563,30 @@ func _preview_figure(uid: int) -> void:
 	var card := FigureCard.new()
 	vb.add_child(card)
 	card.setup(fd, 0, _team_color("player"), false)
+	# Description (custom figures carry one) — a reminder of what it is.
+	var desc := String(base.get("desc", ""))
+	if desc != "":
+		var dl := Label.new()
+		dl.text = desc
+		dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		dl.custom_minimum_size = Vector2(300, 0)
+		UITheme.label(dl, 12, UITheme.TEXT2, false, 500)
+		vb.add_child(dl)
+	# Passives (with what they DO) so you remember its capabilities.
+	var pl: Array = fd.get("passives", [])
+	if not pl.is_empty():
+		var ph := Label.new()
+		ph.text = "Pasivas"
+		UITheme.label(ph, 12, UITheme.GOLD.darkened(0.1), true, 700)
+		vb.add_child(ph)
+		for pid in pl:
+			var info: Dictionary = Roster.PASSIVES.get(pid, {})
+			var prow := Label.new()
+			prow.text = "• %s — %s" % [String(info.get("name", pid)), String(info.get("desc", ""))]
+			prow.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			prow.custom_minimum_size = Vector2(300, 0)
+			UITheme.label(prow, 11, UITheme.TEXT2, false, 500)
+			vb.add_child(prow)
 	var hdr := Label.new()
 	hdr.text = "Ataques · %s" % String(fd.get("type", "?"))
 	UITheme.label(hdr, 12, UITheme.PRIMARY_EDGE, true, 700)
@@ -1036,11 +1077,39 @@ func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 	await _resolve_surround()
 
 func _show_rankup(uid: int) -> void:
+	_swap_model(uid)                                   # change the 3D model if the stage has its own
 	if _name_lbls.has(uid) and is_instance_valid(_name_lbls[uid]):
 		_name_lbls[uid].text = _gs.name_for(uid)
 	if _vis.has(uid) and is_instance_valid(_vis[uid]):
 		(_vis[uid] as Figure3D).play_clip("attack_heavy")
 	_status.text = "¡RANK UP!  " + _gs.name_for(uid)
+
+## Rebuild a figure's 3D model when its current rank uses a DIFFERENT model (e.g. a
+## creator evolution that morphs into another figure). Keeps position + name/status tags.
+func _swap_model(uid: int) -> void:
+	if not _vis.has(uid) or not is_instance_valid(_vis[uid]):
+		return
+	var data: Dictionary = _gs.model_data(uid)
+	var old: Figure3D = _vis[uid]
+	if String(data.get("glb", "")) == "" or String(data.get("glb", "")) == String(old.get_meta("glb", "")):
+		return                                         # same model -> nothing to do
+	var fig := Figure3D.new()
+	add_child(fig)
+	fig.setup(data["glb"], data["clips"], float(data.get("size", 1.0)))
+	fig.set_meta("glb", String(data["glb"]))
+	fig.position = old.position
+	fig.rotation = old.rotation
+	_add_team_ring(fig, _gs.units[uid]["team"])
+	# move the floating tags (name + status) onto the new figure
+	for tag_map in [_name_lbls, _status_lbls]:
+		if tag_map.has(uid) and is_instance_valid(tag_map[uid]):
+			var l: Node = tag_map[uid]
+			if l.get_parent() != null:
+				l.get_parent().remove_child(l)
+			fig.add_child(l)
+	old.queue_free()
+	_vis[uid] = fig
+	fig.play_clip("idle")
 
 ## KO any figures that combat/movement just surrounded (enemies on every side).
 func _resolve_surround() -> void:

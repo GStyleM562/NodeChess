@@ -441,6 +441,10 @@ func _stage_from_figure(id: String) -> Dictionary:
 		"stamina": int(src.get("stamina", 2)),
 		"passives": (src.get("passives", []) as Array).duplicate(),
 		"attack": (src.get("attack", []) as Array).duplicate(true),
+		# carry the target figure's MODEL so the 3D figure changes on Rank Up
+		"glb": String(src.get("glb", "")),
+		"clips": (src.get("clips", {}) as Dictionary).duplicate(true),
+		"size": float(src.get("size", 1.0)),
 		"evolves_id": id,
 	}
 
