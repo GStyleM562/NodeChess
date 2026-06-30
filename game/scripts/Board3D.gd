@@ -38,6 +38,15 @@ var _name_lbls := {}          # uid -> Label3D (figure name + rank over the figu
 var _node_mi := {}
 var _node_mat := {}
 var _highlighted := []
+var _entrance_owner := {}      # entrance node id -> owning team (for the "blocked" siren)
+var _sirening := {}            # entrance nodes currently pulsing red
+var _siren_t := 0.0
+var _ui_layer: CanvasLayer
+var _bench_cards := []         # [{uid, ctrl}] for hit-testing the drag
+var _drag_uid := -1
+var _drag_active := false
+var _drag_start := Vector2.ZERO
+var _drag_ghost: Control
 # Turn / activation state
 var _active_uid := -1
 var _remaining := 0
@@ -75,6 +84,26 @@ func _ready() -> void:
 	_build_ui()
 	_refresh_bench_ui()
 	_update_status()
+
+func _process(delta: float) -> void:
+	# A blocked entrance pulses like a siren: a rival figure is sitting on it (so that
+	# side can't deploy there). Highlighted nodes are left to the highlight system.
+	_siren_t += delta
+	var glow := 0.35 + 1.65 * (0.5 + 0.5 * sin(_siren_t * 7.5))
+	for nid in _entrance_owner:
+		var occ: int = _gs.board.get(nid, -1)
+		var blocked: bool = occ != -1 and _gs.units.has(occ) and _gs.units[occ]["alive"] and _gs.units[occ]["team"] != _entrance_owner[nid]
+		if blocked and nid not in _highlighted:
+			var mat: StandardMaterial3D = _node_mat[nid]
+			mat.emission_enabled = true
+			mat.emission = Color(1.0, 0.16, 0.16)
+			mat.albedo_color = Color(0.5, 0.08, 0.08)
+			mat.emission_energy_multiplier = glow
+			_sirening[nid] = true
+		elif _sirening.has(nid):
+			_sirening.erase(nid)
+			if nid not in _highlighted:
+				_set_highlight(nid, Color(0, 0, 0, 0))   # restore the entrance's base look
 
 # ---------------------------------------------------------------- environment
 func _build_environment() -> void:
@@ -135,6 +164,10 @@ func _build_board() -> void:
 		add_child(mi)
 		_node_mi[n["id"]] = mi
 		_node_mat[n["id"]] = mat
+	for e in _gs.map.entrances_player:
+		_entrance_owner[e] = "player"
+	for e in _gs.map.entrances_enemy:
+		_entrance_owner[e] = "enemy"
 
 func _make_line(a: Vector3, b: Vector3) -> void:
 	var mi := MeshInstance3D.new()
@@ -215,6 +248,7 @@ func _face(fig: Node3D, dir: Vector3) -> void:
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
+	_ui_layer = layer
 	_status = Label.new()
 	_status.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_status.offset_left = 56
@@ -343,6 +377,7 @@ func _show_banner(text: String, col: Color) -> void:
 func _refresh_bench_ui() -> void:
 	for c in _bench_box.get_children():
 		c.queue_free()
+	_bench_cards.clear()
 	var bench: Array = _gs.bench["player"]
 	if bench.is_empty():
 		var l := Label.new()
@@ -353,13 +388,196 @@ func _refresh_bench_ui() -> void:
 	var disabled := _committed or _gs.turn_team != "player" or _busy or _over
 	for uid in bench:
 		var fd: Dictionary = Roster.FIGURES[_gs.units[uid]["rindex"]]
-		var b := Button.new()
-		b.text = String(fd["name"])
-		b.disabled = disabled
-		UITheme.button_font(b, 14, UITheme.TEXT, true, 700)
-		UITheme.style_surface(b, UITheme.SURFACE2, FigureCard.rarity_color(fd), 10)
-		b.pressed.connect(_begin_deploy.bind(uid))
-		_bench_box.add_child(b)
+		var card := _make_bench_card(fd)
+		card.modulate = Color(1, 1, 1, 0.45) if disabled else Color(1, 1, 1, 1)
+		_bench_box.add_child(card)
+		_bench_cards.append({"uid": uid, "ctrl": card})
+
+## A small bench thumbnail (rarity frame + monogram + name + stamina). Tap = preview,
+## drag = deploy. The big card is shown in the preview / drag ghost.
+func _make_bench_card(fd: Dictionary) -> Control:
+	var rar: Color = FigureCard.rarity_color(fd)
+	var accent: Color = FigureCard.accent_of(fd)
+	var p := PanelContainer.new()
+	p.custom_minimum_size = Vector2(78, 48)
+	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE2, rar, 10, 2, 3))
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 4)
+	p.add_child(hb)
+	var port := Panel.new()
+	port.custom_minimum_size = Vector2(32, 40)
+	var ps := StyleBoxFlat.new()
+	ps.bg_color = accent.darkened(0.1)
+	ps.set_corner_radius_all(7)
+	port.add_theme_stylebox_override("panel", ps)
+	var ini := Label.new()
+	ini.text = _initials(String(fd.get("name", "?")))
+	ini.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ini.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ini.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	UITheme.label(ini, 15, Color(1, 1, 1, 0.95), true, 800)
+	port.add_child(ini)
+	hb.add_child(port)
+	var vb := VBoxContainer.new()
+	vb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	vb.add_theme_constant_override("separation", 1)
+	var nm := Label.new()
+	nm.text = String(fd.get("name", "?"))
+	nm.clip_text = true
+	nm.custom_minimum_size = Vector2(34, 0)
+	UITheme.label(nm, 10, UITheme.TEXT, true, 700)
+	vb.add_child(nm)
+	var st := Label.new()
+	st.text = "⚡%d" % int(fd.get("stamina", 2))
+	UITheme.label(st, 10, UITheme.ENERGY, false, 700)
+	vb.add_child(st)
+	hb.add_child(vb)
+	return p
+
+func _initials(nm: String) -> String:
+	var s := ""
+	for part in nm.split(" ", false):
+		if part.length() > 0:
+			s += part[0]
+		if s.length() >= 2:
+			break
+	return s.to_upper()
+
+# ---------------------------------------------------------------- bench drag/deploy
+func _input(event: InputEvent) -> void:
+	if _over or _busy or _gs.turn_team != "player":
+		return
+	if _ui_layer != null and _ui_layer.get_node_or_null("FigPreview") != null:
+		return                                   # a preview overlay is open
+	# Follow / activate (real touch drag and emulated mouse motion).
+	if (event is InputEventScreenDrag) or (event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0):
+		if _drag_uid != -1:
+			if not _drag_active and event.position.distance_to(_drag_start) > 12.0:
+				_activate_drag()
+			if _drag_active:
+				_update_drag(event.position)
+			get_viewport().set_input_as_handled()
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			var uid := _bench_uid_at(event.position)
+			if uid != -1:
+				get_viewport().set_input_as_handled()    # the bench owns this press
+				if not _committed:
+					_drag_uid = uid
+					_drag_start = event.position
+					_drag_active = false
+		elif _drag_uid != -1:
+			if _drag_active:
+				_drop_drag(event.position)
+			else:
+				_preview_figure(_drag_uid)               # a tap = preview
+			_end_drag()
+			get_viewport().set_input_as_handled()
+
+func _bench_uid_at(pos: Vector2) -> int:
+	for c in _bench_cards:
+		var ctrl: Control = c["ctrl"]
+		if is_instance_valid(ctrl) and ctrl.get_global_rect().has_point(pos):
+			return int(c["uid"])
+	return -1
+
+func _activate_drag() -> void:
+	_drag_active = true
+	var fd: Dictionary = Roster.FIGURES[_gs.units[_drag_uid]["rindex"]]
+	var ghost := FigureCard.new()
+	ghost.modulate = Color(1, 1, 1, 0.93)
+	ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ghost.z_index = 100
+	_ui_layer.add_child(ghost)
+	ghost.setup(fd, 0, _team_color("player"), true)
+	_drag_ghost = ghost
+	for e in _gs.free_entrances("player"):
+		_set_highlight(e, HILITE_DEPLOY)
+		if e not in _highlighted:
+			_highlighted.append(e)
+	_status.text = "Arrastra %s a una entrada verde y suelta para desplegar." % String(fd["name"])
+
+func _update_drag(pos: Vector2) -> void:
+	if is_instance_valid(_drag_ghost):
+		_drag_ghost.position = pos - Vector2(120, 34)
+
+func _drop_drag(pos: Vector2) -> void:
+	var nid := _node_under_cursor(pos)
+	if nid != -1 and nid in _gs.free_entrances("player"):
+		_player_deploy(_drag_uid, nid)
+	else:
+		_clear_highlights()
+		_update_status()
+
+func _end_drag() -> void:
+	if is_instance_valid(_drag_ghost):
+		_drag_ghost.queue_free()
+	_drag_ghost = null
+	_drag_uid = -1
+	_drag_active = false
+
+## Tap-to-preview: the big card + its attacks, with a Desplegar shortcut.
+func _preview_figure(uid: int) -> void:
+	if _ui_layer == null:
+		return
+	var fd: Dictionary = Roster.FIGURES[_gs.units[uid]["rindex"]]
+	var ov := Control.new()
+	ov.name = "FigPreview"
+	ov.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ov.mouse_filter = Control.MOUSE_FILTER_STOP
+	_ui_layer.add_child(ov)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed:
+			ov.queue_free())
+	ov.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ov.add_child(cc)
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, FigureCard.rarity_color(fd), 18, 2, 14))
+	cc.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 8)
+	panel.add_child(vb)
+	var card := FigureCard.new()
+	vb.add_child(card)
+	card.setup(fd, 0, _team_color("player"), false)
+	var hdr := Label.new()
+	hdr.text = "Ataques · %s" % String(fd.get("type", "?"))
+	UITheme.label(hdr, 12, UITheme.PRIMARY_EDGE, true, 700)
+	vb.add_child(hdr)
+	var total := 0.0
+	for s in fd["attack"]:
+		total += float(s.get("w", 1.0))
+	for s in fd["attack"]:
+		var row := Label.new()
+		var pct := 100.0 * float(s.get("w", 1.0)) / total
+		row.text = "• %s — %.0f%%%s" % [Combat.label(s), pct, ("  [" + String(s["fx"]) + "]" if s.has("fx") else "")]
+		UITheme.label(row, 12, UITheme.TEXT2, false, 500)
+		vb.add_child(row)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 8)
+	vb.add_child(hb)
+	var dep := Button.new()
+	dep.text = "Desplegar"
+	dep.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dep.disabled = _committed or _busy or _over or _gs.turn_team != "player"
+	UITheme.button_font(dep, 15, UITheme.TEXT, true, 800)
+	UITheme.style_primary(dep, UITheme.SUCCESS)
+	dep.pressed.connect(func():
+		ov.queue_free()
+		_begin_deploy(uid))
+	hb.add_child(dep)
+	var cl := Button.new()
+	cl.text = "Cerrar"
+	UITheme.button_font(cl, 15, UITheme.TEXT, false, 700)
+	UITheme.style_surface(cl)
+	cl.pressed.connect(func(): ov.queue_free())
+	hb.add_child(cl)
 
 func _update_status() -> void:
 	if _over:
@@ -559,8 +777,10 @@ func _player_move(node: int) -> void:
 	var cost: int = int(_reach[node])
 	# Compute the path BEFORE moving (board state is still current). Jump-aware.
 	var path := _gs.move_path(_active_uid, node)
-	# A jump crosses an occupied (enemy) node: it uses up ALL stamina and forbids attacking.
-	var is_jump := not path.is_empty() and _gs.board.has(path[0])
+	# Phasing figures walk THROUGH occupants (keep moving/attacking); a non-phasing
+	# move onto a path that starts with an occupied node is a JUMP (ends the turn).
+	var phasing := _gs.has_passive(_active_uid, "phase") or _gs.has_passive(_active_uid, "aerial")
+	var is_jump := not phasing and not path.is_empty() and _gs.board.has(path[0])
 	_clear_highlights()
 	_busy = true
 	_committed = true
@@ -726,16 +946,25 @@ func _walk_path(uid: int, nodes: Array) -> void:
 	var fig: Figure3D = _vis.get(uid)
 	if fig == null or nodes.is_empty():
 		return
+	var phasing := _gs.has_passive(uid, "phase") or _gs.has_passive(uid, "aerial")
 	fig.play_clip("move_walk")
+	var announced := false
 	var i := 0
 	while i < nodes.size():
 		var nid := int(nodes[i])
 		var blocked: bool = _gs.board.has(nid) and int(_gs.board[nid]) != uid
-		if blocked and i + 1 < nodes.size():
-			# Leap OVER the occupant to the node beyond it (no pass-through).
+		if blocked and not phasing and i + 1 < nodes.size():
+			# JUMP: leap OVER the occupant to the node beyond it (announce it).
+			if not announced:
+				_dramatize_effect(uid, "Salto")
+				announced = true
 			await _hop_over(fig, _gs.map.pos_of(nid), _gs.map.pos_of(int(nodes[i + 1])))
 			i += 2
 		else:
+			# PHASE: walk straight THROUGH the occupant (announce it).
+			if blocked and phasing and not announced:
+				_dramatize_effect(uid, "Phase")
+				announced = true
 			var target := _gs.map.pos_of(nid)
 			_face(fig, target - fig.position)
 			var dur := maxf(0.16, fig.position.distance_to(target) * 0.34)
@@ -820,6 +1049,7 @@ func _resolve_surround() -> void:
 		return
 	for uid in koed:
 		if _vis.has(uid):
+			_dramatize_effect(uid, "Rodeado")    # explain WHY it was KO'd
 			_vis[uid].play_clip("ko")
 	await get_tree().create_timer(1.2).timeout
 	for uid in koed:

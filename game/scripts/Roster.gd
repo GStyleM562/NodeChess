@@ -18,6 +18,7 @@ const PASSIVES := {
 	"lunge": {"name": "Lunge", "desc": "Si te moviste 2+ nodos antes de atacar, repites un Fallo."},
 	"bloodthirst": {"name": "Bloodthirst", "desc": "Al noquear a un enemigo, te mueves 1 nodo gratis."},
 	"aerial": {"name": "Aerial", "desc": "Vuelo: atraviesa figuras al moverse (no da inmunidad a KO por rodear)."},
+	"parkour": {"name": "Parkour", "desc": "Puede caminar Y saltar en el mismo turno; el salto termina el turno y no permite atacar."},
 	"dive": {"name": "Dive", "desc": "Tras volar 3+ nodos, tu Empuje 1 se vuelve Empuje 2."},
 	# --- hidden passives (unlocked on Rank Up) ---
 	"venom_aura": {"name": "Venom Aura (oculta)", "desc": "Aura: los enemigos adyacentes tienen −1 stamina."},
@@ -64,7 +65,7 @@ static var FIGURES := [
 	},
 	{
 		"id": "nightblade", "name": "Nightblade", "stamina": 3, "type": "Moneda",
-		"passives": ["lunge", "bloodthirst"],
+		"passives": ["lunge", "bloodthirst", "parkour"],
 		"glb": "res://assets/figures/nightblade/nightblade.glb",
 		"size": 0.95, "complete": true,
 		"clips": {

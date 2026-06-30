@@ -60,6 +60,20 @@ func _initialize() -> void:
 	ev["stamina"] = 5
 	CF.apply_live(ev)
 	ok = _expect("apply_live replaced (no dup)", Roster.FIGURES.size(), n1) and ok
+	# rank-up calls the CONFIGURED stage (evolves into Stone Golem -> a Blue pool)
+	var gs2 := GameState.new(MapData.new())
+	var ui := -1
+	for i in Roster.FIGURES.size():
+		if String(Roster.FIGURES[i].get("id", "")) == String(ev["id"]):
+			ui = i
+	var unit := gs2.add_to_bench("player", ui)
+	gs2._try_rank_up(unit)
+	var has_blue := false
+	for s in gs2.pool_for(unit):
+		if String(s.get("col", "")) == "blue":
+			has_blue = true
+	ok = _expect("rank-up uses configured stage", has_blue, true) and ok
+	ok = _expect("rank name = stage name", gs2.name_for(unit).begins_with("Stone Golem"), true) and ok
 
 	# UI smoke test (await a frame so the scene's _ready runs and builds controls)
 	var inst = load("res://scenes/character_creator.tscn").instantiate()

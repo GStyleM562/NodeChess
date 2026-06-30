@@ -134,17 +134,32 @@ func reachable_for(uid: int) -> Dictionary:
 ## JUMPS: with >= 2 stamina, a unit standing next to an enemy may hop OVER it,
 ## landing on a free node just beyond the enemy (passing through the enemy's node).
 ## A jump costs 2 stamina. Any figure with enough stamina can do this.
+## Phase / Aerial: this figure walks THROUGH other figures (but still can't land on
+## an occupied node, and terrain still blocks).
+func _can_phase(uid: int) -> bool:
+	return has_passive(uid, "phase") or has_passive(uid, "aerial")
+
 func move_targets(uid: int, budget: int) -> Dictionary:
 	if not can_move(uid) or budget <= 0:
 		return {}
 	var u: Dictionary = units[uid]
+	var phasing := _can_phase(uid)
 	var blocked := {}
-	for nid in board.keys():
-		if nid != u["node"]:
-			blocked[nid] = true
+	if not phasing:
+		for nid in board.keys():
+			if nid != u["node"]:
+				blocked[nid] = true
 	var reach := map.reachable(u["node"], budget, blocked)
 	reach.erase(u["node"])
-	if budget >= 2:
+	if phasing:
+		# Pass-through: cannot END on an occupied node, but keeps moving / may attack.
+		for nid in board.keys():
+			reach.erase(nid)
+		return reach
+	# JUMP over ONE adjacent enemy (cost 2; ends the turn, no attack). A basic jump is
+	# allowed only as a FIRST action; jumping AFTER moving needs the PARKOUR passive.
+	var can_jump := budget >= 2 and (budget >= effective_stamina(uid) or has_passive(uid, "parkour"))
+	if can_jump:
 		for e in map.adj[u["node"]]:
 			var occ := int(board.get(e, -1))
 			if occ == -1 or units[occ]["team"] == u["team"] or not units[occ]["alive"]:
@@ -160,11 +175,15 @@ func move_targets(uid: int, budget: int) -> Dictionary:
 ## a jump (hop over an adjacent enemy: [enemy_node, target]).
 func move_path(uid: int, target: int) -> Array:
 	var u: Dictionary = units[uid]
+	var phasing := _can_phase(uid)
 	var blocked := {}
-	for nid in board.keys():
-		if nid != u["node"]:
-			blocked[nid] = true
+	if not phasing:
+		for nid in board.keys():
+			if nid != u["node"]:
+				blocked[nid] = true
 	var normal := map.path_to(u["node"], target, blocked)
+	if phasing:
+		return normal                                     # walks straight through figures
 	var jump: Array = []
 	for e in map.adj[u["node"]]:
 		var occ := int(board.get(e, -1))
