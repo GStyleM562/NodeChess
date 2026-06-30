@@ -75,6 +75,19 @@ static func merge_into_roster() -> void:
 		Roster.FIGURES.append(fig)
 		present[id] = true
 
+## Apply a just-saved figure to the in-memory Roster immediately (so a NEW figure
+## appears and an EDITED one updates without restarting). merge_into_roster() skips
+## ids already present, so editing needs this explicit replace.
+static func apply_live(fig: Dictionary) -> void:
+	var f := fig.duplicate(true)
+	_ensure_model(f)
+	f["custom"] = true
+	for i in Roster.FIGURES.size():
+		if String(Roster.FIGURES[i].get("id", "")) == String(f.get("id", "")):
+			Roster.FIGURES[i] = f
+			return
+	Roster.FIGURES.append(f)
+
 ## Find a built-in figure by id (used to borrow a placeholder model).
 static func _builtin(id: String) -> Dictionary:
 	for f in Roster.FIGURES:

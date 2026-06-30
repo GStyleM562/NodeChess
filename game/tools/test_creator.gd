@@ -44,6 +44,23 @@ func _initialize() -> void:
 	ok = _expect("rolls a valid colour", String(gs._roll_full(u, true)["seg"].get("col", "")) in ["white", "purple", "red"], true) and ok
 	CF.remove(String(fig["id"]))
 
+	# --- evolution via explicit stages (evolve INTO an existing figure) ---
+	var ev := CC.make_figure({
+		"name": "Evolver", "type": "Ruleta", "passives": [], "model_ref": "stone_golem",
+		"pool": [{"col": "red", "w": 100}],
+		"stages": [{"name": "Stone Golem", "type": "Ruleta", "stamina": 1, "passives": [],
+			"attack": [{"col": "blue", "w": 100}], "evolves_id": "stone_golem"}],
+	})
+	ok = _expect("stages -> 1 rank", (ev.get("ranks", []) as Array).size(), 1) and ok
+	ok = _expect("rank keeps evolves_id", String(ev["ranks"][0].get("evolves_id", "")), "stone_golem") and ok
+	var n0 := Roster.FIGURES.size()
+	CF.apply_live(ev)
+	var n1 := Roster.FIGURES.size()
+	ok = _expect("apply_live appended new", n1 == n0 + 1, true) and ok
+	ev["stamina"] = 5
+	CF.apply_live(ev)
+	ok = _expect("apply_live replaced (no dup)", Roster.FIGURES.size(), n1) and ok
+
 	# UI smoke test (await a frame so the scene's _ready runs and builds controls)
 	var inst = load("res://scenes/character_creator.tscn").instantiate()
 	get_root().add_child(inst)
@@ -51,6 +68,21 @@ func _initialize() -> void:
 	ok = _expect("scene _ready built controls", inst._model != null, true) and ok
 	ok = _expect("seeded pool has 3 segs", (inst.build_figure().get("attack", []) as Array).size(), 3) and ok
 	inst.queue_free()
+
+	# --- edit round-trip: load an existing figure into a fresh creator ---
+	CC.edit_figure = {
+		"id": "custom_edit_me", "name": "Edit Me", "type": "Moneda", "stamina": 4,
+		"class": "Agile", "rarity": "legend", "passives": ["lunge"], "model_ref": "nightblade",
+		"attack": [{"col": "white", "name": "Cut", "pow": 80, "w": 60}, {"col": "red", "w": 40}],
+	}
+	var ed = load("res://scenes/character_creator.tscn").instantiate()
+	get_root().add_child(ed)
+	await process_frame
+	ok = _expect("edit: name loaded", ed._name.text, "Edit Me") and ok
+	ok = _expect("edit: pool loaded (2)", (ed._rows as Array).size(), 2) and ok
+	ok = _expect("edit: editing id set", ed._editing_id, "custom_edit_me") and ok
+	ok = _expect("edit: static cleared", CC.edit_figure.is_empty(), true) and ok
+	ed.queue_free()
 
 	print("CREATOR_OK" if ok else "CREATOR_FAIL")
 	quit()

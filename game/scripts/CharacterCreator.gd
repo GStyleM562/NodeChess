@@ -1,4 +1,5 @@
 extends Control
+class_name CharacterCreator
 ## Character Creator — compose a figure from existing engine-supported building
 ## blocks (5 attack types, 5 colours, the status/displacement library, the passive
 ## catalog), validate it (FigureValidator / GDD §32) and save it (CustomFigures).
@@ -60,6 +61,10 @@ const FX_DESC := {
 	"Intercambio": "Intercambia posiciones con el rival.",
 }
 
+# Set this static before changing to the creator scene to EDIT an existing figure
+# (Dex "Modificar" does this). _ready loads it and clears it.
+static var edit_figure := {}
+
 var _scroll: ScrollContainer
 var _name: LineEdit
 var _desc: LineEdit
@@ -69,13 +74,20 @@ var _type: OptionButton
 var _model: OptionButton
 var _stamina: SpinBox
 var _evolve: CheckBox
-var _passive_boxes := {}        # pid -> CheckBox
-var _rows: Array = []           # each: { panel, col, name, pow, stars, fx, prob }
+var _evo_box: VBoxContainer       # evolution sub-section (hidden until "Evoluciona")
+var _phase_count: SpinBox
+var _phase_holder: VBoxContainer
+var _phase_opts: Array = []        # one OptionButton per evolution phase
+var _evo_fig_ids: Array = []       # figure ids selectable as an evolution stage
+var _evo_names: Array = []
+var _passive_boxes := {}          # pid -> toggle Button
+var _rows: Array = []             # each: { panel, col, name, pow, stars, fx, prob }
 var _rows_box: VBoxContainer
 var _total_lbl: Label
 var _status_lbl: Label
 var _save_btn: Button
 var _model_ids: Array = []
+var _editing_id := ""             # non-empty when editing -> save overwrites it
 
 func _ready() -> void:
 	var bg := ColorRect.new()
@@ -112,6 +124,9 @@ func _ready() -> void:
 
 	_build_footer()
 	_seed_default_pool()
+	if not edit_figure.is_empty():
+		_load_figure(edit_figure)
+		edit_figure = {}
 	_revalidate()
 
 # ---------------------------------------------------------------- top / footer
@@ -132,7 +147,7 @@ func _build_topbar() -> void:
 	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 	hb.add_child(back)
 	var title := Label.new()
-	title.text = "Crear Personaje"
+	title.text = "Editar Personaje" if not edit_figure.is_empty() else "Crear Personaje"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	UITheme.label(title, 22, UITheme.GOLD, true, 800)
@@ -224,36 +239,70 @@ func _build_combat(form: VBoxContainer) -> void:
 			names.append(String(f.get("name", "?")))
 	_model = _opt(names)
 	_field(s, "Modelo (placeholder)", _model)
+	# --- evolution ---
 	_evolve = CheckBox.new()
-	_evolve.text = "Evoluciona (Rank Up → etapa más fuerte)"
-	UITheme.button_font(_evolve, 13, UITheme.TEXT, false, 600)
+	_evolve.text = "Evoluciona (Rank Up)"
+	UITheme.button_font(_evolve, 14, UITheme.GOLD, false, 700)
+	_evolve.toggled.connect(_on_evolve_toggled)
 	s.add_child(_evolve)
+	# Figures selectable as an evolution stage (every roster figure is already valid).
+	_evo_fig_ids = []
+	_evo_names = []
+	for f in Roster.FIGURES:
+		_evo_fig_ids.append(String(f.get("id", "")))
+		_evo_names.append(String(f.get("name", "?")))
+	_evo_box = VBoxContainer.new()
+	_evo_box.add_theme_constant_override("separation", 6)
+	_evo_box.visible = false
+	s.add_child(_evo_box)
+	var ev_hint := Label.new()
+	ev_hint.text = "Cada fase evoluciona EN un personaje existente (toma sus ataques)."
+	ev_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.label(ev_hint, 11, UITheme.MUTED, false, 500)
+	_evo_box.add_child(ev_hint)
+	_phase_count = SpinBox.new()
+	_phase_count.min_value = 1
+	_phase_count.max_value = 3
+	_phase_count.value = 1
+	_phase_count.value_changed.connect(func(v): _rebuild_phases(int(v)))
+	_field(_evo_box, "¿Cuántas fases?", _phase_count)
+	_phase_holder = VBoxContainer.new()
+	_phase_holder.add_theme_constant_override("separation", 6)
+	_evo_box.add_child(_phase_holder)
 
 func _build_passives(form: VBoxContainer) -> void:
 	var s := _section(form, "Pasivas (máx. 3)")
+	var hint := Label.new()
+	hint.text = "Toca para activar/desactivar · ⓘ explica qué hace."
+	UITheme.label(hint, 11, UITheme.MUTED, false, 500)
+	s.add_child(hint)
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 6)
-	grid.add_theme_constant_override("v_separation", 4)
+	grid.add_theme_constant_override("v_separation", 6)
 	s.add_child(grid)
 	for pid in Roster.PASSIVES.keys():
 		if pid in HIDDEN_PASSIVES:
 			continue
-		var item := HBoxContainer.new()
-		item.add_theme_constant_override("separation", 2)
-		var cb := CheckBox.new()
-		cb.text = String(Roster.PASSIVES[pid].get("name", pid))
-		cb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		cb.clip_text = true
-		cb.tooltip_text = String(Roster.PASSIVES[pid].get("desc", ""))
-		UITheme.button_font(cb, 12, UITheme.TEXT, false, 500)
-		cb.toggled.connect(func(_p): _revalidate())
-		item.add_child(cb)
 		var pname := String(Roster.PASSIVES[pid].get("name", pid))
 		var pdesc := String(Roster.PASSIVES[pid].get("desc", ""))
+		var item := HBoxContainer.new()
+		item.add_theme_constant_override("separation", 4)
+		# A toggle button reads clearly as "selectable" (fills with accent when ON).
+		var tg := Button.new()
+		tg.toggle_mode = true
+		tg.text = pname
+		tg.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		tg.clip_text = true
+		tg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tg.custom_minimum_size = Vector2(0, 38)
+		tg.tooltip_text = pdesc
+		_style_toggle(tg)
+		tg.toggled.connect(func(_p): _revalidate())
+		item.add_child(tg)
 		item.add_child(_info_btn(func(): _show_info(pname, pdesc)))
 		grid.add_child(item)
-		_passive_boxes[pid] = cb
+		_passive_boxes[pid] = tg
 
 func _build_pool(form: VBoxContainer) -> void:
 	var s := _section(form, "Pool de ataque")
@@ -366,13 +415,105 @@ func build_figure() -> Dictionary:
 	var model_ref := ""
 	if _model.selected >= 0 and _model.selected < _model_ids.size():
 		model_ref = String(_model_ids[_model.selected])
+	# Evolution stages: each phase evolves INTO an existing (valid) figure.
+	var stages: Array = []
+	if _evolve.button_pressed:
+		for opt in _phase_opts:
+			var sel := int(opt.selected)
+			if sel >= 0 and sel < _evo_fig_ids.size():
+				stages.append(_stage_from_figure(String(_evo_fig_ids[sel])))
 	return make_figure({
 		"name": _name.text, "desc": _desc.text,
 		"class": CLASSES[_class.selected], "rarity": RARITIES[_rarity.selected],
 		"stamina": int(_stamina.value), "type": TYPES[_type.selected],
-		"passives": passives, "model_ref": model_ref, "evolve": _evolve.button_pressed,
+		"passives": passives, "model_ref": model_ref,
+		"evolve": _evolve.button_pressed, "stages": stages,
 		"pool": pool,
 	})
+
+## Build one evolution-stage dict from an existing figure (its pool/type/stamina/
+## passives). Stores `evolves_id` so editing can re-select the source figure.
+func _stage_from_figure(id: String) -> Dictionary:
+	var src := _figure_by_id(id)
+	return {
+		"name": String(src.get("name", "?")),
+		"type": String(src.get("type", "Ruleta")),
+		"stamina": int(src.get("stamina", 2)),
+		"passives": (src.get("passives", []) as Array).duplicate(),
+		"attack": (src.get("attack", []) as Array).duplicate(true),
+		"evolves_id": id,
+	}
+
+func _figure_by_id(id: String) -> Dictionary:
+	for f in Roster.FIGURES:
+		if String(f.get("id", "")) == id:
+			return f
+	return {}
+
+# ---------------------------------------------------------------- evolution UI
+func _on_evolve_toggled(on: bool) -> void:
+	_evo_box.visible = on
+	if on and _phase_opts.is_empty():
+		_rebuild_phases(int(_phase_count.value))
+	_revalidate()
+
+func _rebuild_phases(n: int) -> void:
+	for c in _phase_holder.get_children():
+		_phase_holder.remove_child(c)
+		c.queue_free()
+	_phase_opts.clear()
+	for i in n:
+		var opt := _opt(_evo_names)
+		opt.item_selected.connect(func(_i): _revalidate())
+		_field(_phase_holder, "Fase %d →" % (i + 1), opt)
+		_phase_opts.append(opt)
+	_revalidate()
+
+# ---------------------------------------------------------------- load (edit)
+func _clear_pool() -> void:
+	for row in _rows:
+		row["panel"].queue_free()
+	_rows.clear()
+
+## Populate every control from an existing figure (Dex "Modificar").
+func _load_figure(fig: Dictionary) -> void:
+	_editing_id = String(fig.get("id", ""))
+	_name.text = String(fig.get("name", ""))
+	_desc.text = String(fig.get("desc", ""))
+	_select_index(_class, CLASSES.find(String(fig.get("class", "Balanced"))))
+	_select_index(_rarity, RARITIES.find(String(fig.get("rarity", "epic"))))
+	_stamina.value = int(fig.get("stamina", 2))
+	_select_index(_type, TYPES.find(String(fig.get("type", "Ruleta"))))
+	_select_index(_model, _model_ids.find(String(fig.get("model_ref", ""))))
+	var pl: Array = fig.get("passives", [])
+	for pid in _passive_boxes.keys():
+		_passive_boxes[pid].button_pressed = pid in pl
+	_clear_pool()
+	for seg in fig.get("attack", []):
+		_add_row(seg)
+	var ranks: Array = fig.get("ranks", [])
+	if not ranks.is_empty():
+		_evolve.button_pressed = true       # builds the evolution UI (1 phase)
+		_phase_count.value = ranks.size()   # rebuilds to the right number of phases
+		for i in ranks.size():
+			if i < _phase_opts.size():
+				var idx := _evo_fig_ids.find(String(ranks[i].get("evolves_id", "")))
+				if idx >= 0:
+					_phase_opts[i].select(idx)
+
+func _select_index(opt: OptionButton, i: int) -> void:
+	if opt != null and i >= 0 and i < opt.item_count:
+		opt.select(i)
+
+func _style_toggle(b: Button) -> void:
+	b.add_theme_stylebox_override("normal", UITheme.panel(UITheme.SURFACE2, UITheme.BORDER, 10, 1, 8))
+	var on := UITheme.panel(UITheme.PRIMARY.darkened(0.05), UITheme.PRIMARY_EDGE, 10, 2, 8)
+	b.add_theme_stylebox_override("pressed", on)
+	b.add_theme_stylebox_override("hover_pressed", on)
+	b.add_theme_stylebox_override("hover", UITheme.panel(UITheme.SURFACE2.lightened(0.06), UITheme.PRIMARY, 10, 1, 8))
+	UITheme.button_font(b, 12, UITheme.TEXT, false, 600)
+	b.add_theme_color_override("font_pressed_color", UITheme.TEXT)
+	b.add_theme_color_override("font_hover_pressed_color", UITheme.TEXT)
 
 ## Pure builder — no UI. `pool` rows carry col/name/pow/stars/fx_index/w.
 static func make_figure(p: Dictionary) -> Dictionary:
@@ -389,7 +530,10 @@ static func make_figure(p: Dictionary) -> Dictionary:
 		"model_ref": String(p.get("model_ref", "")),
 		"attack": attack,
 	}
-	if bool(p.get("evolve", false)):
+	var stages: Array = p.get("stages", [])
+	if not stages.is_empty():
+		fig["ranks"] = stages                       # each phase = an existing figure
+	elif bool(p.get("evolve", false)):
 		fig["ranks"] = [_boosted_stage(attack, fig["name"], fig["type"], int(fig["stamina"]), fig["passives"])]
 	return fig
 
@@ -470,16 +614,18 @@ func _on_save() -> void:
 	if String(r["state"]) == "INVALID":
 		_revalidate()
 		return
-	# unique id if it already exists
-	var base_id := String(fig["id"])
-	var id := base_id
-	var n := 2
-	while CustomFigures.exists(id) or _builtin_has(id):
-		id = "%s_%d" % [base_id, n]
-		n += 1
-	fig["id"] = id
-	CustomFigures.add(fig)
-	CustomFigures.merge_into_roster()   # live this session too
+	if _editing_id != "":
+		fig["id"] = _editing_id          # editing → overwrite the original
+	else:
+		var base_id := String(fig["id"])
+		var id := base_id
+		var n := 2
+		while CustomFigures.exists(id) or _builtin_has(id):
+			id = "%s_%d" % [base_id, n]
+			n += 1
+		fig["id"] = id
+	CustomFigures.add(fig)               # persist (overwrites by id)
+	CustomFigures.apply_live(fig)        # update the in-memory roster now (new or edited)
 	_show_saved(String(fig["name"]))
 
 func _builtin_has(id: String) -> bool:

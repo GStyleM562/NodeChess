@@ -12,6 +12,7 @@ var _type_label: Label
 var _attacks_box: VBoxContainer
 var _passives_box: VBoxContainer
 var _evos_box: VBoxContainer
+var _edit_btn: Button
 
 func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
@@ -74,6 +75,15 @@ func _build_ui() -> void:
 	_type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	UITheme.label(_type_label, 18, UITheme.PRIMARY_EDGE, true, 600)
 	top.add_child(_type_label)
+	# "Modificar": only shown for player-created (custom) figures.
+	_edit_btn = Button.new()
+	_edit_btn.text = "✎ Modificar este personaje"
+	_edit_btn.custom_minimum_size = Vector2(0, 38)
+	UITheme.button_font(_edit_btn, 14, UITheme.TEXT, true, 700)
+	UITheme.style_primary(_edit_btn, UITheme.GOLD.darkened(0.1))
+	_edit_btn.pressed.connect(_to_edit)
+	_edit_btn.visible = false
+	top.add_child(_edit_btn)
 
 	var panel := PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -155,6 +165,8 @@ func _spawn(i: int) -> void:
 	_name_label.text = "%d/%d   %s" % [i + 1, Roster.FIGURES.size(), data["name"]]
 	var warn := "   ⚠ anim incompleta" if not data.get("complete", true) else ""
 	_type_label.text = "Tipo de ataque: " + String(data.get("type", "?")) + warn
+	if _edit_btn != null:
+		_edit_btn.visible = bool(data.get("custom", false))
 	_build_passives(data)
 	_build_evolutions(data)
 	_build_attacks(data["attack"])
@@ -236,6 +248,14 @@ func _switch(d: int) -> void:
 
 func _to_menu() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+
+## Load this (custom) figure into the Character Creator for editing.
+func _to_edit() -> void:
+	var data: Dictionary = Roster.FIGURES[_index]
+	if not bool(data.get("custom", false)):
+		return
+	CharacterCreator.edit_figure = data.duplicate(true)
+	get_tree().change_scene_to_file("res://scenes/character_creator.tscn")
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:

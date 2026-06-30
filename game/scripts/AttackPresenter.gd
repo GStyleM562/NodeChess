@@ -50,19 +50,19 @@ func clear() -> void:
 	for c in get_children():
 		c.queue_free()
 
-## Centre a child using ANCHORS so the engine keeps it centred across every
-## (re)layout. A one-shot `position = size*0.5 - sz*0.5` desyncs if `size` changes
-## afterwards (font load, concurrent presenter, deferred container sort) and the
-## visual ends up off-screen — anchors self-correct on resize, so it can't.
+## Mount a child inside a FULL-RECT CenterContainer so the engine always keeps it
+## centred — no matter when/how this presenter is (re)sized. A one-shot
+## `position = size*0.5 - sz*0.5` (or even raw anchors on a SubViewportContainer)
+## can desync if the layout settles later, and the visual flies off-screen.
 func _center(ctrl: Control, sz: Vector2) -> void:
-	ctrl.anchor_left = 0.5
-	ctrl.anchor_right = 0.5
-	ctrl.anchor_top = 0.5
-	ctrl.anchor_bottom = 0.5
-	ctrl.offset_left = -sz.x * 0.5
-	ctrl.offset_right = sz.x * 0.5
-	ctrl.offset_top = -sz.y * 0.5
-	ctrl.offset_bottom = sz.y * 0.5
+	ctrl.custom_minimum_size = sz
+	var holder := CenterContainer.new()
+	holder.set_anchors_preset(Control.PRESET_FULL_RECT)
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(holder)
+	if ctrl.get_parent() != null:
+		ctrl.get_parent().remove_child(ctrl)
+	holder.add_child(ctrl)
 
 # --------------------------------------------------------------- 2D shape (coin)
 func _mk_shape(seg: Dictionary, s: int, circle: bool) -> Panel:
