@@ -630,9 +630,11 @@ func _update_status() -> void:
 	if _gs.turn_team != "player":
 		_status.text = "Turno del enemigo…"
 	elif _active_uid != -1:
-		var fname: String = Roster.FIGURES[_gs.units[_active_uid]["rindex"]]["name"]
+		var fname: String = _gs.name_for(_active_uid)
 		if _jumped:
 			_status.text = "%s saltó sobre el enemigo — sin más acciones." % fname
+		elif _reach.is_empty():
+			_status.text = "%s no puede moverse: %s" % [fname, _why_stuck(_active_uid)]
 		else:
 			_status.text = "%s — mov restante: %d.  verde=mover · rojo=atacar · o Terminar turno." % [fname, _remaining]
 	else:
@@ -877,6 +879,20 @@ func _status_text(list: Array) -> String:
 		parts.append(STATUS_ES.get(s, s))
 	return " · ".join(parts)
 
+## Why can't the active figure move? (No on-screen status can mean an enemy AURA,
+## spent stamina, or being boxed in — explain it so it isn't a mystery.)
+func _why_stuck(uid: int) -> String:
+	for s in ["paralysis", "immobilized", "freeze", "sleep"]:
+		if _gs.has_status(uid, s):
+			return STATUS_ES.get(s, s)
+	if _remaining <= 0:
+		return "ya no le queda estamina este turno"
+	if _gs.effective_stamina(uid) < int(_gs.units[uid]["stamina"]):
+		return "un aura enemiga adyacente le bajó la estamina"
+	if not _gs.adjacent_enemies(uid).is_empty():
+		return "rodeado, sin nodos libres — puedes atacar o Terminar turno"
+	return "sin nodos libres alrededor — Terminar turno"
+
 ## Big dramatic effect word that pops over the affected figure, then fades.
 func _dramatize_effect(uid: int, fx_text: String) -> void:
 	var f: Figure3D = _vis.get(uid)
@@ -1099,6 +1115,7 @@ func _swap_model(uid: int) -> void:
 	fig.set_meta("glb", String(data["glb"]))
 	fig.position = old.position
 	fig.rotation = old.rotation
+	fig.scale = Vector3.ONE * 0.05               # grows in
 	_add_team_ring(fig, _gs.units[uid]["team"])
 	# move the floating tags (name + status) onto the new figure
 	for tag_map in [_name_lbls, _status_lbls]:
@@ -1107,9 +1124,15 @@ func _swap_model(uid: int) -> void:
 			if l.get_parent() != null:
 				l.get_parent().remove_child(l)
 			fig.add_child(l)
-	old.queue_free()
 	_vis[uid] = fig
 	fig.play_clip("idle")
+	_dramatize_effect(uid, "Evolución")          # flash over the (new) figure
+	# transition: the old version shrinks away, the new one pops in
+	var shrink := create_tween()
+	shrink.tween_property(old, "scale", Vector3.ONE * 0.05, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	shrink.tween_callback(old.queue_free)
+	var grow := create_tween()
+	grow.tween_property(fig, "scale", Vector3.ONE, 0.38).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 ## KO any figures that combat/movement just surrounded (enemies on every side).
 func _resolve_surround() -> void:

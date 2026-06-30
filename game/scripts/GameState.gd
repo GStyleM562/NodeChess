@@ -413,6 +413,7 @@ func rank_data(uid: int) -> Dictionary:
 	var ranks: Array = base.get("ranks", [])
 	if r >= 1 and r - 1 < ranks.size():
 		var st: Dictionary = ranks[r - 1]
+		var m := _stage_model(st, base)
 		return {
 			"id": base.get("id", ""),
 			"name": st.get("name", base["name"]), "attack": st.get("attack", base["attack"]),
@@ -420,10 +421,7 @@ func rank_data(uid: int) -> Dictionary:
 			"stamina": st.get("stamina", base.get("stamina", 2)),
 			"passives": st.get("passives", base.get("passives", [])),
 			"coin_a": base.get("coin_a", []), "coin_b": base.get("coin_b", []),
-			# Model: the evolution stage's own model if it set one, else the base model.
-			"glb": st.get("glb", base.get("glb", "")),
-			"clips": st.get("clips", base.get("clips", {})),
-			"size": st.get("size", base.get("size", 1.0)),
+			"glb": m["glb"], "clips": m["clips"], "size": m["size"],
 		}
 	return {
 		"id": base.get("id", ""),
@@ -437,6 +435,34 @@ func rank_data(uid: int) -> Dictionary:
 func model_data(uid: int) -> Dictionary:
 	var rd := rank_data(uid)
 	return {"glb": rd.get("glb", ""), "clips": rd.get("clips", {}), "size": rd.get("size", 1.0)}
+
+## Resolve an evolution stage's 3D model: its own glb, else the figure it evolves
+## INTO (evolves_id — works even for figures saved before stages carried a glb),
+## else the base figure's model.
+func _stage_model(st: Dictionary, base: Dictionary) -> Dictionary:
+	var glb := String(st.get("glb", ""))
+	var clips: Dictionary = st.get("clips", {})
+	var size := float(st.get("size", 0.0))
+	if glb == "" and st.has("evolves_id"):
+		var src := _figure_by_id(String(st["evolves_id"]))
+		if not src.is_empty():
+			glb = String(src.get("glb", ""))
+			clips = src.get("clips", {})
+			if size <= 0.0:
+				size = float(src.get("size", 1.0))
+	if glb == "":
+		glb = String(base.get("glb", ""))
+		if clips.is_empty():
+			clips = base.get("clips", {})
+	if size <= 0.0:
+		size = float(base.get("size", 1.0))
+	return {"glb": glb, "clips": clips, "size": size}
+
+func _figure_by_id(id: String) -> Dictionary:
+	for f in Roster.FIGURES:
+		if String(f.get("id", "")) == id:
+			return f
+	return {}
 
 func pool_for(uid: int) -> Array:
 	return rank_data(uid)["attack"]

@@ -96,6 +96,23 @@ func _initialize() -> void:
 	ok = _expect("model changes on rank-up", base_glb != rank_glb, true) and ok
 	ok = _expect("ranked model = stage glb", rank_glb.ends_with("witch.glb"), true) and ok
 
+	# old figures: stage has NO glb but DOES have evolves_id -> resolve the model live
+	var ofig := CC.make_figure({
+		"name": "OldEvo", "type": "Ruleta", "passives": [], "model_ref": "stone_golem",
+		"pool": [{"col": "red", "w": 100}],
+		"stages": [{"name": "Witchy", "type": "Ruleta", "stamina": 2, "passives": [],
+			"attack": [{"col": "red", "w": 100}], "evolves_id": "venom_witch"}],
+	})
+	CF.apply_live(ofig)
+	var gs4 := GameState.new(MapData.new())
+	var oui := -1
+	for i in Roster.FIGURES.size():
+		if String(Roster.FIGURES[i].get("id", "")) == String(ofig["id"]):
+			oui = i
+	var ounit := gs4.add_to_bench("player", oui)
+	gs4._try_rank_up(ounit)
+	ok = _expect("model resolves from evolves_id", String(gs4.model_data(ounit)["glb"]).ends_with("witch.glb"), true) and ok
+
 	# UI smoke test (await a frame so the scene's _ready runs and builds controls)
 	var inst = load("res://scenes/character_creator.tscn").instantiate()
 	get_root().add_child(inst)
