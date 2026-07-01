@@ -17,12 +17,22 @@ signal match_start(seed: int, map: int, decks: Array)
 signal remote_action(action: Dictionary)
 signal player_left(id: int)
 
+## Ventana total de reintentos para el arranque en frio de Render free (~30-60s).
+## Son "var" (no const) para que los tests puedan acortarlas.
+var wake_window := 120.0
+var retry_delay := 4.0     # espera entre reintentos mientras el servidor enciende
+var ws_timeout := 20.0     # timeout de UN intento de WS (tras el wake el server ya responde)
+var wake_timeout := 70.0   # timeout del GET de despertar (Render puede retenerlo ~50s)
+
 var _ws := WebSocketPeer.new()
 var _open := false
 var _connecting := false
 var _ws_url := ""
 var _connect_t := 0.0
 var _ws_retries := 0
+var _retry_wait := 0.0     # >0: esperando para volver a intentar (servidor encendiendo)
+var _start_ms := 0         # inicio del connect_to() actual (ventana total)
+var _remote := false       # wss:// (Render: puede dormir) vs ws:// local
 var _http: HTTPRequest
 
 func _ensure_http() -> void:
@@ -30,28 +40,46 @@ func _ensure_http() -> void:
 		return
 	_http = HTTPRequest.new()
 	add_child(_http)
-	_http.timeout = 70.0   # el arranque en frio de Render free puede tardar ~50s
 	_http.request_completed.connect(_on_wake_done)
 
 func connect_to(url: String) -> void:
 	_ensure_http()
 	_ws_url = url
 	_open = false
+	_connecting = false
 	_ws_retries = 0
+	_retry_wait = 0.0
+	_start_ms = Time.get_ticks_msec()
+	_remote = _ws_url.begins_with("wss://") or _ws_url.begins_with("https://")
 	# Render free DUERME; un WS directo a un server dormido se cae. Un GET normal SI lo
-	# despierta (~50s). Por eso: primero un GET para despertar, luego abrimos el WS.
-	if _ws_url.begins_with("wss://") or _ws_url.begins_with("https://"):
-		connecting_status.emit("Despertando servidor… (puede tardar ~50s la primera vez)")
-		_http.cancel_request()
-		var http_url := _ws_url.replace("wss://", "https://")
-		if _http.request(http_url) != OK:
-			_open_ws()
+	# despierta (~50s). Por eso: primero un GET; solo abrimos el WS cuando responde OK.
+	if _remote:
+		connecting_status.emit("Despertando servidor… (si estaba dormido tarda ~1 min)")
+		_wake()
 	else:
 		_open_ws()   # servidor local (ws://): no duerme
 
-func _on_wake_done(_r: int, _c: int, _h: PackedStringArray, _b: PackedByteArray) -> void:
-	connecting_status.emit("Conectando a la sala…")
-	_open_ws()
+## GET al server: lo despierta si duerme y a la vez confirma si ya esta encendido.
+func _wake() -> void:
+	if not is_inside_tree():
+		_retry_wait = 0.1   # aun no entramos al arbol; reintentar en el primer frame
+		return
+	_http.cancel_request()
+	_http.timeout = wake_timeout
+	var http_url := _ws_url.replace("wss://", "https://")
+	if _http.request(http_url) != OK:
+		_open_ws()   # no se pudo lanzar el GET; probamos el WS directo
+
+func _on_wake_done(result: int, code: int, _h: PackedStringArray, _b: PackedByteArray) -> void:
+	if result == HTTPRequest.RESULT_SUCCESS and code >= 200 and code < 400:
+		connecting_status.emit("Servidor listo. Conectando a la sala…")
+		_open_ws()
+	else:
+		# Aun no responde (sigue encendiendo, 5xx del proxy, o timeout): reintentar.
+		_retry_or_fail("despertando servidor")
+
+func _elapsed() -> float:
+	return float(Time.get_ticks_msec() - _start_ms) / 1000.0
 
 func _open_ws() -> void:
 	_ws = WebSocketPeer.new()
@@ -65,11 +93,23 @@ func is_open() -> bool:
 	return _open
 
 func close() -> void:
+	if _http != null:
+		_http.cancel_request()
 	_ws.close()
 	_open = false
 	_connecting = false
+	_retry_wait = 0.0
 
 func _process(delta: float) -> void:
+	if _retry_wait > 0.0:
+		_retry_wait -= delta
+		if _retry_wait <= 0.0:
+			# Volver a preguntar si ya encendio (el GET tambien lo despierta).
+			if _remote:
+				_wake()
+			else:
+				_open_ws()
+		return
 	if not _connecting and not _open:
 		return
 	if _connecting:
@@ -84,7 +124,7 @@ func _process(delta: float) -> void:
 			while _ws.get_available_packet_count() > 0:
 				_handle(_ws.get_packet().get_string_from_utf8())
 		WebSocketPeer.STATE_CONNECTING:
-			if _connecting and _connect_t > 45.0:
+			if _connecting and _connect_t > ws_timeout:
 				_retry_or_fail("tardó demasiado")
 		WebSocketPeer.STATE_CLOSED:
 			if _open:
@@ -93,14 +133,20 @@ func _process(delta: float) -> void:
 			elif _connecting:
 				_retry_or_fail("cerrado cod %d" % _ws.get_close_code())
 
+## Un intento fallo. Con Render el server puede estar ENCENDIENDO (30-60s): en vez de
+## rendirnos, esperamos unos segundos y volvemos a intentar durante toda la ventana.
 func _retry_or_fail(reason: String) -> void:
-	if _ws_retries < 3:
+	_connecting = false
+	if _remote and _elapsed() < wake_window:
+		_ws_retries += 1
+		_retry_wait = retry_delay
+		connecting_status.emit("Servidor encendiendo… reintento %d (llevo %ds)" % [_ws_retries, int(_elapsed())])
+	elif not _remote and _ws_retries < 3:
 		_ws_retries += 1
 		connecting_status.emit("Reintentando… (%d)" % _ws_retries)
 		_open_ws()
 	else:
-		_connecting = false
-		error_msg.emit("Sin conexión al servidor [" + reason + "]")
+		error_msg.emit("Sin conexión al servidor [" + reason + "]. Vuelve a pulsar para reintentar.")
 
 func _handle(text: String) -> void:
 	var data = JSON.parse_string(text)
