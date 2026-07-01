@@ -5,3 +5,4 @@ extends Node
 
 func _ready() -> void:
 	CustomFigures.merge_into_roster()
+	Loadout.load()   # restore saved team + modifiers + map (after customs are merged)

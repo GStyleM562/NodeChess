@@ -124,6 +124,14 @@ func _build_maps() -> void:
 func _select_map(i: int) -> void:
 	_map_index = i
 	_build_maps()
+	_commit()
+
+## Persist the current team + modifiers + map to disk (survives app restarts).
+func _commit() -> void:
+	Loadout.player_team = _team.duplicate()
+	Loadout.map_index = _map_index
+	Loadout.player_modifiers = _mods.duplicate()
+	Loadout.save()
 
 func _build_modsel() -> void:
 	for c in _modsel_box.get_children():
@@ -150,6 +158,7 @@ func _toggle_mod(mid: String) -> void:
 	elif _mods.size() < 3:
 		_mods.append(mid)
 	_build_modsel()
+	_commit()
 
 func _build_available() -> void:
 	for ri in Roster.FIGURES.size():
@@ -194,11 +203,10 @@ func _refresh() -> void:
 			b.disabled = true
 		_team_box.add_child(b)
 	_play_btn.disabled = not Loadout.valid(_team)
+	_commit()
 
 func _on_play() -> void:
 	if not Loadout.valid(_team):
 		return
-	Loadout.player_team = _team.duplicate()
-	Loadout.map_index = _map_index
-	Loadout.player_modifiers = _mods.duplicate()
+	_commit()
 	get_tree().change_scene_to_file("res://scenes/board.tscn")

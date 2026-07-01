@@ -1,0 +1,18 @@
+# Render Blueprint — despliega el servidor relay de NodeChess en el plan GRATIS.
+# Uso: en Render -> New -> Blueprint -> conecta el repo GStyleM562/NodeChess.
+# Detecta este archivo y crea el servicio automaticamente.
+#
+# El servidor es Node (carpeta nodechess_server/). Escucha en $PORT y responde 200
+# en "/" (health check). Soporta WebSocket. El plan free "duerme" tras ~15 min sin
+# uso y despierta en ~30-50s en la primera conexion (el app lo "despierta" con un GET).
+services:
+  - type: web
+    name: nodechess-server
+    runtime: node
+    plan: free
+    region: ohio # US-East (mas cerca de LATAM). Cambiable en el panel.
+    rootDir: nodechess_server
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /
+    autoDeploy: true
