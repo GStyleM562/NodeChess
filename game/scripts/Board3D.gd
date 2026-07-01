@@ -47,6 +47,14 @@ var _drag_uid := -1
 var _drag_active := false
 var _drag_start := Vector2.ZERO
 var _drag_ghost: Control
+# --- online (turn-based 1v1) ---
+var _online := false
+var _seat := 0
+var _half := 5                 # figures per side (for the uid mirror)
+var _remote_q: Array = []
+var _remote_busy := false
+var _wait_banner: PanelContainer
+var _saved_roster: Array = []
 # Turn / activation state
 var _active_uid := -1
 var _remaining := 0
@@ -72,18 +80,65 @@ func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
 	randomize()
 	_build_environment()
-	_gs = GameState.new(MapData.new(Loadout.map_index))
-	# Teams come from the Deck Builder (player) + a preset enemy deck.
-	for ri in Loadout.player_team:
-		_gs.add_to_bench("player", int(ri))
-	for ri in Loadout.enemy_team:
-		_gs.add_to_bench("enemy", int(ri))
+	if NetSession.online:
+		_setup_online_state()
+	else:
+		_gs = GameState.new(MapData.new(Loadout.map_index))
+		# Teams come from the Deck Builder (player) + a preset enemy deck.
+		for ri in Loadout.player_team:
+			_gs.add_to_bench("player", int(ri))
+		for ri in Loadout.enemy_team:
+			_gs.add_to_bench("enemy", int(ri))
 	_build_board()
 	_overlay = CombatOverlay.new()
 	add_child(_overlay)
 	_build_ui()
 	_refresh_bench_ui()
 	_update_status()
+	if _online:
+		NetSession.client.remote_action.connect(_on_remote_action)
+		NetSession.client.player_left.connect(_on_opp_left)
+
+## Online: build the local-perspective state (I am always "player" at the bottom, the
+## opponent is "enemy" at the top — no board flip). Both clients build the SAME figures,
+## just with their own deck first, so uids line up via a fixed mirror.
+func _setup_online_state() -> void:
+	_online = true
+	_seat = NetSession.seat
+	var mine: Array = NetSession.decks_by_seat.get(_seat, [])
+	var theirs: Array = NetSession.decks_by_seat.get(1 - _seat, [])
+	_half = mine.size()
+	# Swap the roster to [my figures, opponent figures]; restored on leaving the match.
+	_saved_roster = Roster.FIGURES
+	var roster: Array = []
+	for f in mine:
+		roster.append(f)
+	for f in theirs:
+		roster.append(f)
+	Roster.FIGURES = roster
+	_gs = GameState.new(MapData.new(NetSession.map))
+	for i in mine.size():
+		_gs.add_to_bench("player", i)                 # uids 0.._half-1
+	for i in theirs.size():
+		_gs.add_to_bench("enemy", _half + i)          # uids _half..
+	if _seat == 1:
+		_gs.turn_team = "enemy"                        # the host (seat 0) moves first
+
+func _mirror_uid(u: int) -> int:
+	return (u + _half) if u < _half else (u - _half)
+
+func _mirror_node(n: int) -> int:
+	return _gs.map.mirror_node(n)
+
+func _net_send(action: Dictionary) -> void:
+	if _online:
+		NetSession.client.send_action(action)
+
+func _leave_to_menu() -> void:
+	if _online:
+		Roster.FIGURES = _saved_roster                 # un-swap the roster
+		NetSession.end_online()
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 func _process(delta: float) -> void:
 	# A blocked entrance pulses like a siren: a rival figure is sitting on it (so that
@@ -250,6 +305,20 @@ func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	_ui_layer = layer
+	# "Waiting for opponent" banner — online only, toggled in _update_status.
+	_wait_banner = PanelContainer.new()
+	_wait_banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_wait_banner.offset_top = 58
+	_wait_banner.offset_left = -180
+	_wait_banner.offset_right = 180
+	_wait_banner.add_theme_stylebox_override("panel", UITheme.pill(Color(0.12, 0.07, 0.04, 0.96), UITheme.ORANGE, 14))
+	_wait_banner.visible = false
+	layer.add_child(_wait_banner)
+	var wl := Label.new()
+	wl.text = "⏳  Esperando movimiento del RIVAL…"
+	wl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(wl, 15, UITheme.ORANGE, true, 800)
+	_wait_banner.add_child(wl)
 	_status = Label.new()
 	_status.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_status.offset_left = 56
@@ -268,7 +337,7 @@ func _build_ui() -> void:
 	menu_btn.offset_bottom = 48
 	UITheme.button_font(menu_btn, 20, UITheme.TEXT2, false, 700)
 	UITheme.style_surface(menu_btn, UITheme.SURFACE, UITheme.BORDER, 11)
-	menu_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+	menu_btn.pressed.connect(_leave_to_menu)
 	layer.add_child(menu_btn)
 
 	_end_btn = Button.new()
@@ -621,6 +690,8 @@ func _preview_figure(uid: int) -> void:
 	hb.add_child(cl)
 
 func _update_status() -> void:
+	if _wait_banner != null:
+		_wait_banner.visible = _online and not _over and _gs.turn_team == "enemy"
 	if _over:
 		_end_btn.visible = false
 		return
@@ -673,6 +744,7 @@ func _on_modifier(mid: String) -> void:
 		return
 	if _gs.activate_modifier("player", mid):
 		var m: Dictionary = GameState.MODIFIERS[mid]
+		_net_send({"kind": "modifier", "mid": mid})
 		_show_banner("Usaste %s — %s" % [String(m["name"]), String(m["desc"])], Color(1.0, 0.85, 0.3))
 		_update_status()
 
@@ -807,6 +879,7 @@ func _player_deploy(uid: int, node: int) -> void:
 	_clear_highlights()
 	_deploy_uid = -1
 	_gs.deploy(uid, node)
+	_net_send({"kind": "deploy", "uid": uid, "node": node})
 	_spawn_vis(uid)
 	_active_uid = uid
 	_remaining = maxi(0, _gs.effective_stamina(uid) - 1)  # deploy costs 1
@@ -830,6 +903,7 @@ func _player_move(node: int) -> void:
 	_refresh_bench_ui()
 	_update_status()
 	_gs.move_unit(_active_uid, node)
+	_net_send({"kind": "move", "uid": _active_uid, "to": node})
 	# A jump (over ONE enemy) always uses up all stamina and ends this figure's
 	# actions — you cannot jump again nor keep moving (no chaining through units).
 	if is_jump:
@@ -923,6 +997,8 @@ func _player_attack(foe_uid: int) -> void:
 	_committed = true
 	_update_status()
 	var rec := _gs.attack(att, foe_uid, moved)
+	_net_send({"kind": "attack", "att": att, "def": foe_uid, "moved": moved,
+		"idx_a": int(rec.get("idx_a", -1)), "idx_b": int(rec.get("idx_b", -1))})
 	await _play_combat(att, foe_uid, rec)
 	# PASSIVE — Bloodthirst: on an enemy KO, the attacker may move 1 node (no attack).
 	if int(rec.get("ko", -1)) == foe_uid and _gs.units[att]["alive"] and _gs.has_passive(att, "bloodthirst"):
@@ -952,10 +1028,69 @@ func _end_player_turn() -> void:
 	_update_status()
 	if _check_and_show_winner():
 		return
+	if _online:
+		_net_send({"kind": "end"})       # opponent's turn now (driven by their client)
+		_busy = false
+		_refresh_bench_ui()
+		_update_status()
+		return
 	await _bot_loop()
 	_busy = false
 	_refresh_bench_ui()
 	_update_status()
+
+# ---------------------------------------------------------------- online remote
+func _on_remote_action(action: Dictionary) -> void:
+	_remote_q.append(action)
+	_drain_remote()
+
+func _drain_remote() -> void:
+	if _remote_busy:
+		return
+	_remote_busy = true
+	while not _remote_q.is_empty() and not _over:
+		var a: Dictionary = _remote_q.pop_front()
+		await _apply_remote(a)
+	_remote_busy = false
+
+## Apply + animate the opponent's action on MY board (their figures are my "enemy";
+## coords are mirrored so I still see myself at the bottom — no board flip).
+func _apply_remote(a: Dictionary) -> void:
+	match String(a.get("kind", "")):
+		"deploy":
+			var uid := _mirror_uid(int(a["uid"]))
+			_gs.deploy(uid, _mirror_node(int(a["node"])))
+			_spawn_vis(uid)
+			await get_tree().create_timer(0.3).timeout
+		"move":
+			var uid := _mirror_uid(int(a["uid"]))
+			var tnode := _mirror_node(int(a["to"]))
+			var path := _gs.move_path(uid, tnode)
+			_gs.move_unit(uid, tnode)
+			await _walk_path(uid, path)
+		"modifier":
+			_gs.activate_modifier("enemy", String(a["mid"]))
+			var m: Dictionary = GameState.MODIFIERS.get(String(a["mid"]), {})
+			if not m.is_empty():
+				_show_banner("El rival usó %s — %s" % [String(m.get("name", "")), String(m.get("desc", ""))], Color(1.0, 0.55, 0.4))
+				await get_tree().create_timer(1.2).timeout
+		"attack":
+			var att := _mirror_uid(int(a["att"]))
+			var def := _mirror_uid(int(a["def"]))
+			var rec := _gs.attack(att, def, int(a.get("moved", 0)), int(a.get("idx_a", -1)), int(a.get("idx_b", -1)))
+			await _play_combat(att, def, rec)
+		"end":
+			await _resolve_surround()        # opponent may have surrounded my figures
+			_gs.end_turn()                   # -> my turn
+	_update_status()
+	_check_and_show_winner()
+
+func _on_opp_left(_id: int) -> void:
+	if _over:
+		return
+	_show_banner("El rival salió de la partida — ganas por abandono.", UITheme.SUCCESS)
+	_gs.winner = "player"
+	_check_and_show_winner()
 
 func _bot_loop() -> void:
 	while _gs.winner == "" and _gs.turn_team == "enemy":
@@ -1338,14 +1473,18 @@ func _show_winner(team: String) -> void:
 	rematch.custom_minimum_size = Vector2(360, 54)
 	UITheme.button_font(rematch, 20, UITheme.TEXT2, true, 700)
 	UITheme.style_surface(rematch, UITheme.SURFACE, UITheme.BORDER, 14)
-	rematch.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/board.tscn"))
+	rematch.pressed.connect(func():
+		if _online:
+			_leave_to_menu()
+		else:
+			get_tree().change_scene_to_file("res://scenes/board.tscn"))
 	v.add_child(_center(rematch))
 	var claim := Button.new()
 	claim.text = "Reclamar y volver"
 	claim.custom_minimum_size = Vector2(360, 60)
 	UITheme.button_font(claim, 22, Color.WHITE, true, 800)
 	UITheme.style_primary(claim, UITheme.PRIMARY, 16)
-	claim.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+	claim.pressed.connect(_leave_to_menu)
 	v.add_child(_center(claim))
 
 	_status.text = ""

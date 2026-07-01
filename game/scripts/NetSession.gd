@@ -13,6 +13,7 @@ var map := 0
 var match_roster: Array = []     # deck0 figures then deck1 figures (as dicts)
 var team_p0: Array = []          # indices into match_roster (canonical player team)
 var team_p1: Array = []          # (canonical enemy team)
+var decks_by_seat := {0: [], 1: []}   # raw deck (figure dicts) per seat
 var opp_name := "Rival"
 
 func _ready() -> void:
@@ -39,6 +40,7 @@ func build_match(decks: Array, my_seat: int, s: int, m: int) -> void:
 		by_seat[int(d.get("seat", 0))] = d.get("deck", [])
 		if int(d.get("seat", 0)) != my_seat:
 			opp_name = String(d.get("name", "Rival"))
+	decks_by_seat = by_seat
 	for f in by_seat[0]:
 		team_p0.append(match_roster.size())
 		match_roster.append(f)
