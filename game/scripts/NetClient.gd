@@ -19,7 +19,7 @@ signal player_left(id: int)
 
 ## Ventana total de reintentos para el arranque en frio de Render free (~30-60s).
 ## Son "var" (no const) para que los tests puedan acortarlas.
-var wake_window := 120.0
+var wake_window := 180.0
 var retry_delay := 4.0     # espera entre reintentos mientras el servidor enciende
 var ws_timeout := 20.0     # timeout de UN intento de WS (tras el wake el server ya responde)
 var wake_timeout := 70.0   # timeout del GET de despertar (Render puede retenerlo ~50s)
@@ -33,6 +33,7 @@ var _ws_retries := 0
 var _retry_wait := 0.0     # >0: esperando para volver a intentar (servidor encendiendo)
 var _start_ms := 0         # inicio del connect_to() actual (ventana total)
 var _remote := false       # wss:// (Render: puede dormir) vs ws:// local
+var _active := false       # hay un intento de conexion en curso (wake + WS + reintentos)
 var _http: HTTPRequest
 
 func _ensure_http() -> void:
@@ -49,12 +50,13 @@ func connect_to(url: String) -> void:
 	_connecting = false
 	_ws_retries = 0
 	_retry_wait = 0.0
+	_active = true
 	_start_ms = Time.get_ticks_msec()
 	_remote = _ws_url.begins_with("wss://") or _ws_url.begins_with("https://")
 	# Render free DUERME; un WS directo a un server dormido se cae. Un GET normal SI lo
 	# despierta (~50s). Por eso: primero un GET; solo abrimos el WS cuando responde OK.
 	if _remote:
-		connecting_status.emit("Despertando servidor… (si estaba dormido tarda ~1 min)")
+		connecting_status.emit("Despertando servidor… espera ~1 min sin cerrar (reintenta solo)")
 		_wake()
 	else:
 		_open_ws()   # servidor local (ws://): no duerme
@@ -92,12 +94,19 @@ func _open_ws() -> void:
 func is_open() -> bool:
 	return _open
 
+## True mientras un intento de conexion sigue vivo (despertando, abriendo WS o
+## esperando el siguiente reintento). La UI lo usa para no reiniciar el intento
+## en cada toque: reiniciar cancela el GET que esta despertando a Render.
+func is_connecting() -> bool:
+	return _active and not _open
+
 func close() -> void:
 	if _http != null:
 		_http.cancel_request()
 	_ws.close()
 	_open = false
 	_connecting = false
+	_active = false
 	_retry_wait = 0.0
 
 func _process(delta: float) -> void:
@@ -120,6 +129,7 @@ func _process(delta: float) -> void:
 			if not _open:
 				_open = true
 				_connecting = false
+				_active = false
 				connected.emit()
 			while _ws.get_available_packet_count() > 0:
 				_handle(_ws.get_packet().get_string_from_utf8())
@@ -146,6 +156,7 @@ func _retry_or_fail(reason: String) -> void:
 		connecting_status.emit("Reintentando… (%d)" % _ws_retries)
 		_open_ws()
 	else:
+		_active = false
 		error_msg.emit("Sin conexión al servidor [" + reason + "]. Vuelve a pulsar para reintentar.")
 
 func _handle(text: String) -> void:

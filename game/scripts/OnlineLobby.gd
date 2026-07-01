@@ -119,11 +119,13 @@ func _wire(c) -> void:
 # ---------------------------------------------------------------- actions
 func _on_create() -> void:
 	_pending = "create"
-	_status.text = "Conectando…"
 	_save_url(_url.text)
 	if NetSession.client.is_open():
 		_on_connected()
+	elif NetSession.client.is_connecting():
+		_status.text = "Ya estoy conectando… espera, se reintenta solo."
 	else:
+		_status.text = "Conectando…"
 		NetSession.client.connect_to(_url.text.strip_edges())
 
 func _on_join() -> void:
@@ -131,11 +133,13 @@ func _on_join() -> void:
 		_status.text = "Escribe el código de 4 letras."
 		return
 	_pending = "join"
-	_status.text = "Conectando…"
 	_save_url(_url.text)
 	if NetSession.client.is_open():
 		_on_connected()
+	elif NetSession.client.is_connecting():
+		_status.text = "Ya estoy conectando… espera, se reintenta solo."
 	else:
+		_status.text = "Conectando…"
 		NetSession.client.connect_to(_url.text.strip_edges())
 
 func _on_connected() -> void:
