@@ -33,6 +33,10 @@ window/handheld/orientation=1
 
 theme/custom_font="res://assets/fonts/Manrope.ttf"
 
+[network]
+
+tls/certificate_bundle_override="res://cacert.pem"
+
 [rendering]
 
 renderer/rendering_method="mobile"
