@@ -194,7 +194,7 @@ func _build_buttons(layer: CanvasLayer) -> void:
 	row.add_child(_menu_button("🃏", "Mazos", func(): get_tree().change_scene_to_file("res://scenes/deck_builder.tscn")))
 	row.add_child(_menu_button("📖", "Colección", func(): get_tree().change_scene_to_file("res://scenes/dex.tscn")))
 	row.add_child(_menu_button("🎲", "Probar", func(): get_tree().change_scene_to_file("res://scenes/attack_tester.tscn")))
-	row.add_child(_menu_button("🛍", "Tienda", _soon))
+	row.add_child(_menu_button("🌐", "Online", func(): get_tree().change_scene_to_file("res://scenes/online_lobby.tscn")))
 	row.add_child(_menu_button("🛠", "Crear", func(): get_tree().change_scene_to_file("res://scenes/character_creator.tscn")))
 
 func _build_nav(layer: CanvasLayer) -> void:

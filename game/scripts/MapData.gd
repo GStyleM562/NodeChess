@@ -39,6 +39,22 @@ static func display_name(i: int) -> String:
 func pos_of(id: int) -> Vector3:
 	return nodes[id]["pos"]
 
+## The node at the 180°-rotated position (x,z)->(-x,-z). The maps are symmetric under
+## this rotation, so this is a bijection swapping the two sides. Online uses it so each
+## player can see itself at the bottom (no board flip): an action on my node N is
+## applied to the opponent's mirror_node(N).
+func mirror_node(id: int) -> int:
+	var p: Vector3 = nodes[id]["pos"]
+	var best := id
+	var bd := 1e9
+	for n in nodes:
+		var q: Vector3 = n["pos"]
+		var d := Vector2(q.x - (-p.x), q.z - (-p.z)).length()
+		if d < bd:
+			bd = d
+			best = int(n["id"])
+	return best
+
 func role_of(id: int) -> String:
 	return nodes[id]["role"]
 

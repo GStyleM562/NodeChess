@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 GameBoot="*res://scripts/GameBoot.gd"
+NetSession="*res://scripts/NetSession.gd"
 
 [display]
 

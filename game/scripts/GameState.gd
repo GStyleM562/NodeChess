@@ -262,11 +262,13 @@ func move_unit(uid: int, node: int) -> void:
 ## Rolls an attack: returns { "seg": buffed segment (what the figure WILL do, with
 ## buff-node/modifier bonuses already baked in), "idx": the pool face that came up
 ## (so the die/reel lands on the right face) }.
-func _roll_full(uid: int, is_attacker := false) -> Dictionary:
+## `forced` >= 0 replays a specific rolled face (online lockstep: the acting client
+## rolled it; the other client re-applies the SAME index for an identical result).
+func _roll_full(uid: int, is_attacker := false, forced := -1) -> Dictionary:
 	var pool: Array = pool_for(uid)
-	var bidx := _weighted_index(pool)
+	var bidx := forced if (forced >= 0 and forced < pool.size()) else _weighted_index(pool)
 	# MODIFIER — Adrenaline: reroll a Miss once (attacker), before other buffs.
-	if is_attacker and pending_buff[units[uid]["team"]].get("adrenaline", false) and String(pool[bidx].get("col", "")) == "red":
+	if forced < 0 and is_attacker and pending_buff[units[uid]["team"]].get("adrenaline", false) and String(pool[bidx].get("col", "")) == "red":
 		bidx = _weighted_index(pool)
 	var s: Dictionary = pool[bidx].duplicate(true)
 	if has_status(uid, "weakened"):
@@ -318,17 +320,19 @@ func _boost_seg(s: Dictionary, dmg: int, stars: int) -> void:
 
 ## Resolve an attack. KO only on a damage (White/Gold) win. Purple win applies a
 ## status (and/or displacement); Blue win blocks. Returns the combat record.
-func attack(att_uid: int, def_uid: int, att_moved: int = 0) -> Dictionary:
-	var ra := _roll_full(att_uid, true)
+## `fidx_a`/`fidx_b` >= 0 force the rolled faces (online: the acting client sends the
+## indices it rolled so the other client reproduces the SAME combat, no re-rolling).
+func attack(att_uid: int, def_uid: int, att_moved: int = 0, fidx_a: int = -1, fidx_b: int = -1) -> Dictionary:
+	var ra := _roll_full(att_uid, true, fidx_a)
 	var seg_a: Dictionary = ra["seg"]
 	var idx_a := int(ra["idx"])
 	# PASSIVE — Lunge: after moving 2+ nodes this turn, reroll a Miss once.
-	if String(seg_a.get("col", "")) == "red" and att_moved >= 2 and has_passive(att_uid, "lunge"):
+	if fidx_a < 0 and String(seg_a.get("col", "")) == "red" and att_moved >= 2 and has_passive(att_uid, "lunge"):
 		ra = _roll_full(att_uid, true)
 		seg_a = ra["seg"]
 		idx_a = int(ra["idx"])
 	_att_moved_ctx = att_moved
-	var rb := _roll_full(def_uid, false)
+	var rb := _roll_full(def_uid, false, fidx_b)
 	var seg_b: Dictionary = rb["seg"]
 	var idx_b := int(rb["idx"])
 	# MARKED — attacking a Marked figure hits harder (+20 dmg / +1★, baked in).
