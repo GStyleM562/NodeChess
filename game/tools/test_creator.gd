@@ -113,6 +113,27 @@ func _initialize() -> void:
 	gs4._try_rank_up(ounit)
 	ok = _expect("model resolves from evolves_id", String(gs4.model_data(ounit)["glb"]).ends_with("witch.glb"), true) and ok
 
+	# BUG FIX: editing the evolution TARGET must reflect in figures that evolve into it.
+	CF.apply_live(CC.make_figure({"name": "Tgt", "type": "Ruleta", "passives": [], "model_ref": "nightblade",
+		"pool": [{"col": "white", "name": "A", "pow": 40, "w": 100}]}))
+	CF.apply_live(CC.make_figure({"name": "Host", "type": "Ruleta", "passives": [], "model_ref": "stone_golem",
+		"pool": [{"col": "red", "w": 100}],
+		"stages": [{"name": "Tgt", "type": "Ruleta", "stamina": 2, "passives": [],
+			"attack": [{"col": "white", "pow": 40, "w": 100}], "evolves_id": "custom_tgt"}]}))
+	# edit the target: change its attack to Gold 90
+	CF.apply_live(CC.make_figure({"name": "Tgt", "type": "Ruleta", "passives": [], "model_ref": "nightblade",
+		"pool": [{"col": "gold", "name": "B", "pow": 90, "w": 100}]}))
+	var gs5 := GameState.new(MapData.new())
+	var hi := -1
+	for i in Roster.FIGURES.size():
+		if String(Roster.FIGURES[i].get("id", "")) == "custom_host":
+			hi = i
+	var hu := gs5.add_to_bench("player", hi)
+	gs5._try_rank_up(hu)
+	var pool := gs5.pool_for(hu)
+	var is_gold: bool = pool.size() > 0 and String(pool[0].get("col", "")) == "gold"
+	ok = _expect("editing target propagates to evolution", is_gold, true) and ok
+
 	# UI smoke test (await a frame so the scene's _ready runs and builds controls)
 	var inst = load("res://scenes/character_creator.tscn").instantiate()
 	get_root().add_child(inst)

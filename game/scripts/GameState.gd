@@ -413,14 +413,24 @@ func rank_data(uid: int) -> Dictionary:
 	var ranks: Array = base.get("ranks", [])
 	if r >= 1 and r - 1 < ranks.size():
 		var st: Dictionary = ranks[r - 1]
+		# If this stage evolves INTO an existing figure, use that figure's LIVE data
+		# (not a copy frozen at creation) so editing the target — or the evolution — is
+		# reflected in new matches. Inline stages (no evolves_id) use the stored data.
+		var eff: Dictionary = st
+		if st.has("evolves_id"):
+			var src := _figure_by_id(String(st["evolves_id"]))
+			if not src.is_empty():
+				eff = src
 		var m := _stage_model(st, base)
 		return {
 			"id": base.get("id", ""),
-			"name": st.get("name", base["name"]), "attack": st.get("attack", base["attack"]),
-			"type": st.get("type", base.get("type", "Ruleta")),
-			"stamina": st.get("stamina", base.get("stamina", 2)),
-			"passives": st.get("passives", base.get("passives", [])),
-			"coin_a": base.get("coin_a", []), "coin_b": base.get("coin_b", []),
+			"name": eff.get("name", st.get("name", base["name"])),
+			"attack": eff.get("attack", st.get("attack", base["attack"])),
+			"type": eff.get("type", st.get("type", base.get("type", "Ruleta"))),
+			"stamina": eff.get("stamina", st.get("stamina", base.get("stamina", 2))),
+			"passives": eff.get("passives", st.get("passives", base.get("passives", []))),
+			"coin_a": eff.get("coin_a", base.get("coin_a", [])),
+			"coin_b": eff.get("coin_b", base.get("coin_b", [])),
 			"glb": m["glb"], "clips": m["clips"], "size": m["size"],
 		}
 	return {
@@ -440,16 +450,15 @@ func model_data(uid: int) -> Dictionary:
 ## INTO (evolves_id — works even for figures saved before stages carried a glb),
 ## else the base figure's model.
 func _stage_model(st: Dictionary, base: Dictionary) -> Dictionary:
+	# Prefer the LIVE target figure's model (so editing the target propagates), then
+	# the stored stage copy, then the base figure.
+	if st.has("evolves_id"):
+		var src := _figure_by_id(String(st["evolves_id"]))
+		if not src.is_empty() and String(src.get("glb", "")) != "":
+			return {"glb": String(src["glb"]), "clips": src.get("clips", {}), "size": float(src.get("size", 1.0))}
 	var glb := String(st.get("glb", ""))
 	var clips: Dictionary = st.get("clips", {})
 	var size := float(st.get("size", 0.0))
-	if glb == "" and st.has("evolves_id"):
-		var src := _figure_by_id(String(st["evolves_id"]))
-		if not src.is_empty():
-			glb = String(src.get("glb", ""))
-			clips = src.get("clips", {})
-			if size <= 0.0:
-				size = float(src.get("size", 1.0))
 	if glb == "":
 		glb = String(base.get("glb", ""))
 		if clips.is_empty():
