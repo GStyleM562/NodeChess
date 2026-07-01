@@ -202,4 +202,49 @@ static var FIGURES := [
 			{"col": "purple", "name": "Wild Card", "stars": 2, "w": 1, "ai": 1, "bi": 1},
 		],
 	},
+	# --- New models (Meshy "bunny" set). Minimal placeholder pools; build real
+	# characters on these models with the Character Creator. Clip maps auto-detected
+	# from each GLB (tools/inspect_glb.gd).
+	{
+		"id": "heal_bunny", "name": "Heal Bunny", "stamina": 2, "type": "Ruleta", "rarity": "rare",
+		"passives": [], "complete": true, "size": 1.0,
+		"glb": "res://assets/figures/heal_bunny/Meshy_AI_Meshy_Merged_Animations.glb",
+		"clips": {
+			"idle": "Idle_6", "move_walk": "Walking", "move_run": "Running",
+			"attack": "mage_soell_cast_2", "attack_heavy": "mage_soell_cast_6",
+			"defend": "Stand_Dodge", "hit": "Hit_Reaction", "ko": "Knock_Down_1",
+		},
+		"attack": [
+			{"col": "white", "name": "Thump", "pow": 40, "w": 35}, {"col": "blue", "name": "Guard", "w": 25},
+			{"col": "purple", "name": "Soothe", "stars": 1, "w": 15}, {"col": "red", "w": 25},
+		],
+	},
+	{
+		"id": "mage_bunny", "name": "Mage Bunny", "stamina": 3, "type": "Ruleta", "rarity": "epic",
+		"passives": [], "complete": true, "size": 1.0,
+		"glb": "res://assets/figures/mage_bunny/Meshy_AI_Meshy_Merged_Animations (1).glb",
+		"clips": {
+			"idle": "Idle_7", "move_walk": "Walking", "move_run": "Running",
+			"attack": "mage_soell_cast_3", "attack_heavy": "mage_soell_cast_4",
+			"hit": "Hit_Reaction", "ko": "Knock_Down",
+		},
+		"attack": [
+			{"col": "white", "name": "Spark", "pow": 60, "w": 30}, {"col": "gold", "name": "Arcane", "pow": 40, "w": 20},
+			{"col": "purple", "name": "Hex", "stars": 1, "w": 20}, {"col": "red", "w": 30},
+		],
+	},
+	{
+		"id": "tank_bunny", "name": "Tank Bunny", "stamina": 1, "type": "Ruleta", "rarity": "rare",
+		"passives": [], "complete": true, "size": 1.0,
+		"glb": "res://assets/figures/tank_bunny/Meshy_AI_Meshy_Merged_Animations.glb",
+		"clips": {
+			"idle": "Idle_15", "move_walk": "Walking", "move_run": "Running",
+			"attack": "Punch_Combo", "attack_heavy": "Punch_Combo",
+			"defend": "Shield_Push_Left", "hit": "Head_Hold_in_Pain", "ko": "Knock_Down",
+		},
+		"attack": [
+			{"col": "blue", "name": "Bulwark", "w": 40}, {"col": "white", "name": "Punch", "pow": 50, "w": 30},
+			{"col": "red", "w": 30},
+		],
+	},
 ]

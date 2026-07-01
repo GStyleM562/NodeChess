@@ -33,49 +33,59 @@ func _build() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.add_child(bg)
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_root.add_child(center)
+	# The layout FILLS the screen (full-rect margin) and the two attack presenters
+	# SHARE the leftover height (EXPAND_FILL). This guarantees combat never spills
+	# off-screen on any device — it always stays within the screen and centred.
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	_root.add_child(margin)
 
 	var vb := VBoxContainer.new()
-	vb.custom_minimum_size = Vector2(AREA.x, 0)
 	vb.alignment = BoxContainer.ALIGNMENT_CENTER
-	vb.add_theme_constant_override("separation", 6)
-	center.add_child(vb)
+	vb.add_theme_constant_override("separation", 4)
+	margin.add_child(vb)
 
-	_title = _mk("⚔  ¡COMBATE!  ⚔", 30, UITheme.GOLD)
+	_title = _mk("⚔  ¡COMBATE!  ⚔", 26, UITheme.GOLD)
 	vb.add_child(_title)
 
-	vb.add_child(_mk("ATACANTE", 14, UITheme.SUCCESS))
+	vb.add_child(_mk("ATACANTE", 13, UITheme.SUCCESS))
 	_card_a = CenterContainer.new()
-	_card_a.custom_minimum_size = Vector2(AREA.x, 66)
+	_card_a.custom_minimum_size = Vector2(AREA.x, 60)
 	vb.add_child(_card_a)
-	_presA = AttackPresenter.new()
-	_presA.custom_minimum_size = AREA
-	_presA.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_presA = _make_presenter()
 	vb.add_child(_presA)
 
-	var vs := _mk("VS", 22, UITheme.GOLD)
 	var vsp := PanelContainer.new()
 	vsp.add_theme_stylebox_override("panel", UITheme.pill(UITheme.SURFACE2, UITheme.BORDER.lightened(0.1), 14))
-	vsp.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	vs.custom_minimum_size = Vector2(0, 0)
-	vsp.add_child(vs)
+	vsp.add_child(_mk("VS", 20, UITheme.GOLD))
 	var vsc := CenterContainer.new()
 	vsc.add_child(vsp)
 	vb.add_child(vsc)
 
-	vb.add_child(_mk("DEFENSOR", 14, UITheme.DANGER))
+	vb.add_child(_mk("DEFENSOR", 13, UITheme.DANGER))
 	_card_b = CenterContainer.new()
-	_card_b.custom_minimum_size = Vector2(AREA.x, 66)
+	_card_b.custom_minimum_size = Vector2(AREA.x, 60)
 	vb.add_child(_card_b)
-	_presB = AttackPresenter.new()
-	_presB.custom_minimum_size = AREA
-	_presB.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_presB = _make_presenter()
 	vb.add_child(_presB)
 
-	_result = _mk("", 24, Color(1, 1, 1))
+	_result = _mk("", 22, Color(1, 1, 1))
 	vb.add_child(_result)
+
+## A presenter that shares the leftover vertical space and clips its own contents,
+## so a large roll visual can never spill outside its region.
+func _make_presenter() -> AttackPresenter:
+	var p := AttackPresenter.new()
+	p.custom_minimum_size = Vector2(AREA.x, 150)
+	p.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.clip_contents = true
+	return p
 
 func _mk(t: String, sz: int, col: Color) -> Label:
 	var l := Label.new()
