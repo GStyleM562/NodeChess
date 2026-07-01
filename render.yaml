@@ -16,3 +16,8 @@ services:
     startCommand: node server.js
     healthCheckPath: /
     autoDeploy: true
+    # Solo redeploy si cambia el servidor (no por cambios del juego/app).
+    buildFilters:
+      paths:
+        - nodechess_server/**
+        - render.yaml
