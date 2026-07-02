@@ -347,8 +347,25 @@ func _build_ui() -> void:
 	_end_btn.offset_top = -118
 	_end_btn.offset_right = -12
 	_end_btn.offset_bottom = -74
-	UITheme.button_font(_end_btn, 17, UITheme.TEXT2, true, 700)
-	UITheme.style_surface(_end_btn, Color(0.078, 0.102, 0.188), UITheme.BORDER, 14)
+	UITheme.button_font(_end_btn, 17, UITheme.TEXT, true, 800)
+	_end_btn.add_theme_color_override("font_disabled_color", UITheme.MUTED)
+	# HABILITADO = "puedes terminar turno": verde con brillo que respira. Deshabilitado
+	# (aún te quedan acciones) = apagado, para que el contraste se lea de inmediato.
+	var glow := UITheme.panel(UITheme.SUCCESS.darkened(0.55), UITheme.SUCCESS, 14, 2, 8)
+	glow.shadow_color = Color(UITheme.SUCCESS, 0.5)
+	glow.shadow_offset = Vector2.ZERO
+	_end_btn.add_theme_stylebox_override("normal", glow)
+	var glow_hot := UITheme.panel(UITheme.SUCCESS.darkened(0.3), UITheme.SUCCESS.lightened(0.3), 14, 2, 8)
+	glow_hot.shadow_color = Color(UITheme.SUCCESS, 0.75)
+	glow_hot.shadow_offset = Vector2.ZERO
+	glow_hot.shadow_size = 16
+	for st in ["hover", "pressed", "hover_pressed", "focus"]:
+		_end_btn.add_theme_stylebox_override(st, glow_hot)
+	_end_btn.add_theme_stylebox_override("disabled",
+		UITheme.panel(Color(0.078, 0.102, 0.188), UITheme.BORDER, 14, 1, 8))
+	var pulse := create_tween().set_loops()
+	pulse.tween_property(glow, "shadow_size", 18, 0.75).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	pulse.tween_property(glow, "shadow_size", 5, 0.75).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_end_btn.pressed.connect(_on_end_turn_pressed)
 	layer.add_child(_end_btn)
 
