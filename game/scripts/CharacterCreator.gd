@@ -152,6 +152,15 @@ func _build_topbar() -> void:
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	UITheme.label(title, 22, UITheme.GOLD, true, 800)
 	hb.add_child(title)
+	# Import/backup: paste a share code (from "Copiar código" in the Dex) to restore
+	# figures after a reinstall, or copy ONE code that backs up every saved figure.
+	var imp := Button.new()
+	imp.text = "⇪ Importar"
+	UITheme.button_font(imp, 14, UITheme.TEXT, true, 700)
+	UITheme.style_surface(imp)
+	imp.custom_minimum_size = Vector2(0, 40)
+	imp.pressed.connect(_show_import)
+	hb.add_child(imp)
 
 func _build_footer() -> void:
 	var bar := PanelContainer.new()
@@ -751,6 +760,99 @@ func _info_btn(cb: Callable) -> Button:
 	UITheme.style_surface(b)
 	b.pressed.connect(cb)
 	return b
+
+## Import/backup modal: paste a code and import it, or copy a full-backup code.
+func _show_import() -> void:
+	var old := get_node_or_null("ImportModal")
+	if old:
+		old.queue_free()
+	var modal := Control.new()
+	modal.name = "ImportModal"
+	modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(modal)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.add_child(cc)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(480, 0)
+	panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.PRIMARY_EDGE, 18, 2, 18))
+	cc.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	panel.add_child(vb)
+	var t := Label.new()
+	t.text = "Importar / Respaldo de personajes"
+	UITheme.label(t, 18, UITheme.GOLD, true, 800)
+	vb.add_child(t)
+	var hint := Label.new()
+	hint.text = "Pega aquí un código (NCFIG1… de un personaje, o NCPACK1… de un respaldo completo) y toca IMPORTAR."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(440, 0)
+	UITheme.label(hint, 12, UITheme.TEXT2, false, 600)
+	vb.add_child(hint)
+	var code_in := TextEdit.new()
+	code_in.placeholder_text = "NCFIG1.…  /  NCPACK1.…"
+	code_in.custom_minimum_size = Vector2(440, 110)
+	code_in.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	vb.add_child(code_in)
+	var result := Label.new()
+	result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	result.custom_minimum_size = Vector2(440, 0)
+	UITheme.label(result, 13, UITheme.TEXT2, false, 700)
+	vb.add_child(result)
+	var row1 := HBoxContainer.new()
+	row1.add_theme_constant_override("separation", 8)
+	vb.add_child(row1)
+	var paste := Button.new()
+	paste.text = "Pegar"
+	paste.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UITheme.button_font(paste, 14, UITheme.TEXT, false, 700)
+	UITheme.style_surface(paste)
+	paste.pressed.connect(func(): code_in.text = DisplayServer.clipboard_get())
+	row1.add_child(paste)
+	var do_imp := Button.new()
+	do_imp.text = "IMPORTAR"
+	do_imp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UITheme.button_font(do_imp, 14, UITheme.TEXT, true, 800)
+	UITheme.style_primary(do_imp, UITheme.SUCCESS)
+	do_imp.pressed.connect(func():
+		var r: Dictionary = CustomFigures.import_code(code_in.text)
+		if bool(r["ok"]):
+			var extra: String = ("  (%d inválidos omitidos)" % int(r["skipped"])) if int(r["skipped"]) > 0 else ""
+			result.text = "✓ Importado: " + ", ".join(r["names"]) + extra + ". Ya aparecen en Colección y Mazos."
+			result.add_theme_color_override("font_color", UITheme.SUCCESS)
+		else:
+			result.text = "✗ " + String(r["error"])
+			result.add_theme_color_override("font_color", UITheme.DANGER))
+	row1.add_child(do_imp)
+	var row2 := HBoxContainer.new()
+	row2.add_theme_constant_override("separation", 8)
+	vb.add_child(row2)
+	var backup := Button.new()
+	backup.text = "⧉ Copiar TODOS (respaldo)"
+	backup.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UITheme.button_font(backup, 14, UITheme.TEXT, false, 700)
+	UITheme.style_surface(backup)
+	backup.pressed.connect(func():
+		if CustomFigures.load_all().is_empty():
+			result.text = "No hay personajes guardados que respaldar."
+			result.add_theme_color_override("font_color", UITheme.GOLD)
+		else:
+			DisplayServer.clipboard_set(CustomFigures.export_all_code())
+			result.text = "✓ Respaldo copiado al portapapeles. Guárdalo (notas, chat) y cuando reinstales pégalo aquí."
+			result.add_theme_color_override("font_color", UITheme.SUCCESS))
+	row2.add_child(backup)
+	var close := Button.new()
+	close.text = "Cerrar"
+	UITheme.button_font(close, 14, UITheme.TEXT, false, 700)
+	UITheme.style_surface(close)
+	close.pressed.connect(func(): modal.queue_free())
+	row2.add_child(close)
 
 ## A simple modal that explains an attack colour/effect or a passive.
 func _show_info(title: String, body: String) -> void:

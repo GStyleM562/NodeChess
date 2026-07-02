@@ -13,6 +13,7 @@ var _attacks_box: VBoxContainer
 var _passives_box: VBoxContainer
 var _evos_box: VBoxContainer
 var _edit_btn: Button
+var _copy_btn: Button
 
 func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
@@ -84,6 +85,16 @@ func _build_ui() -> void:
 	_edit_btn.pressed.connect(_to_edit)
 	_edit_btn.visible = false
 	top.add_child(_edit_btn)
+	# "Copiar código": shareable/backup code for player-created figures. Paste it in
+	# the Creator ("Importar") to restore the figure after a reinstall or on another phone.
+	_copy_btn = Button.new()
+	_copy_btn.text = "⧉ Copiar código (respaldo)"
+	_copy_btn.custom_minimum_size = Vector2(0, 38)
+	UITheme.button_font(_copy_btn, 14, UITheme.TEXT, true, 700)
+	UITheme.style_surface(_copy_btn, UITheme.SURFACE, UITheme.BORDER, 10)
+	_copy_btn.pressed.connect(_copy_code)
+	_copy_btn.visible = false
+	top.add_child(_copy_btn)
 
 	var panel := PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -167,6 +178,9 @@ func _spawn(i: int) -> void:
 	_type_label.text = "Tipo de ataque: " + String(data.get("type", "?")) + warn
 	if _edit_btn != null:
 		_edit_btn.visible = bool(data.get("custom", false))
+	if _copy_btn != null:
+		_copy_btn.visible = bool(data.get("custom", false))
+		_copy_btn.text = "⧉ Copiar código (respaldo)"
 	_build_passives(data)
 	_build_evolutions(data)
 	_build_attacks(data["attack"])
@@ -248,6 +262,14 @@ func _switch(d: int) -> void:
 
 func _to_menu() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+
+## Copy this figure's share/backup code to the clipboard.
+func _copy_code() -> void:
+	var data: Dictionary = Roster.FIGURES[_index]
+	if not bool(data.get("custom", false)):
+		return
+	DisplayServer.clipboard_set(CustomFigures.export_code(data))
+	_copy_btn.text = "✓ Código copiado — pégalo donde quieras"
 
 ## Load this (custom) figure into the Character Creator for editing.
 func _to_edit() -> void:
