@@ -83,7 +83,7 @@ func _test_outcome() -> void:
 	var purple := {"col": "purple", "stars": 2, "fx": "Miedo"}
 	var blue := {"col": "blue"}
 	var red := {"col": "red"}
-	_expect_b("white beats gold -> KO", bool(Combat.outcome(white, gold)["ko"]), true)
+	_expect_b("white 60 beats gold 40 (más daño) -> KO", bool(Combat.outcome(white, gold)["ko"]), true)
 	_expect_b("purple beats white -> NO KO", bool(Combat.outcome(purple, white)["ko"]), false)
 	_expect_b("blue beats white -> NO KO", bool(Combat.outcome(blue, white)["ko"]), false)
 	_expect_b("white beats red -> KO", bool(Combat.outcome(white, red)["ko"]), true)
@@ -99,7 +99,8 @@ func _test_resolver() -> void:
 	var blue := {"col": "blue"}
 	var red := {"col": "red"}
 	_expect("blue beats white", Combat.resolve(blue, white80), 1)
-	_expect("white beats gold", Combat.resolve(white60, gold40), 1)
+	_expect("white 60 beats gold 40 (daño)", Combat.resolve(white60, gold40), 1)
+	_expect("gold 130 beats white 60 (daño)", Combat.resolve({"col": "gold", "pow": 130}, white60), 1)
 	_expect("gold beats purple", Combat.resolve(gold40, purple1), 1)
 	_expect("purple beats white", Combat.resolve(purple1, white80), 1)
 	_expect("red loses to white", Combat.resolve(red, white60), -1)

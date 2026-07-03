@@ -35,8 +35,8 @@ const HIDDEN_PASSIVES := ["venom_aura", "burning_aura", "loaded_dice", "phase", 
 
 # Help text shown by the ⓘ buttons (same order as COL_IDS).
 const COL_DESC := [
-	"Blanco — daño directo. Vence a Oro, pierde con Púrpura. Si gana: K.O.",
-	"Oro — daño/especial. Vence a Púrpura, puede perder con Blanco. Si gana: K.O.",
+	"Blanco — daño directo. Contra Oro gana el de MÁS daño; pierde con Púrpura. Si gana: K.O.",
+	"Oro — daño/especial. Vence a Púrpura; contra Blanco gana el de MÁS daño. Si gana: K.O.",
 	"Púrpura — especial (★1–3). Vence a Blanco, pierde con Oro. Aplica su efecto (no K.O.).",
 	"Azul — bloqueo defensivo. Vence a Blanco/Oro/Púrpura. Nunca noquea.",
 	"Rojo — Fallo. Siempre pierde.",

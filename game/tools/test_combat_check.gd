@@ -9,12 +9,15 @@ func B() -> Dictionary: return {"col": "blue"}
 func R() -> Dictionary: return {"col": "red"}
 
 func _initialize() -> void:
-	print("=== A. COLOUR HIERARCHY (who wins, regardless of damage) ===")
+	print("=== A. COLOUR HIERARCHY (GDD: Blanco vs Oro lo decide el DAÑO) ===")
 	_o("white 200 vs blue 0", W(200), B(), -1)        # blue blocks even huge damage
 	_o("blue vs white 200", B(), W(200), 1)
 	_o("white vs purple", W(99), P(1), -1)            # purple beats white (cycle)
 	_o("purple vs white", P(1), W(99), 1)
-	_o("white vs gold", W(10), G(99), 1)              # white beats gold
+	_o("white 10 vs gold 99", W(10), G(99), -1)       # GDD: entre Blanco y Oro gana el daño
+	_o("white 99 vs gold 10", W(99), G(10), 1)
+	_o("gold 130 vs white 60", G(130), W(60), 1)      # el caso del bug reportado
+	_o("white 60 vs gold 60", W(60), G(60), 0)        # mismo daño = empate
 	_o("gold vs purple", G(10), P(3), 1)              # gold beats purple
 	_o("red vs white", R(), W(10), -1)                # red always loses
 	_o("blue vs blue", B(), B(), 0)

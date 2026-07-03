@@ -20,7 +20,7 @@ and **deploy** from entrances. Player at the **bottom**, enemy at the **top**. Y
 - **Deploy:** press a *"Desplegar …"* button (bottom), then tap a glowing entrance.
 - **Select** a blue figure → green nodes = move (by stamina), red nodes = attack an adjacent enemy.
 - **Attack** → both figures' attack **wheels** spin, land, and the result resolves:
-  Blue > White/Purple/Gold (cycle: White>Gold>Purple>White), Red = miss. Loser → **KO bench**.
+  Blue > White/Purple/Gold; Gold>Purple; Purple>White; **White vs Gold = higher damage wins** (GDD); Red = miss. Loser → **KO bench**.
 - **Win** by entering the enemy goal (gold), or when the enemy can no longer act.
 - **Mouse wheel** = zoom. Node colors: blue = your entrances, red = enemy, green = your goal, gold = enemy goal, orange = buff.
 

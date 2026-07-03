@@ -18,9 +18,10 @@ static func roll(pool: Array) -> Dictionary:
 	return pool[pool.size() - 1]
 
 ## Compare two rolled segments. Returns 1 if A wins, -1 if B wins, 0 tie.
-## Hierarchy: Blue beats White/Purple/Gold; among those a cycle
-## (White>Gold, Gold>Purple, Purple>White); same color compares power/stars;
-## Red always loses.
+## Hierarchy (GDD Parte 1): Blue beats White/Purple/Gold; Gold beats Purple;
+## Purple beats White; **White vs Gold is decided BY DAMAGE** (both are damage
+## colours — the bigger `pow` wins, equal = tie). Same colour compares
+## power/stars; Red always loses.
 static func resolve(a: Dictionary, b: Dictionary) -> int:
 	var ca := String(a.get("col", "red"))
 	var cb := String(b.get("col", "red"))
@@ -40,8 +41,12 @@ static func resolve(a: Dictionary, b: Dictionary) -> int:
 		if ca == "purple":
 			return signi(int(a.get("stars", 0)) - int(b.get("stars", 0)))
 		return signi(int(a.get("pow", 0)) - int(b.get("pow", 0)))
-	var beats := {"white": "gold", "gold": "purple", "purple": "white"}
-	return 1 if beats[ca] == cb else -1
+	# GDD: "White beats Gold (by damage)" — NOT automatically. Both are damage
+	# colours, so the bigger hit lands first; equal damage = tie.
+	if (ca == "white" and cb == "gold") or (ca == "gold" and cb == "white"):
+		return signi(int(a.get("pow", 0)) - int(b.get("pow", 0)))
+	var beats := {"gold": "purple", "purple": "white"}
+	return 1 if beats.get(ca, "") == cb else -1
 
 ## Full combat outcome: who wins AND whether it is a KO.
 ## Winning with White/Gold (damage) -> KO. Winning with Purple -> applies its
@@ -94,11 +99,16 @@ static func label(s: Dictionary) -> String:
 ## Damage/★ only decide SAME colour; otherwise the colour hierarchy decides.
 static func win_reason(a: Dictionary, b: Dictionary) -> String:
 	var r := resolve(a, b)
+	var ca := String(a.get("col", ""))
+	var cb := String(b.get("col", ""))
+	var dmg_duel := (ca == "white" and cb == "gold") or (ca == "gold" and cb == "white")
 	if r == 0:
-		if String(a.get("col", "")) == "blue" and String(b.get("col", "")) == "blue":
+		if ca == "blue" and cb == "blue":
 			return "ambos bloquean"
-		if String(a.get("col", "")) == "red" and String(b.get("col", "")) == "red":
+		if ca == "red" and cb == "red":
 			return "ambos fallan"
+		if dmg_duel or ca == cb:
+			return "mismo daño — empate" if ca != "purple" else "mismas ★ — empate"
 		return "empate"
 	var win: Dictionary = a if r > 0 else b
 	var lose: Dictionary = b if r > 0 else a
@@ -108,7 +118,7 @@ static func win_reason(a: Dictionary, b: Dictionary) -> String:
 		return "el rival falló"
 	if wc == "blue":
 		return "Azul bloquea todo"
-	if wc == lc:
+	if wc == lc or dmg_duel:
 		return "más ★" if wc == "purple" else "más daño"
 	return _cname(wc) + " vence a " + _cname(lc)
 
