@@ -24,9 +24,17 @@ var _cur := ""          # slot sonando ("" = silencio)
 var _threat := ""       # "" | "advantage" | "danger"
 var _in_battle := false
 var _streams := {}      # slot -> AudioStream (o null si la carpeta está vacía)
+var _user_vol := 1.0    # volumen del usuario 0..1 (Settings)
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_ensure_players()
+
+## Perezoso: en tests (--script) los autoloads existen antes de su _ready; cualquier
+## entrada pública debe poder crear los players por sí misma.
+func _ensure_players() -> void:
+	if _a != null:
+		return
 	_a = AudioStreamPlayer.new()
 	_b = AudioStreamPlayer.new()
 	for p in [_a, _b]:
@@ -61,8 +69,20 @@ func stop() -> void:
 	for p in [_a, _b]:
 		create_tween().tween_property(p, "volume_db", -60.0, FADE)
 
+## Volumen del usuario (0..1). Se aplica de inmediato a la pista sonando.
+func set_volume(v: float) -> void:
+	_ensure_players()
+	_user_vol = clampf(v, 0.0, 1.0)
+	var front := _a if _front_is_a else _b
+	if front.playing:
+		front.volume_db = _target_db()
+
+func _target_db() -> float:
+	return -60.0 if _user_vol <= 0.01 else VOL_DB + linear_to_db(_user_vol)
+
 # ---------------------------------------------------------------- interno
 func _switch(slot: String) -> void:
+	_ensure_players()
 	if slot == _cur:
 		return
 	_cur = slot
@@ -76,7 +96,7 @@ func _switch(slot: String) -> void:
 	back.stream = st
 	back.volume_db = -60.0
 	back.play()
-	create_tween().tween_property(back, "volume_db", VOL_DB, FADE)
+	create_tween().tween_property(back, "volume_db", _target_db(), FADE)
 
 ## Primer archivo de audio de la carpeta del slot (cache; null si no hay).
 func _stream(slot: String) -> AudioStream:

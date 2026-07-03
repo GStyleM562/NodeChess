@@ -129,7 +129,10 @@ func _build_topbar(layer: CanvasLayer) -> void:
 	tb.add_child(_chip("🪙", "1,250", UITheme.GOLD))
 	tb.add_child(_chip("💎", "30", Color(0.5, 0.85, 1.0)))
 	tb.add_child(_chip("⚡", "8", UITheme.ENERGY))
-	tb.add_child(_icon_btn("⚙"))
+	var gear := _icon_btn("⚙")
+	gear.pressed.disconnect(_soon)
+	gear.pressed.connect(_toggle_settings)
+	tb.add_child(gear)
 
 func _build_centerpiece(layer: CanvasLayer) -> void:
 	var d: Dictionary = Roster.FIGURES[_lead()]
@@ -264,6 +267,101 @@ func _chip(icon: String, value: String, col: Color) -> Control:
 	h.add_child(_lbl(icon, 15, col, false, 600))
 	h.add_child(_lbl(value, 14, UITheme.TEXT, true, 700))
 	return p
+
+# ---------------------------------------------------------------- settings
+## ATRÁS (Android) en el menú: abre/cierra la Configuración en vez de salir.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		_toggle_settings()
+
+func _toggle_settings() -> void:
+	var old := get_node_or_null("SettingsModal")
+	if old != null:
+		old.queue_free()
+		return
+	_show_settings()
+
+## Panel de Configuración (engranaje ⚙): volúmenes + dónde van los archivos de audio.
+func _show_settings() -> void:
+	var modal := Control.new()
+	modal.name = "SettingsModal"
+	modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	var layer := CanvasLayer.new()
+	layer.layer = 30
+	modal.add_child(layer)
+	add_child(modal)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.62)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed:
+			modal.queue_free())
+	layer.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(cc)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(470, 0)
+	panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.PRIMARY_EDGE, 18, 2, 18))
+	cc.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 12)
+	panel.add_child(vb)
+	var t := _lbl("⚙ Configuración", 20, UITheme.GOLD, true, 800)
+	vb.add_child(t)
+
+	vb.add_child(_volume_row("Música", Settings.music_vol, func(v: float): Settings.set_music(v)))
+	vb.add_child(_volume_row("Sonidos (SFX)", Settings.sfx_vol, func(v: float):
+		Settings.set_sfx(v)
+		Sfx.play("ui_click")))   # feedback inmediato del nuevo volumen
+
+	# Dónde van los archivos de audio (chuleta para no buscar en el README).
+	var hdr := _lbl("¿DÓNDE PONGO LA MÚSICA? (.mp3/.ogg/.wav, 1 por carpeta)", 11, UITheme.MUTED, true, 700)
+	hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	vb.add_child(hdr)
+	var paths := Label.new()
+	paths.text = ("game/assets/audio/music/\n" +
+		"   menu/  ·  battle/  ·  advantage/ (tú por ganar)  ·  danger/ (rival por ganar)\n" +
+		"game/assets/audio/sfx/\n" +
+		"   ui_click/  end_turn/  deploy/  attack_hit/  attack_block/\n" +
+		"   attack_effect/  attack_miss/  ko/  rankup/  victory/  defeat/")
+	paths.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	paths.custom_minimum_size = Vector2(430, 0)
+	UITheme.label(paths, 12, UITheme.TEXT2, false, 600)
+	vb.add_child(paths)
+
+	var close := Button.new()
+	close.text = "Cerrar"
+	close.custom_minimum_size = Vector2(0, 46)
+	UITheme.button_font(close, 15, UITheme.TEXT, true, 700)
+	UITheme.style_primary(close, UITheme.PRIMARY)
+	close.pressed.connect(func(): modal.queue_free())
+	vb.add_child(close)
+
+## Fila de volumen: etiqueta + slider 0–100 + porcentaje en vivo.
+func _volume_row(caption: String, val: float, on_change: Callable) -> Control:
+	var row := VBoxContainer.new()
+	row.add_theme_constant_override("separation", 2)
+	var hb := HBoxContainer.new()
+	row.add_child(hb)
+	var l := _lbl(caption, 14, UITheme.TEXT, true, 700)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_child(l)
+	var pct := _lbl("%d%%" % roundi(val * 100.0), 14, UITheme.GOLD, true, 700)
+	hb.add_child(pct)
+	var s := HSlider.new()
+	s.min_value = 0
+	s.max_value = 100
+	s.step = 5
+	s.value = val * 100.0
+	s.custom_minimum_size = Vector2(0, 34)
+	s.value_changed.connect(func(v: float):
+		pct.text = "%d%%" % int(v)
+		on_change.call(v / 100.0))
+	row.add_child(s)
+	return row
 
 func _icon_btn(icon: String) -> Button:
 	var b := Button.new()
