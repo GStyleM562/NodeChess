@@ -180,6 +180,12 @@ func _build_environment() -> void:
 	sun.light_energy = 1.25
 	sun.shadow_enabled = true
 	add_child(sun)
+	# Fill light frío desde el lado opuesto: separa las figuras del fondo.
+	var fill := DirectionalLight3D.new()
+	fill.rotation_degrees = Vector3(-38.0, 145.0, 0.0)
+	fill.light_color = Color(0.55, 0.68, 1.0)
+	fill.light_energy = 0.35
+	add_child(fill)
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
@@ -187,11 +193,17 @@ func _build_environment() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.55, 0.6, 0.8)
 	env.ambient_light_energy = 0.6
+	# Glow: lo emisivo (aros, caminos, faros de meta, luces de KO) florece suave.
+	env.glow_enabled = true
+	env.glow_intensity = 0.55
+	env.glow_bloom = 0.06
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	we.environment = env
 	add_child(we)
 
 # ---------------------------------------------------------------- board build
 func _build_board() -> void:
+	_build_island()
 	var seen := {}
 	for id in _gs.map.adj:
 		for nb in _gs.map.adj[id]:
@@ -219,24 +231,142 @@ func _build_board() -> void:
 		add_child(mi)
 		_node_mi[n["id"]] = mi
 		_node_mat[n["id"]] = mat
+		_add_node_rim(n)
+	for g in [_gs.map.goal_player, _gs.map.goal_enemy]:
+		if g >= 0:
+			_add_goal_beacon(g)
+	for b in _gs.map.buffs:
+		_add_buff_crystal(b)
 	for e in _gs.map.entrances_player:
 		_entrance_owner[e] = "player"
 	for e in _gs.map.entrances_enemy:
 		_entrance_owner[e] = "enemy"
 
+## Plataforma "isla flotante" bajo el tablero: base clara + sombra profunda.
+func _build_island() -> void:
+	var ext := 0.0
+	for n in _gs.map.nodes:
+		var p: Vector3 = n["pos"]
+		ext = maxf(ext, Vector2(p.x, p.z).length())
+	var top := MeshInstance3D.new()
+	var cy := CylinderMesh.new()
+	cy.top_radius = ext + 1.5
+	cy.bottom_radius = ext + 0.9
+	cy.height = 0.34
+	top.mesh = cy
+	top.position = Vector3(0, -0.19, 0)
+	var mt := StandardMaterial3D.new()
+	mt.albedo_color = Color(0.10, 0.115, 0.19)
+	mt.roughness = 0.92
+	top.material_override = mt
+	add_child(top)
+	var deep := MeshInstance3D.new()
+	var cy2 := CylinderMesh.new()
+	cy2.top_radius = ext + 0.9
+	cy2.bottom_radius = ext + 0.1
+	cy2.height = 0.6
+	deep.mesh = cy2
+	deep.position = Vector3(0, -0.64, 0)
+	var md := StandardMaterial3D.new()
+	md.albedo_color = Color(0.05, 0.055, 0.1)
+	md.roughness = 1.0
+	deep.material_override = md
+	add_child(deep)
+
+## Aro emisivo alrededor de cada nodo (por rol) — decorativo, no participa en los
+## resaltados de _set_highlight (esos siguen sobre el disco).
+func _add_node_rim(n: Dictionary) -> void:
+	var rim := MeshInstance3D.new()
+	var t := TorusMesh.new()
+	t.inner_radius = 0.52
+	t.outer_radius = 0.6
+	rim.mesh = t
+	rim.position = n["pos"] + Vector3(0, 0.055, 0)
+	rim.scale = Vector3(1, 0.35, 1)
+	var mat := StandardMaterial3D.new()
+	var role := String(n["role"])
+	var col: Color = ROLE_COLOR.get(role, ROLE_COLOR["normal"])
+	if role == "normal":
+		mat.albedo_color = Color(0.2, 0.26, 0.42)
+		mat.emission_enabled = true
+		mat.emission = Color(0.25, 0.38, 0.7)
+		mat.emission_energy_multiplier = 0.35
+	elif role == "obstacle":
+		mat.albedo_color = Color(0.09, 0.1, 0.15)
+	else:
+		mat.albedo_color = col.darkened(0.2)
+		mat.emission_enabled = true
+		mat.emission = col
+		mat.emission_energy_multiplier = 1.1
+	rim.material_override = mat
+	add_child(rim)
+
+## Faro vertical suave sobre cada meta: se ve desde toda la mesa a dónde hay que llegar.
+func _add_goal_beacon(id: int) -> void:
+	var beam := MeshInstance3D.new()
+	var cy := CylinderMesh.new()
+	cy.top_radius = 0.3
+	cy.bottom_radius = 0.42
+	cy.height = 3.4
+	beam.mesh = cy
+	beam.position = _gs.map.pos_of(id) + Vector3(0, 1.75, 0)
+	var col: Color = ROLE_COLOR.get(_gs.map.role_of(id), Color(1, 1, 1))
+	var mat := StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(col.r, col.g, col.b, 0.07)
+	mat.emission_enabled = true
+	mat.emission = col
+	mat.emission_energy_multiplier = 0.5
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.no_depth_test = false
+	beam.material_override = mat
+	add_child(beam)
+
+## Cristal flotante girando sobre el buff node ("objeto de poder").
+func _add_buff_crystal(id: int) -> void:
+	var c := MeshInstance3D.new()
+	var pm := PrismMesh.new()
+	pm.size = Vector3(0.34, 0.5, 0.34)
+	c.mesh = pm
+	c.position = _gs.map.pos_of(id) + Vector3(0, 1.05, 0)
+	var col: Color = ROLE_COLOR.get("buff", Color(1.0, 0.6, 0.2))
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = col.darkened(0.15)
+	mat.emission_enabled = true
+	mat.emission = col
+	mat.emission_energy_multiplier = 1.4
+	c.material_override = mat
+	add_child(c)
+	var tw := create_tween().set_loops()
+	tw.tween_property(c, "rotation:y", TAU, 4.0).from(0.0)
+	var bob := create_tween().set_loops()
+	bob.tween_property(c, "position:y", c.position.y + 0.18, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	bob.tween_property(c, "position:y", c.position.y, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+## Camino entre nodos: pasarela oscura ancha + línea de energía al centro.
 func _make_line(a: Vector3, b: Vector3) -> void:
+	var walk := MeshInstance3D.new()
+	var wbox := BoxMesh.new()
+	wbox.size = Vector3(0.26, 0.03, a.distance_to(b) - 0.55)
+	walk.mesh = wbox
+	var wmat := StandardMaterial3D.new()
+	wmat.albedo_color = Color(0.135, 0.155, 0.25)
+	wmat.roughness = 0.85
+	walk.material_override = wmat
+	var mid := (a + b) * 0.5 + Vector3(0, 0.015, 0)
+	walk.look_at_from_position(mid, b + Vector3(0, 0.015, 0), Vector3.UP)
+	add_child(walk)
 	var mi := MeshInstance3D.new()
 	var box := BoxMesh.new()
-	box.size = Vector3(0.05, 0.02, a.distance_to(b))
+	box.size = Vector3(0.05, 0.02, a.distance_to(b) - 0.6)
 	mi.mesh = box
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.35, 0.45, 0.7)
 	mat.emission_enabled = true
 	mat.emission = Color(0.3, 0.45, 0.8)
-	mat.emission_energy_multiplier = 0.3
+	mat.emission_energy_multiplier = 0.6
 	mi.material_override = mat
-	var mid := (a + b) * 0.5 + Vector3(0, 0.02, 0)
-	mi.look_at_from_position(mid, b + Vector3(0, 0.02, 0), Vector3.UP)
+	mi.look_at_from_position(mid + Vector3(0, 0.02, 0), b + Vector3(0, 0.035, 0), Vector3.UP)
 	add_child(mi)
 
 # ---------------------------------------------------------------- figures
@@ -1390,10 +1520,18 @@ func _combat_cutaway(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 		var winner_uid := def_uid if ko == att_uid else att_uid
 		if _vis.has(winner_uid):
 			_vis[winner_uid].play_clip("attack_heavy")
+			_victory_light(_vis[winner_uid].global_position)
 		if _vis.has(ko):
 			_vis[ko].play_clip("ko")
+			_defeat_light(_vis[ko].global_position)
 		await get_tree().create_timer(2.5).timeout      # hold so the KO is appreciated
 	else:
+		# Non-KO but decisive (block / effect): the winner still gets its glow.
+		var rr: int = int(rec.get("result", 0))
+		if rr != 0:
+			var wuid := att_uid if rr > 0 else def_uid
+			if _vis.has(wuid):
+				_victory_light(_vis[wuid].global_position)
 		# Survives: defender blocks (Blue) or flinches, then both return to idle.
 		if _vis.has(def_uid):
 			_vis[def_uid].play_clip("defend" if String(rec.get("win_col", "")) == "blue" else "hit")
@@ -1412,6 +1550,41 @@ func _combat_cutaway(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 		if uid != att_uid and uid != def_uid:
 			_vis[uid].visible = true
 	_cam.current = true
+
+## Victoria: una pequeña luz VERDE envuelve al ganador y su nodo, y se desvanece.
+func _victory_light(pos: Vector3) -> void:
+	var l := OmniLight3D.new()
+	l.light_color = Color(0.3, 1.0, 0.55)
+	l.omni_range = 2.8
+	l.light_energy = 0.0
+	l.position = pos + Vector3(0, 1.2, 0)
+	add_child(l)
+	var tw := create_tween()
+	tw.tween_property(l, "light_energy", 3.2, 0.25)
+	tw.tween_interval(1.3)
+	tw.tween_property(l, "light_energy", 0.0, 0.8)
+	tw.tween_callback(l.queue_free)
+
+## Derrota: un haz desde ARRIBA baña al caído (como fundiéndose), parpadea y se
+## APAGA — la luz que se extingue simula que perdió.
+func _defeat_light(pos: Vector3) -> void:
+	var l := SpotLight3D.new()
+	l.light_color = Color(1.0, 0.84, 0.55)
+	l.spot_range = 6.5
+	l.spot_angle = 16.0
+	l.light_energy = 0.0
+	l.position = pos + Vector3(0, 4.6, 0)
+	l.rotation_degrees.x = -90.0
+	add_child(l)
+	var tw := create_tween()
+	tw.tween_property(l, "light_energy", 6.0, 0.3)
+	tw.tween_interval(0.55)
+	tw.tween_property(l, "light_energy", 1.2, 0.16)   # parpadeo agónico…
+	tw.tween_property(l, "light_energy", 4.2, 0.13)
+	tw.tween_property(l, "light_energy", 0.7, 0.15)
+	tw.tween_property(l, "light_energy", 2.4, 0.12)
+	tw.tween_property(l, "light_energy", 0.0, 0.55)   # …y se apaga: perdió
+	tw.tween_callback(l.queue_free)
 
 # ---------------------------------------------------------------- victory
 func _check_and_show_winner() -> bool:
