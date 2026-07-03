@@ -14,18 +14,22 @@ El giro/flotado (cristal del buff, etc.) lo hago yo por código.
 
 ```
 game/assets/board/
-  node_tile/node_tile.glb            <- loseta de nodo NORMAL (runa apagada)
-  node_goal/node_goal.glb            <- loseta de META (runa brillante)  [opcional]
-  node_entrance/node_entrance.glb    <- loseta de ENTRADA               [opcional]
-  path_stone/path_stone.glb          <- tramo de CAMINO recto (~rectangular, repetible)
-  buff_crystal/buff_crystal.glb      <- cristal del buff node
-  goal_portal/goal_portal.glb        <- portal/arco de meta (yo lo tiño azul/dorado)
-  rock_small/rock_small.glb          <- decoración de borde
+  node_tile/node_tile.glb                  <- loseta de nodo NORMAL (runa apagada)
+  goal_player/goal_player.glb              <- META ALIADA (tu meta, lado de abajo)
+  goal_enemy/goal_enemy.glb                <- META ENEMIGA (lado de arriba)
+  entrance_player/entrance_player.glb      <- ENTRADA ALIADA (donde despliegas tú)
+  entrance_enemy/entrance_enemy.glb        <- ENTRADA ENEMIGA
+  path_stone/path_stone.glb                <- tramo de CAMINO recto (repetible)
+  buff_crystal/buff_crystal.glb            <- cristal del buff node
+  rock_small/rock_small.glb                <- decoración de borde
   rock_big/rock_big.glb
   tree_small/tree_small.glb
-  island_platform/island_platform.glb  <- [opcional] la isla base como asset
-  <slug>/source/                     <- opcional: referencias, .blend, renders
+  island_platform/island_platform.glb      <- [opcional] la isla base como asset
+  <slug>/source/                           <- opcional: referencias, .blend, renders
 ```
+
+> Si un modelo es el MISMO para ambos lados y solo cambia el color, ponlo solo
+> en la carpeta `_player` y yo tiño la versión enemiga por código.
 
 Con `node_tile` + `path_stone` + `buff_crystal` ya puedo armar la primera
 versión con assets; el resto suma. Cuando estén en su carpeta, avísame y los
