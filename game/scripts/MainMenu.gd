@@ -4,9 +4,19 @@ extends Node3D
 ## reward/gift slots, a juicy PLAY button, secondary buttons and a bottom nav.
 ## Style only — scene routes and the 3D model are unchanged.
 
+## Cofres REALES del lobby (los "regalos" del diseño): gratis + 5/10/15 min.
+const CHEST_LOBBY := {
+	"free": {"icon": "🎁", "col": Color(0.35, 0.6, 1.0), "name": "Gratis"},
+	"t5": {"icon": "🧰", "col": Color(0.212, 0.82, 0.498), "name": "Común"},
+	"t10": {"icon": "💎", "col": Color(0.722, 0.451, 1.0), "name": "Épico"},
+	"t15": {"icon": "👑", "col": Color(1.0, 0.773, 0.239), "name": "Legendario"},
+}
+
 var _pivot: Node3D
 var _leader: Figure3D
 var _toast: Label
+var _chest_states := {}   # id -> Label del estado (timer / ¡LISTO!)
+var _chest_tick := 0.0
 
 func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
@@ -17,6 +27,26 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _pivot != null:
 		_pivot.rotate_y(delta * 0.4)
+	_chest_tick += delta
+	if _chest_tick >= 0.5:
+		_chest_tick = 0.0
+		_refresh_chest_states()
+
+func _refresh_chest_states() -> void:
+	for id in _chest_states.keys():
+		var lbl: Label = _chest_states[id]
+		if not is_instance_valid(lbl):
+			continue
+		if id == "free":
+			lbl.text = "¡Gratis!"
+			continue
+		var left: int = Inventory.chest_left(id)
+		if left <= 0:
+			lbl.text = "¡LISTO!"
+			lbl.add_theme_color_override("font_color", UITheme.SUCCESS)
+		else:
+			lbl.text = "%d:%02d" % [left / 60, left % 60]
+			lbl.add_theme_color_override("font_color", UITheme.TEXT2)
 
 # ----------------------------------------------------------------- 3D centerpiece
 func _build_env() -> void:
@@ -159,7 +189,7 @@ func _build_centerpiece(layer: CanvasLayer) -> void:
 	box.add_child(_center(pill))
 
 func _build_gifts(layer: CanvasLayer) -> void:
-	var hdr := _lbl("REGALOS  ·  cartas / cajas / cofres (base)", 11, UITheme.MUTED, true, 700)
+	var hdr := _lbl("COFRES  ·  toca uno para abrirlo", 11, UITheme.MUTED, true, 700)
 	hdr.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	hdr.offset_top = -420
 	hdr.offset_bottom = -402
@@ -171,10 +201,156 @@ func _build_gifts(layer: CanvasLayer) -> void:
 	gifts.alignment = BoxContainer.ALIGNMENT_CENTER
 	gifts.add_theme_constant_override("separation", 10)
 	layer.add_child(gifts)
-	gifts.add_child(_gift_slot("🎁", "¡Listo!", UITheme.SUCCESS, UITheme.R_RARE))
-	gifts.add_child(_gift_slot("🎁", "2h 14m", UITheme.TEXT2, UITheme.R_EPIC))
-	gifts.add_child(_gift_slot("🔒", "Bloqueado", UITheme.MUTED, UITheme.BORDER))
-	gifts.add_child(_gift_slot("➕", "Vacío", UITheme.MUTED, UITheme.BORDER))
+	for id in ["free", "t5", "t10", "t15"]:
+		gifts.add_child(_chest_slot(id))
+	_refresh_chest_states()
+
+## Slot de cofre del lobby: icono + nombre + estado en vivo; toca para abrir.
+func _chest_slot(id: String) -> Control:
+	var st: Dictionary = CHEST_LOBBY[id]
+	var col: Color = st["col"]
+	var p := PanelContainer.new()
+	p.custom_minimum_size = Vector2(108, 92)
+	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE.lerp(col, 0.08), col, 14, 2, 6))
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 2)
+	p.add_child(v)
+	v.add_child(_lbl(String(st["icon"]), 30, col.lightened(0.2), false, 700))
+	v.add_child(_lbl(String(st["name"]), 11, col, true, 700))
+	var state := _lbl("…", 12, UITheme.TEXT2, true, 700)
+	v.add_child(state)
+	_chest_states[id] = state
+	var b := Button.new()
+	b.flat = true
+	b.set_anchors_preset(Control.PRESET_FULL_RECT)
+	b.pressed.connect(_tap_chest.bind(id))
+	p.add_child(b)
+	return p
+
+func _tap_chest(id: String) -> void:
+	if id == "free":
+		var got: Dictionary = Inventory.open_free()
+		var lines: Array = []
+		for key in got:
+			lines.append("%s %s  +%d fragmentos" % [_piece_icon(String(key)), Inventory.piece_name(String(key)), int(got[key])])
+		_open_chest_anim(id, lines)
+		return
+	if not Inventory.chest_ready(id):
+		var left: int = Inventory.chest_left(id)
+		_toast_msg("⏳ %s disponible en %d:%02d" % [String(Inventory.CHESTS[id]["name"]), left / 60, left % 60])
+		return
+	var pieces: Array = Inventory.open_chest(id)
+	var lines2: Array = []
+	for key in pieces:
+		lines2.append("%s %s" % [_piece_icon(String(key)), Inventory.piece_name(String(key))])
+	_open_chest_anim(id, lines2)
+
+func _piece_icon(key: String) -> String:
+	if key.begins_with("model:"): return "🧍"
+	if key.begins_with("rarity:"): return "⭐"
+	if key.begins_with("atype:"): return "🎲"
+	if key.begins_with("color:"): return "🎯"
+	if key.begins_with("fx:"): return "🌀"
+	if key.begins_with("passive:"): return "✨"
+	return "👟"   # stamina
+
+func _toast_msg(text: String) -> void:
+	var box = _toast.get_meta("box") if _toast != null and _toast.has_meta("box") else null
+	if box == null:
+		return
+	_toast.text = text
+	box.visible = true
+	var t := get_tree().create_timer(1.6)
+	t.timeout.connect(func(): if is_instance_valid(box): box.visible = false)
+
+## Animación de apertura: el cofre tiembla, se abre con un destello y las
+## recompensas van saltando una por una.
+func _open_chest_anim(id: String, lines: Array) -> void:
+	var st: Dictionary = CHEST_LOBBY[id]
+	var col: Color = st["col"]
+	Sfx.play("rankup")
+	var layer := CanvasLayer.new()
+	layer.layer = 40
+	add_child(layer)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.0)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	layer.add_child(dim)
+	create_tween().tween_property(dim, "color:a", 0.75, 0.25)
+	# destello radial detrás del cofre
+	var glow := _radial(col, 0.55)
+	glow.set_anchors_preset(Control.PRESET_CENTER)
+	glow.offset_left = -30
+	glow.offset_right = 30
+	glow.offset_top = -230
+	glow.offset_bottom = -170
+	glow.pivot_offset = Vector2(30, 30)
+	glow.scale = Vector2(0.2, 0.2)
+	glow.modulate.a = 0.0
+	layer.add_child(glow)
+	# el cofre
+	var chest := _lbl(String(st["icon"]), 84, col.lightened(0.15), false, 800)
+	chest.set_anchors_preset(Control.PRESET_CENTER)
+	chest.offset_left = -80
+	chest.offset_right = 80
+	chest.offset_top = -270
+	chest.offset_bottom = -130
+	chest.pivot_offset = Vector2(80, 70)
+	layer.add_child(chest)
+	# tiembla…
+	var shake := create_tween()
+	for i in 3:
+		shake.tween_property(chest, "rotation_degrees", 9.0, 0.07)
+		shake.tween_property(chest, "rotation_degrees", -9.0, 0.07)
+	shake.tween_property(chest, "rotation_degrees", 0.0, 0.05)
+	# …se aplasta y ¡POP! (destello florece)
+	shake.tween_property(chest, "scale", Vector2(1.25, 0.72), 0.1)
+	shake.tween_property(chest, "scale", Vector2(1.45, 1.45), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	shake.tween_callback(func():
+		var g := create_tween()
+		g.set_parallel(true)
+		g.tween_property(glow, "scale", Vector2(9, 9), 0.5).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		g.tween_property(glow, "modulate:a", 1.0, 0.12)
+		g.chain().tween_property(glow, "modulate:a", 0.0, 0.6))
+	await shake.finished
+	# recompensas: pastillas que van saltando una por una
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_CENTER)
+	box.offset_left = -170
+	box.offset_right = 170
+	box.offset_top = -95
+	box.add_theme_constant_override("separation", 8)
+	layer.add_child(box)
+	for line in lines:
+		var pill := PanelContainer.new()
+		pill.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, col, 12, 2, 10))
+		var l := _lbl(String(line), 15, UITheme.TEXT, true, 700)
+		pill.add_child(l)
+		pill.pivot_offset = Vector2(170, 24)
+		pill.scale = Vector2(0.05, 0.05)
+		box.add_child(pill)
+		var pt := create_tween()
+		pt.tween_property(pill, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		Sfx.play("ui_click")
+		await get_tree().create_timer(0.16).timeout
+	# recoger
+	var take := Button.new()
+	take.text = "✓ RECOGER"
+	take.custom_minimum_size = Vector2(220, 52)
+	UITheme.button_font(take, 17, Color.WHITE, true, 800)
+	UITheme.style_primary(take, col.darkened(0.25), 14)
+	take.set_anchors_preset(Control.PRESET_CENTER)
+	take.offset_left = -110
+	take.offset_right = 110
+	take.offset_top = 150
+	take.offset_bottom = 202
+	take.modulate.a = 0.0
+	take.pressed.connect(func(): layer.queue_free())
+	layer.add_child(take)
+	create_tween().tween_property(take, "modulate:a", 1.0, 0.3)
+	_refresh_chest_states()
 
 func _build_buttons(layer: CanvasLayer) -> void:
 	var play := _big_button("JUGAR", "Partida rápida")
@@ -197,7 +373,7 @@ func _build_buttons(layer: CanvasLayer) -> void:
 	layer.add_child(row)
 	row.add_child(_menu_button("🃏", "Mazos", func(): get_tree().change_scene_to_file("res://scenes/deck_builder.tscn")))
 	row.add_child(_menu_button("📖", "Colección", func(): get_tree().change_scene_to_file("res://scenes/dex.tscn")))
-	row.add_child(_menu_button("🎁", "Cajas", func(): get_tree().change_scene_to_file("res://scenes/inventory.tscn")))
+	row.add_child(_menu_button("📦", "Inventario", func(): get_tree().change_scene_to_file("res://scenes/inventory.tscn")))
 	row.add_child(_menu_button("🌐", "Online", func(): get_tree().change_scene_to_file("res://scenes/online_lobby.tscn")))
 	row.add_child(_menu_button("🛠", "Crear", func(): get_tree().change_scene_to_file("res://scenes/character_creator.tscn")))
 	row.add_child(_menu_button("🎲", "Probar", func(): get_tree().change_scene_to_file("res://scenes/attack_tester.tscn")))
@@ -438,23 +614,6 @@ func _icon_btn(icon: String) -> Button:
 	UITheme.style_surface(b, UITheme.SURFACE2, UITheme.BORDER, 11)
 	b.pressed.connect(_soon)
 	return b
-
-func _gift_slot(icon: String, state: String, state_col: Color, frame: Color) -> Control:
-	var p := PanelContainer.new()
-	p.custom_minimum_size = Vector2(108, 92)
-	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, frame, 14, 2, 6))
-	var v := VBoxContainer.new()
-	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_theme_constant_override("separation", 4)
-	p.add_child(v)
-	v.add_child(_lbl(icon, 32, frame.lightened(0.2), false, 700))
-	v.add_child(_lbl(state, 12, state_col, true, 700))
-	var b := Button.new()
-	b.flat = true
-	b.set_anchors_preset(Control.PRESET_FULL_RECT)
-	b.pressed.connect(_soon)
-	p.add_child(b)
-	return p
 
 func _big_button(text: String, subtitle: String) -> Button:
 	var b := Button.new()

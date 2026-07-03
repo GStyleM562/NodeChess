@@ -1,20 +1,11 @@
 extends Control
-## Cajas & Inventario. Arriba los COFRES (gratis + 5/10/15 min, cada uno más
-## épico y con mejores piezas); abajo el inventario de piezas con fragmentos y
-## conversión (10 frag = 1 pieza). Admin: botón de regalo ×3 para probar.
-
-const CHEST_STYLE := {
-	"free": {"icon": "🎁", "col": Color(0.35, 0.6, 1.0), "sub": "Fragmentos · GRATIS (siempre)"},
-	"t5": {"icon": "🧰", "col": Color(0.212, 0.82, 0.498), "sub": "2 piezas completas · cada 5 min"},
-	"t10": {"icon": "💎", "col": Color(0.722, 0.451, 1.0), "sub": "3 piezas (mitad premium) · cada 10 min"},
-	"t15": {"icon": "👑", "col": Color(1.0, 0.773, 0.239), "sub": "4 piezas premium + figura · cada 15 min"},
-}
+## Inventario de PIEZAS del Creador: cuántas posees, fragmentos y conversión
+## (10 frag = 1 pieza). Los COFRES viven en el lobby (menú principal).
+## Admin: botón de regalo ×3 para probar.
 
 var _result: Label
 var _mode_lbl: Label
 var _inv_box: VBoxContainer
-var _chest_lbls := {}   # id -> {timer: Label, btn: Button}
-var _tick := 0.0
 
 func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
@@ -45,7 +36,7 @@ func _ready() -> void:
 	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 	top.add_child(back)
 	var title := Label.new()
-	title.text = "Cajas & Inventario"
+	title.text = "Inventario"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	UITheme.label(title, 22, UITheme.GOLD, true, 800)
@@ -55,15 +46,11 @@ func _ready() -> void:
 	UITheme.label(_mode_lbl, 13, UITheme.TEXT2, true, 700)
 	top.add_child(_mode_lbl)
 
-	# --- cofres ---
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	root.add_child(grid)
-	grid.add_child(_chest_card("free"))
-	for id in ["t5", "t10", "t15"]:
-		grid.add_child(_chest_card(id))
+	var chint := Label.new()
+	chint.text = "Los COFRES se abren desde el menú principal; aquí ves tus piezas y conviertes fragmentos."
+	chint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.label(chint, 11, UITheme.MUTED, false, 600)
+	root.add_child(chint)
 
 	_result = Label.new()
 	_result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -99,77 +86,6 @@ func _ready() -> void:
 
 	_refresh_mode()
 	_rebuild_inventory()
-
-func _process(delta: float) -> void:
-	_tick += delta
-	if _tick < 0.5:
-		return
-	_tick = 0.0
-	for id in _chest_lbls.keys():
-		var left: int = Inventory.chest_left(id)
-		var e: Dictionary = _chest_lbls[id]
-		if left <= 0:
-			e["timer"].text = "¡LISTO!"
-			e["btn"].disabled = false
-		else:
-			e["timer"].text = "%d:%02d" % [left / 60, left % 60]
-			e["btn"].disabled = true
-
-# ---------------------------------------------------------------- cofres
-func _chest_card(id: String) -> Control:
-	var st: Dictionary = CHEST_STYLE[id]
-	var col: Color = st["col"]
-	var p := PanelContainer.new()
-	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# más épico = borde más grueso y fondo teñido
-	var bw := 1 if id == "free" else (2 if id == "t5" else 3)
-	p.add_theme_stylebox_override("panel",
-		UITheme.panel(UITheme.SURFACE.lerp(col, 0.08), col, 14, bw, 10))
-	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 4)
-	p.add_child(vb)
-	var name := Label.new()
-	name.text = "%s %s" % [String(st["icon"]), ("Caja Gratis" if id == "free" else String(Inventory.CHESTS[id]["name"]))]
-	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UITheme.label(name, 15, col, true, 800)
-	vb.add_child(name)
-	var sub := Label.new()
-	sub.text = String(st["sub"])
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	UITheme.label(sub, 10, UITheme.TEXT2, false, 600)
-	vb.add_child(sub)
-	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(0, 40)
-	UITheme.button_font(btn, 14, UITheme.TEXT, true, 800)
-	UITheme.style_primary(btn, col.darkened(0.35), 10)
-	vb.add_child(btn)
-	if id == "free":
-		btn.text = "ABRIR"
-		btn.pressed.connect(func():
-			var got: Dictionary = Inventory.open_free()
-			var parts: Array = []
-			for key in got:
-				parts.append("%s +%d frag" % [Inventory.piece_name(key), int(got[key])])
-			_result.text = "🎁 " + " · ".join(parts)
-			_rebuild_inventory())
-	else:
-		var timer := Label.new()
-		timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		UITheme.label(timer, 13, col, true, 800)
-		vb.add_child(timer)
-		btn.text = "RECLAMAR"
-		btn.pressed.connect(func():
-			var got: Array = Inventory.open_chest(id)
-			if got.is_empty():
-				return
-			var names: Array = []
-			for key in got:
-				names.append(Inventory.piece_name(key))
-			_result.text = "%s ¡%s! → %s (timer reiniciado)" % [String(st["icon"]), String(Inventory.CHESTS[id]["name"]), ", ".join(names)]
-			_rebuild_inventory())
-		_chest_lbls[id] = {"timer": timer, "btn": btn}
-	return p
 
 # ---------------------------------------------------------------- inventario
 func _refresh_mode() -> void:
