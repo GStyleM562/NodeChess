@@ -317,6 +317,39 @@ func _show_settings() -> void:
 		Settings.set_sfx(v)
 		Sfx.play("ui_click")))   # feedback inmediato del nuevo volumen
 
+	# --- tablero 3D con assets vs 2D digital (solo visual, no afecta gameplay) ---
+	var bh := _lbl("TABLERO (solo visual)", 11, UITheme.MUTED, true, 700)
+	bh.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	vb.add_child(bh)
+	var brow := HBoxContainer.new()
+	brow.add_theme_constant_override("separation", 8)
+	vb.add_child(brow)
+	var b3d := Button.new()
+	var b2d := Button.new()
+	var bstyle := func():
+		b3d.text = "🗿 3D con assets" + ("  ✓" if Settings.board_view == "3d" else "")
+		b2d.text = "💠 2D digital" + ("  ✓" if Settings.board_view == "2d" else "")
+		if Settings.board_view == "3d":
+			UITheme.style_primary(b3d, UITheme.PRIMARY, 10)
+			UITheme.style_surface(b2d, UITheme.SURFACE2, UITheme.BORDER, 10)
+		else:
+			UITheme.style_surface(b3d, UITheme.SURFACE2, UITheme.BORDER, 10)
+			UITheme.style_primary(b2d, UITheme.PRIMARY, 10)
+	for b in [b3d, b2d]:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.custom_minimum_size = Vector2(0, 42)
+		UITheme.button_font(b, 14, UITheme.TEXT, true, 700)
+		brow.add_child(b)
+	b3d.pressed.connect(func(): Settings.set_board_view("3d"); bstyle.call())
+	b2d.pressed.connect(func(): Settings.set_board_view("2d"); bstyle.call())
+	bstyle.call()
+	var bhint := Label.new()
+	bhint.text = "El 2D digital carga más rápido; se aplica al iniciar la siguiente partida."
+	bhint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bhint.custom_minimum_size = Vector2(430, 0)
+	UITheme.label(bhint, 11, UITheme.TEXT2, false, 600)
+	vb.add_child(bhint)
+
 	# --- vista Admin / Usuario (progresión e inventario) ---
 	var mh := _lbl("VISTA (progresión)", 11, UITheme.MUTED, true, 700)
 	mh.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT

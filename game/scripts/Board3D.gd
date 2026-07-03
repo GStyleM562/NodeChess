@@ -20,6 +20,7 @@ const ROLE_COLOR := {
 const HILITE_MOVE := Color(0.353, 0.627, 1.0)  # #5AA0FF
 const HILITE_ATK := Color(1.0, 0.322, 0.278)
 const HILITE_DEPLOY := Color(0.212, 0.82, 0.498)
+const HILITE_JUMP := Color(1.0, 0.78, 0.25)    # dorado: aterrizaje de SALTO
 ## Loseta Meshy por rol (carpeta en assets/board/). Sin asset -> disco procedural.
 const TILE_SLUG := {
 	"normal": "node_tile", "buff": "node_tile",
@@ -45,7 +46,10 @@ var _name_lbls := {}          # uid -> Label3D (figure name + rank over the figu
 var _node_mi := {}
 var _node_mat := {}
 var _tiled := {}         # nid -> true si tiene loseta Meshy (disco = overlay transparente)
-var _tile_scenes := {}   # slug -> PackedScene cacheada (null si no hay asset)
+## Cache COMPARTIDA entre partidas: los GLB del tablero se cargan una sola vez
+## por sesión (la primera partida 3D paga la carga; las siguientes entran rápido).
+static var _tile_scenes := {}
+var _assets_on := true   # Configuración: "3d" = losetas Meshy · "2d" = digital
 var _last_turn := ""     # para anunciar "¡ES TU TURNO!" solo cuando cambia
 var _highlighted := []
 var _entrance_owner := {}      # entrance node id -> owning team (for the "blocked" siren)
@@ -215,6 +219,7 @@ func _build_environment() -> void:
 
 # ---------------------------------------------------------------- board build
 func _build_board() -> void:
+	_assets_on = Settings.board_view == "3d"
 	_build_island()
 	var seen := {}
 	for id in _gs.map.adj:
@@ -223,8 +228,10 @@ func _build_board() -> void:
 			if seen.has(key):
 				continue
 			seen[key] = true
-			if not _make_path(_gs.map.pos_of(id), _gs.map.pos_of(nb)):
-				_make_line(_gs.map.pos_of(id), _gs.map.pos_of(nb))
+			# 3D: losas de piedra (cuerpo) · SIEMPRE: línea de energía encima —
+			# la línea continua es la que hace LEGIBLE qué camino conecta con qué.
+			_make_path(_gs.map.pos_of(id), _gs.map.pos_of(nb))
+			_make_line(_gs.map.pos_of(id), _gs.map.pos_of(nb))
 	for n in _gs.map.nodes:
 		var role := String(n["role"])
 		var tiled := _place_tile(role, n["pos"])
@@ -255,6 +262,7 @@ func _build_board() -> void:
 		_node_mat[n["id"]] = mat
 		if not tiled:
 			_add_node_rim(n)
+			_add_node_core(n)
 	for g in [_gs.map.goal_player, _gs.map.goal_enemy]:
 		if g >= 0:
 			_add_goal_beacon(g)
@@ -301,6 +309,8 @@ func _scene_aabb(root: Node3D) -> AABB:
 ## Coloca la loseta Meshy del rol bajo el nodo. La cara superior queda en TILE_TOP
 ## (los pies de las figuras están en y=0, así NUNCA se entierran ni se traban).
 func _place_tile(role: String, pos: Vector3) -> bool:
+	if not _assets_on:
+		return false   # tablero 2D digital: discos procedurales
 	var slug := String(TILE_SLUG.get(role, ""))
 	if slug == "":
 		return false
@@ -328,11 +338,13 @@ func _place_tile(role: String, pos: Vector3) -> bool:
 ## Camino de LOSAS de piedra entre dos nodos (tramos repetidos del asset).
 ## Cara superior a +0.02: por debajo de los pies, nada que "atore" el paso.
 func _make_path(a: Vector3, b: Vector3) -> bool:
+	if not _assets_on:
+		return false
 	var ps := _board_scene("path_stone")
 	if ps == null:
 		return false
 	var dist := a.distance_to(b)
-	var clear := dist - 0.95          # las losetas de nodo ya cubren los extremos
+	var clear := dist - 0.55          # las losas LLEGAN al borde de las losetas
 	if clear < 0.25:
 		return true
 	var k := maxi(1, roundi(clear / 0.7))
@@ -443,7 +455,7 @@ func _add_goal_beacon(id: int) -> void:
 ## Con asset Meshy usa la plataforma-cristal; sin asset, el prisma procedural.
 func _add_buff_crystal(id: int) -> void:
 	var c: Node3D
-	var ps := _board_scene("buff_crystal")
+	var ps := _board_scene("buff_crystal") if _assets_on else null
 	if ps != null:
 		c = ps.instantiate() as Node3D
 		add_child(c)
@@ -476,30 +488,62 @@ func _add_buff_crystal(id: int) -> void:
 	bob.tween_property(c, "position:y", c.position.y + 0.16, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	bob.tween_property(c, "position:y", c.position.y, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
-## Camino entre nodos: pasarela oscura ancha + línea de energía al centro.
+## Línea de energía que CONECTA dos nodos (ambos modos: es la lectura del grafo).
+## En 2D digital lleva además una pasarela oscura como cuerpo del camino.
 func _make_line(a: Vector3, b: Vector3) -> void:
-	var walk := MeshInstance3D.new()
-	var wbox := BoxMesh.new()
-	wbox.size = Vector3(0.26, 0.03, a.distance_to(b) - 0.55)
-	walk.mesh = wbox
-	var wmat := StandardMaterial3D.new()
-	wmat.albedo_color = Color(0.135, 0.155, 0.25)
-	wmat.roughness = 0.85
-	walk.material_override = wmat
-	var mid := (a + b) * 0.5 + Vector3(0, 0.015, 0)
-	walk.look_at_from_position(mid, b + Vector3(0, 0.015, 0), Vector3.UP)
-	add_child(walk)
+	var dist := a.distance_to(b)
+	var mid := (a + b) * 0.5
+	if not _assets_on:
+		# cuerpo del camino digital
+		var walk := MeshInstance3D.new()
+		var wbox := BoxMesh.new()
+		wbox.size = Vector3(0.3, 0.03, dist - 0.5)
+		walk.mesh = wbox
+		var wmat := StandardMaterial3D.new()
+		wmat.albedo_color = Color(0.135, 0.155, 0.25)
+		wmat.roughness = 0.85
+		walk.material_override = wmat
+		walk.look_at_from_position(mid + Vector3(0, 0.015, 0), b + Vector3(0, 0.015, 0), Vector3.UP)
+		add_child(walk)
+	# línea de energía: en 3D corre POR ENCIMA de las losas y toca las losetas,
+	# para que se vea sin cortes qué camino es de cuál.
+	var w := 0.07 if _assets_on else 0.1
+	var yl := 0.068 if _assets_on else 0.045
+	var trim := 0.7 if _assets_on else 0.42
 	var mi := MeshInstance3D.new()
 	var box := BoxMesh.new()
-	box.size = Vector3(0.05, 0.02, a.distance_to(b) - 0.6)
+	box.size = Vector3(w, 0.018, dist - trim)
 	mi.mesh = box
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.35, 0.45, 0.7)
+	mat.albedo_color = Color(0.42, 0.55, 0.85)
 	mat.emission_enabled = true
-	mat.emission = Color(0.3, 0.45, 0.8)
-	mat.emission_energy_multiplier = 0.6
+	mat.emission = Color(0.35, 0.52, 0.95)
+	mat.emission_energy_multiplier = 1.0
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mi.material_override = mat
-	mi.look_at_from_position(mid + Vector3(0, 0.02, 0), b + Vector3(0, 0.035, 0), Vector3.UP)
+	mi.look_at_from_position(mid + Vector3(0, yl, 0), b + Vector3(0, yl, 0), Vector3.UP)
+	add_child(mi)
+
+## Núcleo emisivo al centro de cada nodo del tablero 2D digital (look "holo").
+func _add_node_core(n: Dictionary) -> void:
+	var mi := MeshInstance3D.new()
+	var d := CylinderMesh.new()
+	d.top_radius = 0.16
+	d.bottom_radius = 0.16
+	d.height = 0.02
+	mi.mesh = d
+	mi.position = n["pos"] + Vector3(0, 0.095, 0)
+	var role := String(n["role"])
+	var col: Color = ROLE_COLOR.get(role, ROLE_COLOR["normal"])
+	if role == "normal":
+		col = Color(0.35, 0.5, 0.9)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = col
+	mat.emission_enabled = true
+	mat.emission = col
+	mat.emission_energy_multiplier = 1.3 if role != "normal" else 0.55
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mi.material_override = mat
 	add_child(mi)
 
 # ---------------------------------------------------------------- figures
@@ -1036,7 +1080,7 @@ func _update_status() -> void:
 		elif _reach.is_empty():
 			_status.text = "%s no puede moverse: %s" % [fname, _why_stuck(_active_uid)]
 		else:
-			_status.text = "%s — mov restante: %d.  verde=mover · rojo=atacar · o Terminar turno." % [fname, _remaining]
+			_status.text = "%s — mov restante: %d.  azul=mover · DORADO=salto · rojo=atacar." % [fname, _remaining]
 	else:
 		_status.text = "Tu turno — toca una figura, o despliega desde la banca."
 	_refresh_status_labels()
@@ -1184,7 +1228,10 @@ func _refresh_active_highlights() -> void:
 	if _remaining > 0:
 		_reach = _gs.move_targets(_active_uid, _remaining)   # includes jumps over enemies
 		for rid in _reach.keys():
-			_set_highlight(rid, HILITE_MOVE)
+			# Aterrizajes de SALTO en DORADO (la ruta empieza sobre un rival).
+			var jp: Array = _gs.move_path(_active_uid, rid)
+			var is_j: bool = not jp.is_empty() and _gs.board.has(int(jp[0]))
+			_set_highlight(rid, HILITE_JUMP if is_j else HILITE_MOVE)
 			_highlighted.append(rid)
 	if _gs.can_attack(_active_uid) and not _jumped:   # no attack after a jump
 		for foe in _gs.adjacent_enemies(_active_uid):
@@ -1266,6 +1313,7 @@ func _player_move(node: int) -> void:
 	if is_jump:
 		_remaining = 0
 		_jumped = true
+		_show_banner("🦘 ¡SALTO sobre el rival!", HILITE_JUMP)
 	else:
 		_remaining -= cost
 	await _walk_path(_active_uid, path)
@@ -1502,7 +1550,9 @@ func _walk_path(uid: int, nodes: Array) -> void:
 	var i := 0
 	while i < nodes.size():
 		var nid := int(nodes[i])
-		var blocked: bool = _gs.board.has(nid) and int(_gs.board[nid]) != uid
+		# Bloqueado si el estado O la VISTA tienen una figura ahí: aunque el estado
+		# se desincronizara, jamás se debe ATRAVESAR una figura visible (se salta).
+		var blocked: bool = (_gs.board.has(nid) and int(_gs.board[nid]) != uid) or _vis_occupied(nid, uid)
 		if blocked and not phasing and i + 1 < nodes.size():
 			# JUMP: leap OVER the occupant to the node beyond it (announce it).
 			if not announced:
@@ -1523,6 +1573,14 @@ func _walk_path(uid: int, nodes: Array) -> void:
 			await tw.finished
 			i += 1
 	fig.play_clip("idle")
+
+## ¿Hay alguna OTRA figura parada visualmente en este nodo? (respaldo del estado)
+func _vis_occupied(nid: int, ignore_uid: int) -> bool:
+	var p := _gs.map.pos_of(nid)
+	for ouid in _vis.keys():
+		if ouid != ignore_uid and is_instance_valid(_vis[ouid]) and _vis[ouid].position.distance_to(p) < 0.3:
+			return true
+	return false
 
 ## A parabolic leap from the figure's current position, arcing up and OVER the
 ## figure standing at `over_pos`, landing at `land_pos`. Reads clearly as "jumped

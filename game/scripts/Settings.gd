@@ -6,6 +6,7 @@ const PATH := "user://settings.json"
 
 var music_vol := 0.8
 var sfx_vol := 0.8
+var board_view := "3d"   # "3d" = losetas Meshy · "2d" = tablero digital (solo visual)
 
 func _ready() -> void:
 	_load()
@@ -19,6 +20,10 @@ func set_music(v: float) -> void:
 func set_sfx(v: float) -> void:
 	sfx_vol = clampf(v, 0.0, 1.0)
 	_apply()
+	_save()
+
+func set_board_view(v: String) -> void:
+	board_view = "2d" if v == "2d" else "3d"
 	_save()
 
 func _apply() -> void:
@@ -36,9 +41,10 @@ func _load() -> void:
 	if data is Dictionary:
 		music_vol = clampf(float(data.get("music", music_vol)), 0.0, 1.0)
 		sfx_vol = clampf(float(data.get("sfx", sfx_vol)), 0.0, 1.0)
+		board_view = "2d" if String(data.get("board", "3d")) == "2d" else "3d"
 
 func _save() -> void:
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
 	if f != null:
-		f.store_string(JSON.stringify({"music": music_vol, "sfx": sfx_vol}))
+		f.store_string(JSON.stringify({"music": music_vol, "sfx": sfx_vol, "board": board_view}))
 		f.close()
