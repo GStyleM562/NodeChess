@@ -24,6 +24,7 @@ NetSession="*res://scripts/NetSession.gd"
 Music="*res://scripts/Music.gd"
 Sfx="*res://scripts/Sfx.gd"
 Settings="*res://scripts/Settings.gd"
+Inventory="*res://scripts/Inventory.gd"
 
 [display]
 

@@ -100,7 +100,7 @@ func _ready() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.offset_top = 60
-	scroll.offset_bottom = -70
+	scroll.offset_bottom = -96
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	add_child(scroll)
 	_scroll = scroll
@@ -108,13 +108,13 @@ func _ready() -> void:
 	var pad := MarginContainer.new()
 	pad.add_theme_constant_override("margin_left", 14)
 	pad.add_theme_constant_override("margin_right", 14)
-	pad.add_theme_constant_override("margin_top", 8)
-	pad.add_theme_constant_override("margin_bottom", 8)
+	pad.add_theme_constant_override("margin_top", 10)
+	pad.add_theme_constant_override("margin_bottom", 28)
 	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(pad)
 	var form := VBoxContainer.new()
 	form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	form.add_theme_constant_override("separation", 12)
+	form.add_theme_constant_override("separation", 18)
 	pad.add_child(form)
 
 	_build_identity(form)
@@ -165,7 +165,7 @@ func _build_topbar() -> void:
 func _build_footer() -> void:
 	var bar := PanelContainer.new()
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	bar.offset_top = -66
+	bar.offset_top = -92     # más alto: los avisos GDD/🔒 caben sin encimarse
 	bar.add_theme_stylebox_override("panel", UITheme.panel(UITheme.BG, UITheme.BORDER, 0, 1, 8))
 	add_child(bar)
 	var vb := VBoxContainer.new()
@@ -189,11 +189,11 @@ func _build_footer() -> void:
 # ---------------------------------------------------------------- sections
 func _section(parent: VBoxContainer, title: String) -> VBoxContainer:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.BORDER, 16, 1, 12))
+	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.BORDER, 16, 1, 14))
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(p)
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 8)
+	vb.add_theme_constant_override("separation", 10)
 	p.add_child(vb)
 	var t := Label.new()
 	t.text = title
@@ -227,6 +227,10 @@ func _build_identity(form: VBoxContainer) -> void:
 	_field(s, "Clase", _class)
 	_rarity = _opt(RARITY_ES)
 	_rarity.select(2)   # Épica by default
+	var rkeys: Array = []
+	for r in RARITIES:
+		rkeys.append("rarity:" + String(r))
+	_lock_items(_rarity, rkeys)
 	_field(s, "Rareza", _rarity)
 
 func _build_combat(form: VBoxContainer) -> void:
@@ -238,6 +242,10 @@ func _build_combat(form: VBoxContainer) -> void:
 	_type = _opt(TYPES)
 	_type.select(0)
 	_type.item_selected.connect(func(_i): _revalidate())
+	var tkeys: Array = []
+	for t in TYPES:
+		tkeys.append("atype:" + String(t))
+	_lock_items(_type, tkeys)
 	_field(s, "Tipo ataque", _type)
 	# placeholder model (borrow an existing figure until a real GLB is added)
 	_model_ids = []
@@ -247,6 +255,10 @@ func _build_combat(form: VBoxContainer) -> void:
 			_model_ids.append(String(f.get("id", "")))
 			names.append(String(f.get("name", "?")))
 	_model = _opt(names)
+	var mkeys: Array = []
+	for mid in _model_ids:
+		mkeys.append("model:" + String(mid))
+	_lock_items(_model, mkeys)
 	_field(s, "Modelo (placeholder)", _model)
 	# --- evolution ---
 	_evolve = CheckBox.new()
@@ -308,6 +320,9 @@ func _build_passives(form: VBoxContainer) -> void:
 		tg.tooltip_text = pdesc
 		_style_toggle(tg)
 		tg.toggled.connect(func(_p): _revalidate())
+		if not _inv().is_admin() and not _inv().has_piece("passive:" + String(pid)):
+			tg.disabled = true
+			tg.text = "🔒 " + pname
 		item.add_child(tg)
 		item.add_child(_info_btn(func(): _show_info(pname, pdesc)))
 		grid.add_child(item)
@@ -341,10 +356,10 @@ func _build_pool(form: VBoxContainer) -> void:
 # ---------------------------------------------------------------- pool rows
 func _add_row(seg: Dictionary) -> void:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE2, UITheme.BORDER, 12, 1, 8))
+	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE2, UITheme.BORDER, 12, 1, 10))
 	_rows_box.add_child(p)
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 4)
+	vb.add_theme_constant_override("separation", 7)
 	p.add_child(vb)
 
 	var line1 := HBoxContainer.new()
@@ -354,6 +369,10 @@ func _add_row(seg: Dictionary) -> void:
 	col.select(COL_IDS.find(String(seg.get("col", "white"))))
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.item_selected.connect(func(_i): _revalidate())
+	var ckeys: Array = []
+	for cid in COL_IDS:
+		ckeys.append("color:" + String(cid))
+	_lock_items(col, ckeys)
 	line1.add_child(col)
 	var nm := LineEdit.new()
 	nm.placeholder_text = "Nombre ataque"
@@ -369,6 +388,11 @@ func _add_row(seg: Dictionary) -> void:
 	var fx := _opt(_fx_labels())
 	fx.select(_fx_index(seg))
 	fx.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var fkeys: Array = []
+	for o in FX_OPTS:
+		var f := String(o.get("fx", ""))
+		fkeys.append(("fx:" + f) if f != "" else "")   # "Ninguno" siempre permitido
+	_lock_items(fx, fkeys)
 	var prob := _spin(0, 100, 5, int(seg.get("w", 10)), "%")
 	prob.get_line_edit().add_theme_color_override("font_color", UITheme.GOLD)
 	prob.value_changed.connect(func(_v): _revalidate())
@@ -475,9 +499,14 @@ func _rebuild_phases(n: int) -> void:
 		_phase_holder.remove_child(c)
 		c.queue_free()
 	_phase_opts.clear()
+	var ekeys: Array = []
+	for eid in _evo_fig_ids:
+		# custom = sin pieza (permitida); integrada = requiere su pieza de figura
+		ekeys.append(("model:" + String(eid)) if _inv()._is_builtin(String(eid)) else "")
 	for i in n:
 		var opt := _opt(_evo_names)
 		opt.item_selected.connect(func(_i): _revalidate())
+		_lock_items(opt, ekeys)
 		_field(_phase_holder, "Fase %d →" % (i + 1), opt)
 		_phase_opts.append(opt)
 	_revalidate()
@@ -615,16 +644,25 @@ func _revalidate() -> void:
 		msgs.append("✗ " + String(e))
 	for w in r["warnings"]:
 		msgs.append("⚠ " + String(w))
+	# MODO USUARIO: solo puede guardar con piezas de su inventario (regla dura).
+	var missing: Array = _inv().missing_pieces(fig)
+	if not missing.is_empty():
+		var names: Array = []
+		for key in missing:
+			names.append(_inv().piece_name(String(key)))
+		msgs.push_front("🔒 Te falta: " + ", ".join(names) + " — consíguelo en 🎁 Cajas")
 	var head: String = {"VALID": "✓ Válido", "WARNING": "⚠ Válido con avisos", "INVALID": "✗ Inválido"}[state]
+	if not missing.is_empty():
+		head = "🔒 Piezas faltantes"
 	_status_lbl.text = head + ("  ·  " + "  ·  ".join(msgs) if not msgs.is_empty() else "")
 	_status_lbl.add_theme_color_override("font_color",
-		UITheme.SUCCESS if state == "VALID" else (UITheme.GOLD if state == "WARNING" else UITheme.DANGER))
-	_save_btn.disabled = state == "INVALID"
+		UITheme.DANGER if (state == "INVALID" or not missing.is_empty()) else (UITheme.SUCCESS if state == "VALID" else UITheme.GOLD))
+	_save_btn.disabled = state == "INVALID" or not missing.is_empty()
 
 func _on_save() -> void:
 	var fig: Dictionary = build_figure()
 	var r: Dictionary = FigureValidator.validate(fig)
-	if String(r["state"]) == "INVALID":
+	if String(r["state"]) == "INVALID" or not _inv().missing_pieces(fig).is_empty():
 		_revalidate()
 		return
 	if _editing_id != "":
@@ -681,6 +719,23 @@ func _show_saved(figname: String) -> void:
 	again.pressed.connect(func(): ov.queue_free())
 	hb.add_child(again)
 
+# ---------------------------------------------------------------- inventario
+## Autoload Inventory resuelto por nodo: Inventory.gd usa las constantes de esta
+## clase, así que nombrarlo aquí como identificador crearía un ciclo de compilación.
+func _inv() -> Node:
+	return get_node("/root/Inventory")
+
+## 🔒 modo usuario: deshabilita las opciones cuya pieza no está en el inventario
+## (keys[i] = pieza de la opción i; "" = siempre permitida).
+func _lock_items(opt: OptionButton, keys: Array) -> void:
+	if _inv().is_admin():
+		return
+	for i in mini(opt.item_count, keys.size()):
+		var key := String(keys[i])
+		if key != "" and not _inv().has_piece(key):
+			opt.set_item_disabled(i, true)
+			opt.set_item_text(i, "🔒 " + opt.get_item_text(i))
+
 # ---------------------------------------------------------------- widgets
 func _opt(items: Array) -> OptionButton:
 	var o := OptionButton.new()
@@ -726,10 +781,14 @@ func _fx_desc(label: String) -> String:
 # ---------------------------------------------------------------- scroll / info
 ## Touch: dragging ANYWHERE pans the form. The input controls (dropdowns, spinboxes,
 ## text fields) would otherwise swallow the drag, leaving only the black gaps usable.
+## Solo secuestra arrastres VERTICALES dominantes: los gestos horizontales (sliders,
+## spinboxes) siguen llegando a sus controles y el scroll ya no "pelea" con ellos.
 func _input(event: InputEvent) -> void:
 	if _scroll != null and event is InputEventScreenDrag:
-		_scroll.scroll_vertical -= int(event.relative.y)
-		get_viewport().set_input_as_handled()
+		var d := (event as InputEventScreenDrag).relative
+		if absf(d.y) > absf(d.x):
+			_scroll.scroll_vertical -= int(d.y)
+			get_viewport().set_input_as_handled()
 
 ## Fatter, clearly-coloured vertical scrollbar so it is easy to grab on a phone.
 func _setup_scroll(scroll: ScrollContainer) -> void:

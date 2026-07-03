@@ -28,43 +28,50 @@ func _ready() -> void:
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.offset_left = 14
 	root.offset_right = -14
-	root.offset_top = 16
+	root.offset_top = 14
 	root.offset_bottom = -14
-	root.add_theme_constant_override("separation", 8)
+	root.add_theme_constant_override("separation", 10)
 	add_child(root)
 
+	# título + contador en una sola línea (más aire para la lista)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 10)
+	root.add_child(head)
 	var title := Label.new()
 	title.text = "Arma tu equipo"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UITheme.label(title, 30, UITheme.TEXT, true, 800)
-	root.add_child(title)
-
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UITheme.label(title, 26, UITheme.TEXT, true, 800)
+	head.add_child(title)
 	_counter = Label.new()
-	_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UITheme.label(_counter, 18, UITheme.SUCCESS, true, 700)
-	root.add_child(_counter)
+	_counter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	UITheme.label(_counter, 18, UITheme.SUCCESS, true, 800)
+	head.add_child(_counter)
+	var hint := Label.new()
+	hint.text = "Todo se guarda solo: equipo, modificadores y mapa."
+	UITheme.label(hint, 11, UITheme.MUTED, false, 600)
+	root.add_child(hint)
 
-	var map_hdr := _hdr("MAPA")
-	root.add_child(map_hdr)
+	var sec_top := _panel_section(root)
+	sec_top.add_child(_hdr("MAPA"))
 	_map_box = HBoxContainer.new()
 	_map_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	_map_box.add_theme_constant_override("separation", 8)
-	root.add_child(_map_box)
+	sec_top.add_child(_map_box)
 	_build_maps()
-
-	root.add_child(_hdr("MODIFICADORES  ·  elige hasta 3"))
+	sec_top.add_child(_hdr("MODIFICADORES  ·  elige hasta 3"))
 	_modsel_box = GridContainer.new()
 	_modsel_box.columns = 2
 	_modsel_box.add_theme_constant_override("h_separation", 8)
 	_modsel_box.add_theme_constant_override("v_separation", 6)
-	root.add_child(_modsel_box)
+	sec_top.add_child(_modsel_box)
 	_build_modsel()
 
-	root.add_child(_hdr("TU EQUIPO  ·  toca para quitar"))
+	var sec_team := _panel_section(root)
+	sec_team.add_child(_hdr("TU EQUIPO  ·  toca una carta para quitarla"))
 	_team_box = HBoxContainer.new()
 	_team_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	_team_box.add_theme_constant_override("separation", 6)
-	root.add_child(_team_box)
+	sec_team.add_child(_team_box)
 
 	root.add_child(_hdr("DISPONIBLES  ·  toca para añadir"))
 	var scroll := ScrollContainer.new()
@@ -73,7 +80,7 @@ func _ready() -> void:
 	root.add_child(scroll)
 	_avail_box = VBoxContainer.new()
 	_avail_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_avail_box.add_theme_constant_override("separation", 6)
+	_avail_box.add_theme_constant_override("separation", 7)
 	scroll.add_child(_avail_box)
 	_build_available()
 
@@ -101,8 +108,19 @@ func _ready() -> void:
 func _hdr(text: String) -> Label:
 	var l := Label.new()
 	l.text = text
-	UITheme.label(l, 14, UITheme.MUTED, true, 700)
+	UITheme.label(l, 12, UITheme.PRIMARY_EDGE, true, 700)
 	return l
+
+## Panel contenedor de sección (agrupa visualmente en lugar de flotar todo).
+func _panel_section(parent: VBoxContainer) -> VBoxContainer:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.BORDER, 14, 1, 10))
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(p)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 8)
+	p.add_child(vb)
+	return vb
 
 func _build_maps() -> void:
 	for c in _map_box.get_children():
@@ -143,7 +161,9 @@ func _build_modsel() -> void:
 		b.button_pressed = mid in _mods
 		b.text = "%s   ⚡%d" % [String(m["name"]), int(m["cost"])]
 		b.tooltip_text = String(m["desc"])
-		b.custom_minimum_size = Vector2(244, 46)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.custom_minimum_size = Vector2(0, 46)
+		b.clip_text = true
 		UITheme.button_font(b, 15, UITheme.TEXT, true, 700)
 		if mid in _mods:
 			UITheme.style_primary(b, UITheme.ORANGE, 12)
@@ -164,10 +184,13 @@ func _build_available() -> void:
 	for ri in Roster.FIGURES.size():
 		var d: Dictionary = Roster.FIGURES[ri]
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(0, 52)
-		UITheme.button_font(b, 18, UITheme.TEXT, false, 600)
+		b.custom_minimum_size = Vector2(0, 54)
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.clip_text = true
+		UITheme.button_font(b, 17, UITheme.TEXT, false, 600)
 		UITheme.style_surface(b, UITheme.SURFACE, FigureCard.rarity_color(d), 12)
-		b.text = "%s   ·   %s   ·   ⚡%d" % [d["name"], String(d.get("type", "?")), int(d.get("stamina", 1))]
+		var custom_tag := "  · tuya ✎" if bool(d.get("custom", false)) else ""
+		b.text = "  %s   ·   %s   ·   ⚡%d%s" % [d["name"], String(d.get("type", "?")), int(d.get("stamina", 1)), custom_tag]
 		b.pressed.connect(_add.bind(ri))
 		_avail_box.add_child(b)
 
@@ -183,7 +206,9 @@ func _remove(slot: int) -> void:
 		_refresh()
 
 func _refresh() -> void:
-	_counter.text = "%d / %d figuras" % [_team.size(), Loadout.DECK_SIZE]
+	_counter.text = "%d/%d" % [_team.size(), Loadout.DECK_SIZE]
+	_counter.add_theme_color_override("font_color",
+		UITheme.SUCCESS if Loadout.valid(_team) else UITheme.GOLD)
 	for c in _team_box.get_children():
 		c.queue_free()
 	for slot in Loadout.DECK_SIZE:

@@ -197,9 +197,10 @@ func _build_buttons(layer: CanvasLayer) -> void:
 	layer.add_child(row)
 	row.add_child(_menu_button("🃏", "Mazos", func(): get_tree().change_scene_to_file("res://scenes/deck_builder.tscn")))
 	row.add_child(_menu_button("📖", "Colección", func(): get_tree().change_scene_to_file("res://scenes/dex.tscn")))
-	row.add_child(_menu_button("🎲", "Probar", func(): get_tree().change_scene_to_file("res://scenes/attack_tester.tscn")))
+	row.add_child(_menu_button("🎁", "Cajas", func(): get_tree().change_scene_to_file("res://scenes/inventory.tscn")))
 	row.add_child(_menu_button("🌐", "Online", func(): get_tree().change_scene_to_file("res://scenes/online_lobby.tscn")))
 	row.add_child(_menu_button("🛠", "Crear", func(): get_tree().change_scene_to_file("res://scenes/character_creator.tscn")))
+	row.add_child(_menu_button("🎲", "Probar", func(): get_tree().change_scene_to_file("res://scenes/attack_tester.tscn")))
 
 func _build_nav(layer: CanvasLayer) -> void:
 	var nav := PanelContainer.new()
@@ -315,6 +316,39 @@ func _show_settings() -> void:
 	vb.add_child(_volume_row("Sonidos (SFX)", Settings.sfx_vol, func(v: float):
 		Settings.set_sfx(v)
 		Sfx.play("ui_click")))   # feedback inmediato del nuevo volumen
+
+	# --- vista Admin / Usuario (progresión e inventario) ---
+	var mh := _lbl("VISTA (progresión)", 11, UITheme.MUTED, true, 700)
+	mh.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	vb.add_child(mh)
+	var mrow := HBoxContainer.new()
+	mrow.add_theme_constant_override("separation", 8)
+	vb.add_child(mrow)
+	var madmin := Button.new()
+	var muser := Button.new()
+	var restyle := func():
+		madmin.text = ("👑 Admin" + ("  ✓" if Inventory.is_admin() else ""))
+		muser.text = ("👤 Usuario" + ("" if Inventory.is_admin() else "  ✓"))
+		if Inventory.is_admin():
+			UITheme.style_primary(madmin, UITheme.GOLD.darkened(0.25), 10)
+			UITheme.style_surface(muser, UITheme.SURFACE2, UITheme.BORDER, 10)
+		else:
+			UITheme.style_surface(madmin, UITheme.SURFACE2, UITheme.BORDER, 10)
+			UITheme.style_primary(muser, UITheme.PRIMARY, 10)
+	for b in [madmin, muser]:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.custom_minimum_size = Vector2(0, 42)
+		UITheme.button_font(b, 14, UITheme.TEXT, true, 700)
+		mrow.add_child(b)
+	madmin.pressed.connect(func(): Inventory.set_mode("admin"); restyle.call())
+	muser.pressed.connect(func(): Inventory.set_mode("user"); restyle.call())
+	restyle.call()
+	var mhint := Label.new()
+	mhint.text = "Admin: todo desbloqueado e ilimitado. Usuario: solo puedes usar en el Creador las piezas de tu inventario (consíguelas en 🎁 Cajas)."
+	mhint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	mhint.custom_minimum_size = Vector2(430, 0)
+	UITheme.label(mhint, 11, UITheme.TEXT2, false, 600)
+	vb.add_child(mhint)
 
 	# Dónde van los archivos de audio (chuleta para no buscar en el README).
 	var hdr := _lbl("¿DÓNDE PONGO LA MÚSICA? (.mp3/.ogg/.wav, 1 por carpeta)", 11, UITheme.MUTED, true, 700)
