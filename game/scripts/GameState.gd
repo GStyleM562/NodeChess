@@ -660,29 +660,98 @@ func activate_modifier(team: String, mod_id: String) -> bool:
 ## 0 = random/easy, 1 = medium (no surround setups), 2 = hard (default).
 var bot_difficulty := 2
 
+## CPU por lista de prioridades (ver docs/AI_CPU.md). 0 = fácil (legacy);
+## 1+ = lista completa; 2 = además gasta modificadores en ataques ganadores.
 func bot_action(team: String) -> Dictionary:
 	if bot_difficulty <= 0:
 		return _bot_easy(team)
-	var my := units_on_board(team)
 	var target_goal: int = map.goal_player if team == "enemy" else map.goal_enemy
 	var own_goal: int = map.goal_enemy if team == "enemy" else map.goal_player
-	var opp := _enemy_team(team)
-	var md := maxf(1.0, _dist(map.goal_player, map.goal_enemy))
 
-	# 1) WIN NOW — step onto the target goal if reachable.
-	for uid in my:
+	var act := _bot_win_now(team, target_goal)          # 1) ganar YA
+	if act.is_empty():
+		act = _bot_guard_goal(team, own_goal)           # 2) PORTERO en mi meta
+	if act.is_empty():
+		act = _bot_surround(team, own_goal)             # 3) cerrar un CERCO (falta 1)
+	if act.is_empty():
+		act = _bot_attack(team, target_goal, own_goal)  # 4) ataque ÚTIL (gana espacio)
+	if act.is_empty():
+		act = _bot_deploy(team, target_goal)            # 5) desplegar TODO (banca vacía)
+	if act.is_empty():
+		act = _bot_buff(team, own_goal)                 # 6) tomar el buff node
+	if act.is_empty():
+		act = _bot_advance(team, target_goal, own_goal) # 7) avanzar ESQUIVANDO rivales
+	return act if not act.is_empty() else {"type": "pass"}
+
+# 1) Pisar la meta rival si está al alcance = victoria inmediata.
+func _bot_win_now(team: String, target_goal: int) -> Dictionary:
+	for uid in units_on_board(team):
+		if can_move(uid) and reachable_for(uid).has(target_goal):
+			var p := _bot_path(uid, target_goal)
+			move_unit(uid, target_goal)
+			return {"type": "move", "uid": uid, "node": target_goal, "path": p}
+	return {}
+
+# 2) PORTERO: mantener SIEMPRE una figura sentada en la propia meta (un nodo
+# ocupado no puede ser pisado -> el rival no puede ganar por ahí).
+func _bot_guard_goal(team: String, own_goal: int) -> Dictionary:
+	if _node_occupant(own_goal) != -1:
+		return {}                    # ya hay portero (o el rival ya ganó)
+	# ¿alguien puede SENTARSE ya mismo? (el de camino más barato)
+	var best_uid := -1
+	var best_cost := INF
+	for uid in units_on_board(team):
 		if can_move(uid):
 			var reach := reachable_for(uid)
-			if reach.has(target_goal):
-				var p := _bot_path(uid, target_goal)
-				move_unit(uid, target_goal)
-				return {"type": "move", "uid": uid, "node": target_goal, "path": p}
+			if reach.has(own_goal) and float(reach[own_goal]) < best_cost:
+				best_cost = float(reach[own_goal])
+				best_uid = uid
+	if best_uid != -1:
+		var p := _bot_path(best_uid, own_goal)
+		move_unit(best_uid, own_goal)
+		return {"type": "move", "uid": best_uid, "node": own_goal, "path": p}
+	# nadie llega: sembrar guardia desde la banca por la entrada más cercana a MI meta
+	if can_deploy(team):
+		var fe := free_entrances(team)
+		var node: int = fe[0]
+		var bd := INF
+		for n in fe:
+			var dd := _dist(n, own_goal)
+			if dd < bd:
+				bd = dd
+				node = n
+		var uid := _best_bench(team)
+		deploy(uid, node)
+		return {"type": "deploy", "uid": uid, "node": node}
+	return {}
 
-	# 2) BEST ATTACK — by real win/KO probability, weighted by enemy threat.
+# 3) CERCO: si a un rival le falta EXACTAMENTE un nodo para quedar rodeado,
+# ocupar ese último hueco (KO por rodeo al final del turno).
+func _bot_surround(team: String, own_goal: int) -> Dictionary:
+	var opp := _enemy_team(team)
+	for uid in units_on_board(team):
+		if not can_move(uid) or int(units[uid]["node"]) == own_goal:
+			continue                                       # el portero no abandona
+		for nid in reachable_for(uid).keys():
+			if _all_neighbours_held(nid, opp):
+				continue                                   # no meterse a un cerco rival
+			for nb in map.adj[nid]:
+				var occ := _node_occupant(nb)
+				if occ != -1 and units[occ]["team"] == opp and units[occ]["alive"]:
+					if _all_neighbours_held(units[occ]["node"], team, nid):
+						var p := _bot_path(uid, nid)
+						move_unit(uid, nid)
+						return {"type": "move", "uid": uid, "node": nid, "path": p}
+	return {}
+
+# 4) ATAQUE ÚTIL: probabilidad real de ganar/KO + amenaza a MI meta + GANAR
+# ESPACIO (bono si el rival está delante de mí, estorbando el camino a su meta).
+func _bot_attack(team: String, target_goal: int, own_goal: int) -> Dictionary:
+	var md := maxf(1.0, _dist(map.goal_player, map.goal_enemy))
 	var atk_uid := -1
 	var atk_foe := -1
 	var best := -INF
-	for uid in my:
+	for uid in units_on_board(team):
 		if not can_attack(uid):
 			continue
 		var mine := _pool_of(uid)
@@ -690,85 +759,85 @@ func bot_action(team: String) -> Dictionary:
 			var wp := _win_prob(mine, _pool_of(foe))
 			var kp := _ko_prob(mine, _pool_of(foe))
 			var threat := 1.0 - clampf(_dist(units[foe]["node"], own_goal) / md, 0.0, 1.0)
-			var score := wp * 0.7 + kp * 0.6 + threat * 0.5
-			if (wp >= 0.45 or threat > 0.7) and score > best:
+			var space := 0.35 if _dist(units[foe]["node"], target_goal) < _dist(units[uid]["node"], target_goal) else 0.0
+			var score := wp * 0.7 + kp * 0.6 + threat * 0.5 + space
+			if (wp >= 0.42 or threat > 0.7) and score > best:
 				best = score
 				atk_uid = uid
 				atk_foe = foe
-	if atk_uid != -1:
-		var used_mod := ""
-		if bot_difficulty >= 2 and best >= 0.6 and can_use_modifier(team, "power_surge"):
-			if activate_modifier(team, "power_surge"):  # spend energy to press an edge
-				used_mod = "power_surge"
-		var rec := attack(atk_uid, atk_foe)
-		rec["type"] = "attack"
-		rec["modifier"] = used_mod
-		return rec
+	if atk_uid == -1:
+		return {}
+	var used_mod := ""
+	if bot_difficulty >= 2 and best >= 0.6 and can_use_modifier(team, "power_surge"):
+		if activate_modifier(team, "power_surge"):  # spend energy to press an edge
+			used_mod = "power_surge"
+	var rec := attack(atk_uid, atk_foe)
+	rec["type"] = "attack"
+	rec["modifier"] = used_mod
+	return rec
 
-	# 3) SURROUND SETUP — move beside an enemy so it ends fully surrounded by us.
-	if bot_difficulty >= 2:
-		for uid in my:
-			if not can_move(uid):
-				continue
-			for nid in reachable_for(uid).keys():
-				if _all_neighbours_held(nid, opp):
-					continue                                   # don't walk into a surround
-				for nb in map.adj[nid]:
-					var occ := _node_occupant(nb)
-					if occ != -1 and units[occ]["team"] == opp and units[occ]["alive"]:
-						if _all_neighbours_held(units[occ]["node"], team, nid):
-							var p := _bot_path(uid, nid)
-							move_unit(uid, nid)
-							return {"type": "move", "uid": uid, "node": nid, "path": p}
+# 5) DESPLEGAR TODO: nunca dejar figuras en la banca (la mejor primero, por la
+# entrada más cercana a la meta rival).
+func _bot_deploy(team: String, target_goal: int) -> Dictionary:
+	if not can_deploy(team):
+		return {}
+	var fe := free_entrances(team)
+	var node: int = fe[0]
+	var bd := INF
+	for n in fe:
+		var dd := _dist(n, target_goal)
+		if dd < bd:
+			bd = dd
+			node = n
+	var uid := _best_bench(team)
+	deploy(uid, node)
+	return {"type": "deploy", "uid": uid, "node": node}
 
-	# 4) DEPLOY — strongest bench figure to the entrance nearest the target goal.
-	if can_deploy(team) and my.size() < 4:
-		var fe := free_entrances(team)
-		if not fe.is_empty():
-			var node: int = fe[0]
-			var bd := INF
-			for n in fe:
-				var dd := _dist(n, target_goal)
-				if dd < bd:
-					bd = dd
-					node = n
-			var uid := _best_bench(team)
-			deploy(uid, node)
-			return {"type": "deploy", "uid": uid, "node": node}
+# 6) BUFF NODE: tomar el centro si está libre y no es una trampa.
+func _bot_buff(team: String, own_goal: int) -> Dictionary:
+	if controls_buff(team):
+		return {}
+	var opp := _enemy_team(team)
+	for uid in units_on_board(team):
+		if not can_move(uid) or int(units[uid]["node"]) == own_goal:
+			continue
+		for b in map.buffs:
+			if _node_occupant(b) == -1 and not _all_neighbours_held(b, opp) and reachable_for(uid).has(b):
+				var p := _bot_path(uid, b)
+				move_unit(uid, b)
+				return {"type": "move", "uid": uid, "node": b, "path": p}
+	return {}
 
-	# 4.5) CONTROL THE BUFF NODE — grab an uncontested centre node if safe.
-	if not controls_buff(team):
-		for uid in my:
-			if not can_move(uid):
-				continue
-			for b in map.buffs:
-				if _node_occupant(b) == -1 and not _all_neighbours_held(b, opp) and reachable_for(uid).has(b):
-					var p := _bot_path(uid, b)
-					move_unit(uid, b)
-					return {"type": "move", "uid": uid, "node": b, "path": p}
-
-	# 5) ADVANCE — the move that progresses most toward the goal, avoiding surrounds.
+# 7) AVANZAR ESQUIVANDO: máximo progreso hacia la meta rival, penalizando
+# terminar junto a rivales (evita peleas gratis) y sin meterse a cercos.
+func _bot_advance(team: String, target_goal: int, own_goal: int) -> Dictionary:
+	var opp := _enemy_team(team)
 	var mv_uid := -1
 	var mv_node := -1
-	var best_impr := 0.01
-	for uid in my:
-		if not can_move(uid):
-			continue
+	var best_score := 0.01
+	for uid in units_on_board(team):
+		if not can_move(uid) or int(units[uid]["node"]) == own_goal:
+			continue                                       # el portero se queda
 		var cur := _dist(units[uid]["node"], target_goal)
 		for nid in reachable_for(uid).keys():
 			if _all_neighbours_held(nid, opp):
 				continue
 			var impr := cur - _dist(nid, target_goal)
-			if impr > best_impr:
-				best_impr = impr
+			var risk := 0.0
+			for nb in map.adj[nid]:
+				var occ := _node_occupant(nb)
+				if occ != -1 and units[occ]["team"] == opp and units[occ]["alive"]:
+					risk += 1.0
+			var score := impr - risk * 0.8
+			if score > best_score:
+				best_score = score
 				mv_uid = uid
 				mv_node = nid
 	if mv_uid != -1:
 		var p := _bot_path(mv_uid, mv_node)
 		move_unit(mv_uid, mv_node)
 		return {"type": "move", "uid": mv_uid, "node": mv_node, "path": p}
-
-	return {"type": "pass"}
+	return {}
 
 func _bot_easy(team: String) -> Dictionary:
 	if can_deploy(team) and units_on_board(team).size() < 3:

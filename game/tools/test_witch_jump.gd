@@ -49,6 +49,32 @@ func _initialize() -> void:
 				clean = false
 	ok = _expect("rutas normales sin nodos ocupados", clean, true) and ok
 
+	# 6) TODAS las casillas libres adyacentes al enemigo son aterrizajes válidos
+	var all_land := true
+	for f in gs.map.adj[spot[1]]:
+		if f == spot[0] or gs.board.has(f) or f in gs.map.obstacles:
+			continue
+		if not reach.has(f):
+			all_land = false
+	ok = _expect("todo vecino libre del rival aterriza", all_land, true) and ok
+
+	# 7) con TODO alrededor del enemigo ocupado, el salto es IMPOSIBLE
+	var blockers: Array = []
+	for f in gs.map.adj[spot[1]]:
+		if f == spot[0] or gs.board.has(f):
+			continue
+		var blk := gs.add_to_bench("player", 1)
+		gs.bench["player"].erase(blk)
+		gs.units[blk]["node"] = f
+		gs.board[f] = blk
+		blockers.append(f)
+	var reach2 := gs.move_targets(w, gs.effective_stamina(w))
+	var none := true
+	for f in gs.map.adj[spot[1]]:
+		if f != spot[0] and reach2.has(f):
+			none = false
+	ok = _expect("rival tapado: nadie lo salta", none, true) and ok
+
 	print("WITCH_JUMP_OK" if ok else "WITCH_JUMP_FAIL")
 	quit()
 
