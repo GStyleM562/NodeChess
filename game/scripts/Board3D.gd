@@ -46,6 +46,7 @@ var _node_mi := {}
 var _node_mat := {}
 var _tiled := {}         # nid -> true si tiene loseta Meshy (disco = overlay transparente)
 var _tile_scenes := {}   # slug -> PackedScene cacheada (null si no hay asset)
+var _last_turn := ""     # para anunciar "¡ES TU TURNO!" solo cuando cambia
 var _highlighted := []
 var _entrance_owner := {}      # entrance node id -> owning team (for the "blocked" siren)
 var _sirening := {}            # entrance nodes currently pulsing red
@@ -514,6 +515,7 @@ func _spawn_vis(uid: int) -> void:
 	_face(fig, Vector3(0, 0, 1.0) if u["team"] == "player" else Vector3(0, 0, -1.0))
 	_add_team_ring(fig, u["team"])
 	fig.play_clip("idle")
+	_summon_fx(fig, u["team"])
 	var lbl := Label3D.new()
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lbl.no_depth_test = true
@@ -540,6 +542,45 @@ func _spawn_vis(uid: int) -> void:
 	fig.add_child(nlbl)
 	_name_lbls[uid] = nlbl
 	_vis[uid] = fig
+
+## Invocación: la figura APARECE creciendo, con un destello del color del equipo
+## y un anillo de energía que se expande y desvanece sobre su nodo.
+func _summon_fx(fig: Node3D, team: String) -> void:
+	var col := _team_color(team)
+	fig.scale = Vector3.ONE * 0.05
+	var grow := create_tween()
+	grow.tween_property(fig, "scale", Vector3.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var l := OmniLight3D.new()
+	l.light_color = col
+	l.omni_range = 2.4
+	l.light_energy = 0.0
+	l.position = fig.position + Vector3(0, 1.0, 0)
+	add_child(l)
+	var lt := create_tween()
+	lt.tween_property(l, "light_energy", 3.5, 0.18)
+	lt.tween_property(l, "light_energy", 0.0, 0.75)
+	lt.tween_callback(l.queue_free)
+	var ring := MeshInstance3D.new()
+	var t := TorusMesh.new()
+	t.inner_radius = 0.32
+	t.outer_radius = 0.4
+	ring.mesh = t
+	ring.position = fig.position + Vector3(0, 0.12, 0)
+	ring.scale = Vector3(0.3, 0.5, 0.3)
+	var mat := StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(col.r, col.g, col.b, 0.85)
+	mat.emission_enabled = true
+	mat.emission = col
+	mat.emission_energy_multiplier = 1.6
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ring.material_override = mat
+	add_child(ring)
+	var rt := create_tween()
+	rt.set_parallel(true)
+	rt.tween_property(ring, "scale", Vector3(2.6, 0.5, 2.6), 0.55).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	rt.tween_property(mat, "albedo_color:a", 0.0, 0.55)
+	rt.chain().tween_callback(ring.queue_free)
 
 func _add_team_ring(fig: Figure3D, team: String) -> void:
 	var ring := MeshInstance3D.new()
@@ -952,16 +993,19 @@ func _preview_figure(uid: int) -> void:
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 8)
 	vb.add_child(hb)
-	var dep := Button.new()
-	dep.text = "Desplegar"
-	dep.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	dep.disabled = _committed or _busy or _over or _gs.turn_team != "player"
-	UITheme.button_font(dep, 15, UITheme.TEXT, true, 800)
-	UITheme.style_primary(dep, UITheme.SUCCESS)
-	dep.pressed.connect(func():
-		ov.queue_free()
-		_begin_deploy(uid))
-	hb.add_child(dep)
+	# "Desplegar" SOLO si la figura sigue en la banca (desde el tablero, la
+	# descripción es solo lectura — nada de duplicar figuras ya desplegadas).
+	if uid in _gs.bench["player"]:
+		var dep := Button.new()
+		dep.text = "Desplegar"
+		dep.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		dep.disabled = _committed or _busy or _over or _gs.turn_team != "player"
+		UITheme.button_font(dep, 15, UITheme.TEXT, true, 800)
+		UITheme.style_primary(dep, UITheme.SUCCESS)
+		dep.pressed.connect(func():
+			ov.queue_free()
+			_begin_deploy(uid))
+		hb.add_child(dep)
 	var cl := Button.new()
 	cl.text = "Cerrar"
 	UITheme.button_font(cl, 15, UITheme.TEXT, false, 700)
@@ -975,6 +1019,11 @@ func _update_status() -> void:
 	if _over:
 		_end_btn.visible = false
 		return
+	# Anuncio de turno: al pasar a "player" (vs CPU u online) se avisa UNA vez.
+	if _gs.turn_team != _last_turn:
+		_last_turn = _gs.turn_team
+		if _gs.turn_team == "player":
+			_show_banner("✨ ¡ES TU TURNO! ✨", UITheme.SUCCESS)
 	_end_btn.visible = _gs.turn_team == "player"
 	# Can't end the turn without acting — unless there is genuinely nothing to do.
 	_end_btn.disabled = _busy or (not _committed and _player_has_actions())
@@ -1108,6 +1157,8 @@ func _on_board_click(mouse: Vector2) -> void:
 func _begin_deploy(uid: int) -> void:
 	if _busy or _over or _gs.turn_team != "player" or _committed:
 		return
+	if not (uid in _gs.bench["player"]):
+		return   # solo la BANCA despliega: una figura en el tablero jamás se re-despliega
 	_reset_activation()
 	_deploy_uid = uid
 	for e in _gs.free_entrances("player"):

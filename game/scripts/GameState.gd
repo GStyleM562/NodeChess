@@ -245,8 +245,13 @@ func _process_ko_returns() -> void:
 				bench[team].append(uid)
 
 # --- actions ---------------------------------------------------------------
+## SOLO se despliega desde la BANCA y hacia un nodo libre. Sin este candado, un
+## redespliegue de una figura ya en el tablero dejaba su casilla vieja ocupada
+## para siempre (ocupación fantasma que bloqueaba movimientos "sin razón").
 func deploy(uid: int, node: int) -> void:
 	var u: Dictionary = units[uid]
+	if not (uid in bench[u["team"]]) or board.has(node):
+		return
 	bench[u["team"]].erase(uid)
 	u["node"] = node
 	board[node] = uid
