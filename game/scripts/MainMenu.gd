@@ -12,6 +12,7 @@ func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
 	_build_env()
 	_build_ui()
+	Music.play_menu()
 
 func _process(delta: float) -> void:
 	if _pivot != null:

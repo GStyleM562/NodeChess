@@ -21,6 +21,8 @@ config/icon="res://icon.svg"
 
 GameBoot="*res://scripts/GameBoot.gd"
 NetSession="*res://scripts/NetSession.gd"
+Music="*res://scripts/Music.gd"
+Sfx="*res://scripts/Sfx.gd"
 
 [display]
 

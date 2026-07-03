@@ -247,4 +247,22 @@ static var FIGURES := [
 			{"col": "red", "w": 30},
 		],
 	},
+	{
+		"id": "ninja", "name": "Kage Ninja", "stamina": 3, "type": "Ruleta", "rarity": "epic",
+		"class": "Agile",
+		"passives": ["lunge", "parkour"], "complete": true, "size": 0.95,
+		"glb": "res://assets/figures/ninja/Meshy_AI_Meshy_Merged_Animations.glb",
+		"clips": {
+			"idle": "Idle_10", "move_walk": "Walking", "move_run": "Running",
+			"attack": "Punch_Combo_5", "attack_heavy": "Large_step_then_high_kick",
+			"defend": "Quick_Step_and_Spin_Dodge", "hit": "Hit_Reaction_to_Waist", "ko": "Knock_Down",
+		},
+		"attack": [
+			{"col": "white", "name": "Shuriken", "pow": 45, "w": 30},
+			{"col": "white", "name": "Combo Sombra", "pow": 75, "w": 15},
+			{"col": "purple", "name": "Bomba de Humo", "stars": 2, "fx": "Confusión", "w": 20},
+			{"col": "blue", "name": "Evasión", "w": 20},
+			{"col": "red", "w": 15},
+		],
+	},
 ]

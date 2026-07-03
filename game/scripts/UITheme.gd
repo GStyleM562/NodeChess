@@ -75,6 +75,17 @@ static func button_font(b: Button, size: int, col := TEXT, title := true, weight
 	var f := display(weight) if title else body(weight)
 	if f != null:
 		b.add_theme_font_override("font", f)
+	# TODOS los botones pasan por aquí: un solo enganche da el click de UI global.
+	# (resuelto por nodo, sin depender del autoload en tiempo de compilación)
+	if not b.pressed.is_connected(_ui_click):
+		b.pressed.connect(_ui_click)
+
+static func _ui_click() -> void:
+	var ml := Engine.get_main_loop()
+	if ml is SceneTree:
+		var s := (ml as SceneTree).root.get_node_or_null("Sfx")
+		if s != null:
+			s.call("play", "ui_click")
 
 # --- styleboxes ------------------------------------------------------------
 static func panel(bg := SURFACE, border := BORDER, radius := 16, bw := 2, pad := 10) -> StyleBoxFlat:

@@ -20,6 +20,13 @@ const ROLE_COLOR := {
 const HILITE_MOVE := Color(0.353, 0.627, 1.0)  # #5AA0FF
 const HILITE_ATK := Color(1.0, 0.322, 0.278)
 const HILITE_DEPLOY := Color(0.212, 0.82, 0.498)
+## Loseta Meshy por rol (carpeta en assets/board/). Sin asset -> disco procedural.
+const TILE_SLUG := {
+	"normal": "node_tile", "buff": "node_tile",
+	"goal_player": "goal_player", "goal_enemy": "goal_enemy",
+	"entrance_player": "entrance_player", "entrance_enemy": "entrance_enemy",
+}
+const TILE_TOP := 0.06     # altura de la cara superior de las losetas (pies en y=0)
 const FACE_OFFSET := 0.0
 const STATUS_ES := {
 	"fear": "Miedo", "weakened": "Debilitado", "paralysis": "Paralizado", "immobilized": "Inmovilizado",
@@ -37,6 +44,8 @@ var _status_lbls := {}        # uid -> Label3D (status indicator over the figure
 var _name_lbls := {}          # uid -> Label3D (figure name + rank over the figure)
 var _node_mi := {}
 var _node_mat := {}
+var _tiled := {}         # nid -> true si tiene loseta Meshy (disco = overlay transparente)
+var _tile_scenes := {}   # slug -> PackedScene cacheada (null si no hay asset)
 var _highlighted := []
 var _entrance_owner := {}      # entrance node id -> owning team (for the "blocked" siren)
 var _sirening := {}            # entrance nodes currently pulsing red
@@ -95,6 +104,7 @@ func _ready() -> void:
 	_build_ui()
 	_refresh_bench_ui()
 	_update_status()
+	Music.play_battle()
 	if _online:
 		NetSession.client.remote_action.connect(_on_remote_action)
 		NetSession.client.player_left.connect(_on_opp_left)
@@ -138,6 +148,7 @@ func _leave_to_menu() -> void:
 	if _online:
 		Roster.FIGURES = _saved_roster                 # un-swap the roster
 		NetSession.end_online()
+	Music.play_menu()
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 func _process(delta: float) -> void:
@@ -211,27 +222,38 @@ func _build_board() -> void:
 			if seen.has(key):
 				continue
 			seen[key] = true
-			_make_line(_gs.map.pos_of(id), _gs.map.pos_of(nb))
+			if not _make_path(_gs.map.pos_of(id), _gs.map.pos_of(nb)):
+				_make_line(_gs.map.pos_of(id), _gs.map.pos_of(nb))
 	for n in _gs.map.nodes:
+		var role := String(n["role"])
+		var tiled := _place_tile(role, n["pos"])
+		_tiled[int(n["id"])] = tiled
+		# El disco sigue siendo LA superficie de resaltado (verde/rojo/azul). Con
+		# loseta Meshy debajo queda transparente y solo aparece al resaltar.
 		var mi := MeshInstance3D.new()
 		var disc := CylinderMesh.new()
 		disc.top_radius = 0.5
 		disc.bottom_radius = 0.5
 		disc.height = 0.08
 		mi.mesh = disc
-		mi.position = n["pos"] + Vector3(0, 0.04, 0)
+		mi.position = n["pos"] + Vector3(0, 0.10 if tiled else 0.04, 0)
 		var mat := StandardMaterial3D.new()
-		var col: Color = ROLE_COLOR.get(n["role"], ROLE_COLOR["normal"])
-		mat.albedo_color = col
-		if n["role"] != "normal":
-			mat.emission_enabled = true
-			mat.emission = col
-			mat.emission_energy_multiplier = 0.5
+		var col: Color = ROLE_COLOR.get(role, ROLE_COLOR["normal"])
+		if tiled:
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.albedo_color = Color(0, 0, 0, 0)
+		else:
+			mat.albedo_color = col
+			if role != "normal":
+				mat.emission_enabled = true
+				mat.emission = col
+				mat.emission_energy_multiplier = 0.5
 		mi.material_override = mat
 		add_child(mi)
 		_node_mi[n["id"]] = mi
 		_node_mat[n["id"]] = mat
-		_add_node_rim(n)
+		if not tiled:
+			_add_node_rim(n)
 	for g in [_gs.map.goal_player, _gs.map.goal_enemy]:
 		if g >= 0:
 			_add_goal_beacon(g)
@@ -241,6 +263,99 @@ func _build_board() -> void:
 		_entrance_owner[e] = "player"
 	for e in _gs.map.entrances_enemy:
 		_entrance_owner[e] = "enemy"
+
+# ---------------------------------------------------------------- board assets
+## Primer GLB dentro de assets/board/<slug>/ (cacheado). null si no hay.
+func _board_scene(slug: String) -> PackedScene:
+	if _tile_scenes.has(slug):
+		return _tile_scenes[slug]
+	var ps: PackedScene = null
+	var dir := "res://assets/board/%s" % slug
+	var d := DirAccess.open(dir)
+	if d != null:
+		for f in d.get_files():
+			var fname := f.trim_suffix(".remap").trim_suffix(".import")
+			if fname.ends_with(".glb") or fname.ends_with(".gltf"):
+				ps = load(dir + "/" + fname) as PackedScene
+				break
+	_tile_scenes[slug] = ps
+	return ps
+
+## AABB combinado de los meshes de una escena instanciada (en espacio del root).
+func _scene_aabb(root: Node3D) -> AABB:
+	var bb := AABB()
+	var first := true
+	for mi in root.find_children("*", "MeshInstance3D", true, false):
+		var xf: Transform3D = (mi as Node3D).transform
+		var p := mi.get_parent()
+		while p != null and p != root:
+			if p is Node3D:
+				xf = (p as Node3D).transform * xf
+			p = p.get_parent()
+		var t: AABB = xf * (mi as MeshInstance3D).get_aabb()
+		bb = t if first else bb.merge(t)
+		first = false
+	return bb
+
+## Coloca la loseta Meshy del rol bajo el nodo. La cara superior queda en TILE_TOP
+## (los pies de las figuras están en y=0, así NUNCA se entierran ni se traban).
+func _place_tile(role: String, pos: Vector3) -> bool:
+	var slug := String(TILE_SLUG.get(role, ""))
+	if slug == "":
+		return false
+	var ps := _board_scene(slug)
+	if ps == null:
+		return false
+	var inst := ps.instantiate() as Node3D
+	add_child(inst)
+	var bb := _scene_aabb(inst)
+	if bb.size.length() < 0.001:
+		inst.queue_free()
+		return false
+	# Algunas losetas de Meshy vienen PARADAS (placa vertical): acostarlas.
+	if bb.size.y > maxf(bb.size.x, bb.size.z) * 1.25:
+		inst.rotation_degrees.x = -90.0
+		bb = Transform3D(Basis(Vector3.RIGHT, -PI / 2.0), Vector3.ZERO) * bb
+	var s := 1.28 / maxf(bb.size.x, bb.size.z)
+	inst.scale = Vector3.ONE * s
+	inst.position = Vector3(
+		pos.x - (bb.position.x + bb.size.x * 0.5) * s,
+		TILE_TOP - (bb.position.y + bb.size.y) * s,
+		pos.z - (bb.position.z + bb.size.z * 0.5) * s)
+	return true
+
+## Camino de LOSAS de piedra entre dos nodos (tramos repetidos del asset).
+## Cara superior a +0.02: por debajo de los pies, nada que "atore" el paso.
+func _make_path(a: Vector3, b: Vector3) -> bool:
+	var ps := _board_scene("path_stone")
+	if ps == null:
+		return false
+	var dist := a.distance_to(b)
+	var clear := dist - 0.95          # las losetas de nodo ya cubren los extremos
+	if clear < 0.25:
+		return true
+	var k := maxi(1, roundi(clear / 0.7))
+	var step := clear / float(k)
+	var dirn := (b - a).normalized()
+	var start := a + dirn * ((dist - clear) * 0.5)
+	for i in k:
+		var wrap := Node3D.new()
+		add_child(wrap)
+		var mid := start + dirn * (step * (float(i) + 0.5))
+		wrap.look_at_from_position(mid, b, Vector3.UP)   # -Z del wrap corre hacia b
+		var inst := ps.instantiate() as Node3D
+		wrap.add_child(inst)
+		var bb := _scene_aabb(inst)
+		inst.rotation.y = PI / 2.0        # el lado LARGO de la losa sigue el camino
+		var sl := (step * 0.94) / maxf(bb.size.x, 0.01)
+		var sw := 0.46 / maxf(bb.size.z, 0.01)
+		inst.scale = Vector3(sl, sw, sw)
+		var tb: AABB = Transform3D(inst.basis, Vector3.ZERO) * bb
+		inst.position = Vector3(
+			-(tb.position.x + tb.size.x * 0.5),
+			0.02 - (tb.position.y + tb.size.y),
+			-(tb.position.z + tb.size.z * 0.5))
+	return true
 
 ## Plataforma "isla flotante" bajo el tablero: base clara + sombra profunda.
 func _build_island() -> void:
@@ -322,26 +437,43 @@ func _add_goal_beacon(id: int) -> void:
 	beam.material_override = mat
 	add_child(beam)
 
-## Cristal flotante girando sobre el buff node ("objeto de poder").
+## Reliquia flotante girando sobre el buff node ("objeto de poder"). Flota ALTO
+## (por encima de las cabezas) para que ninguna figura la atraviese al pararse ahí.
+## Con asset Meshy usa la plataforma-cristal; sin asset, el prisma procedural.
 func _add_buff_crystal(id: int) -> void:
-	var c := MeshInstance3D.new()
-	var pm := PrismMesh.new()
-	pm.size = Vector3(0.34, 0.5, 0.34)
-	c.mesh = pm
-	c.position = _gs.map.pos_of(id) + Vector3(0, 1.05, 0)
-	var col: Color = ROLE_COLOR.get("buff", Color(1.0, 0.6, 0.2))
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = col.darkened(0.15)
-	mat.emission_enabled = true
-	mat.emission = col
-	mat.emission_energy_multiplier = 1.4
-	c.material_override = mat
-	add_child(c)
+	var c: Node3D
+	var ps := _board_scene("buff_crystal")
+	if ps != null:
+		c = ps.instantiate() as Node3D
+		add_child(c)
+		var bb := _scene_aabb(c)
+		var s := 0.8 / maxf(bb.size.x, bb.size.z)
+		c.scale = Vector3.ONE * s
+		var p := _gs.map.pos_of(id)
+		c.position = Vector3(
+			p.x - (bb.position.x + bb.size.x * 0.5) * s,
+			2.2 - (bb.position.y + bb.size.y * 0.5) * s,
+			p.z - (bb.position.z + bb.size.z * 0.5) * s)
+	else:
+		var mi := MeshInstance3D.new()
+		var pm := PrismMesh.new()
+		pm.size = Vector3(0.34, 0.5, 0.34)
+		mi.mesh = pm
+		mi.position = _gs.map.pos_of(id) + Vector3(0, 2.2, 0)
+		var col: Color = ROLE_COLOR.get("buff", Color(1.0, 0.6, 0.2))
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = col.darkened(0.15)
+		mat.emission_enabled = true
+		mat.emission = col
+		mat.emission_energy_multiplier = 1.4
+		mi.material_override = mat
+		add_child(mi)
+		c = mi
 	var tw := create_tween().set_loops()
-	tw.tween_property(c, "rotation:y", TAU, 4.0).from(0.0)
+	tw.tween_property(c, "rotation:y", TAU, 5.0).from(0.0)
 	var bob := create_tween().set_loops()
-	bob.tween_property(c, "position:y", c.position.y + 0.18, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	bob.tween_property(c, "position:y", c.position.y, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	bob.tween_property(c, "position:y", c.position.y + 0.16, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	bob.tween_property(c, "position:y", c.position.y, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 ## Camino entre nodos: pasarela oscura ancha + línea de energía al centro.
 func _make_line(a: Vector3, b: Vector3) -> void:
@@ -371,6 +503,7 @@ func _make_line(a: Vector3, b: Vector3) -> void:
 
 # ---------------------------------------------------------------- figures
 func _spawn_vis(uid: int) -> void:
+	Sfx.play("deploy")
 	var u: Dictionary = _gs.units[uid]
 	var data: Dictionary = _gs.model_data(uid)   # rank-aware (ranked figures keep their model after KO)
 	var fig := Figure3D.new()
@@ -862,6 +995,26 @@ func _update_status() -> void:
 	_refresh_active_card()
 	if _hud_label != null:
 		_hud_label.text = "Tú: %d   ·   Rival: %d" % [_gs.units_on_board("player").size(), _gs.units_on_board("enemy").size()]
+	_music_threat()
+
+## Música situacional: si TU figura está a ≤3 nodos de la meta rival → "ventaja";
+## si una figura RIVAL está a ≤3 de tu meta → "peligro" (manda sobre ventaja).
+## Al desaparecer la situación vuelve sola a la música normal de partida.
+func _music_threat() -> void:
+	if _over:
+		Music.update_threat(false, false)
+		return
+	Music.update_threat(_goal_dist("player") <= 3, _goal_dist("enemy") <= 3)
+
+## Distancia mínima (en nodos) de las figuras del equipo a la meta que atacan.
+func _goal_dist(team: String) -> int:
+	var target: int = _gs.map.goal_enemy if team == "player" else _gs.map.goal_player
+	if target < 0:
+		return 99
+	var best := 99
+	for uid in _gs.units_on_board(team):
+		best = mini(best, _gs.map.graph_dist(int(_gs.units[uid]["node"]), target))
+	return best
 
 func _refresh_energy_mods() -> void:
 	if _energy_label != null:
@@ -1010,7 +1163,13 @@ func _set_highlight(nid: int, col: Color) -> void:
 		mat.emission_enabled = true
 		mat.emission = col
 		mat.emission_energy_multiplier = 0.9
-		mat.albedo_color = col.darkened(0.3)
+		var c := col.darkened(0.3)
+		c.a = 0.85 if _tiled.get(nid, false) else 1.0
+		mat.albedo_color = c
+	elif _tiled.get(nid, false):
+		# Con loseta Meshy el disco solo existe para resaltar: invisible en reposo.
+		mat.albedo_color = Color(0, 0, 0, 0)
+		mat.emission_enabled = false
 	else:
 		var role: String = _gs.map.role_of(nid)
 		var base: Color = ROLE_COLOR.get(role, ROLE_COLOR["normal"])
@@ -1161,6 +1320,7 @@ func _player_attack(foe_uid: int) -> void:
 func _on_end_turn_pressed() -> void:
 	if _busy or _over or _gs.turn_team != "player":
 		return
+	Sfx.play("end_turn")
 	await _end_player_turn()
 
 # ---------------------------------------------------------------- flow / bot
@@ -1375,6 +1535,7 @@ func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 	await _resolve_surround()
 
 func _show_rankup(uid: int) -> void:
+	Sfx.play("rankup")
 	_swap_model(uid)                                   # change the 3D model if the stage has its own
 	if _name_lbls.has(uid) and is_instance_valid(_name_lbls[uid]):
 		_name_lbls[uid].text = _gs.name_for(uid)
@@ -1516,6 +1677,7 @@ func _combat_cutaway(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 	fa.play_clip("attack")
 	await get_tree().create_timer(0.65).timeout
 	var ko: int = int(rec.get("ko", -1))
+	Sfx.play(_combat_sfx(rec))
 	if ko != -1:
 		var winner_uid := def_uid if ko == att_uid else att_uid
 		if _vis.has(winner_uid):
@@ -1550,6 +1712,20 @@ func _combat_cutaway(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 		if uid != att_uid and uid != def_uid:
 			_vis[uid].visible = true
 	_cam.current = true
+
+## Slot de SFX según el desenlace del combate (ver carpetas en assets/audio/sfx/).
+func _combat_sfx(rec: Dictionary) -> String:
+	if int(rec.get("ko", -1)) != -1:
+		return "ko"
+	match String(rec.get("win_col", "")):
+		"white", "gold":
+			return "attack_hit"
+		"blue":
+			return "attack_block"
+		"purple":
+			return "attack_effect"
+		_:
+			return "attack_miss"
 
 ## Victoria: una pequeña luz VERDE envuelve al ganador y su nodo, y se desvanece.
 func _victory_light(pos: Vector3) -> void:
@@ -1599,6 +1775,8 @@ func _show_winner(team: String) -> void:
 	_reset_activation()
 	_end_btn.visible = false
 	var win := team == "player"
+	Music.stop()
+	Sfx.play("victory" if win else "defeat")
 	var cl := CanvasLayer.new()
 	cl.layer = 20
 	add_child(cl)

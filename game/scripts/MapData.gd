@@ -58,6 +58,30 @@ func mirror_node(id: int) -> int:
 func role_of(id: int) -> String:
 	return nodes[id]["role"]
 
+## Distancia en nodos entre a y b (BFS por el grafo, saltando obstáculos).
+## 99 si no hay ruta. La usa la música de peligro/ventaja ("a N nodos de la meta").
+func graph_dist(a: int, b: int) -> int:
+	if a == b:
+		return 0
+	var seen := {a: true}
+	var frontier := [a]
+	var d := 0
+	while not frontier.is_empty():
+		d += 1
+		var nxt := []
+		for id in frontier:
+			for nb in adj[id]:
+				if seen.has(nb):
+					continue
+				if nb == b:
+					return d
+				if nb in obstacles:
+					continue
+				seen[nb] = true
+				nxt.append(nb)
+		frontier = nxt
+	return 99
+
 func _add(pos: Vector3) -> int:
 	var id := nodes.size()
 	nodes.append({"id": id, "pos": pos, "role": "normal"})
