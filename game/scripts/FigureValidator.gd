@@ -58,8 +58,36 @@ static func validate(fig: Dictionary) -> Dictionary:
 			errors.append("Etapa %d: demasiadas pasivas (%d)." % [i + 2, sp.size()])
 		_check_pool(st.get("attack", fig.get("attack", [])), String(st.get("type", typ)), "Etapa %d" % (i + 2), errors, warnings)
 
+	_gdd_advisories(fig, stam, warnings)
+
 	var state := "INVALID" if not errors.is_empty() else ("WARNING" if not warnings.is_empty() else "VALID")
 	return {"state": state, "errors": errors, "warnings": warnings}
+
+## Avisos de DISEÑO según el GDD (Parte 2). Nunca bloquean el guardado — el
+## diseñador decide — pero marcan combinaciones fuera de la guía de balance.
+static func _gdd_advisories(fig: Dictionary, stam: int, warnings: Array) -> void:
+	var pool: Array = fig.get("attack", [])
+	var max_pow := 0
+	for seg in pool:
+		max_pow = maxi(max_pow, int(seg.get("pow", 0)))
+	var evolves := not (fig.get("ranks", []) as Array).is_empty()
+	# Golpes enormes en la forma BASE: el GDD los reserva para evoluciones.
+	if max_pow >= 110:
+		warnings.append("Golpe base de %d es MUY alto — el GDD reserva daños así para formas evolucionadas%s." %
+			[max_pow, "" if evolves else ", y este personaje ni siquiera evoluciona"])
+	elif max_pow >= 90 and not evolves:
+		warnings.append("Daño alto (%d) sin evolución — fuerte para CUALQUIER rareza (GDD: la rareza nunca da más poder)." % max_pow)
+	# Pegada fuerte + mucha movilidad: la guía cobra la movilidad con menos daño.
+	if max_pow >= 80 and stam >= 3:
+		warnings.append("Ataque muy poderoso (%d) y estamina %d — combinación muy fuerte según el GDD (la movilidad alta debería costar pegada)." % [max_pow, stam])
+	# Guía de estamina por clase (GDD Parte 2: Tank 1–2, Balanced 2, Agile 3–4).
+	var guide := {"Tank": Vector2i(1, 2), "Balanced": Vector2i(2, 2), "Agile": Vector2i(3, 4)}
+	var cls := String(fig.get("class", ""))
+	if guide.has(cls):
+		var g: Vector2i = guide[cls]
+		if stam < g.x or stam > g.y:
+			var rango := ("%d" % g.x) if g.x == g.y else ("%d–%d" % [g.x, g.y])
+			warnings.append("Clase %s con estamina %d — la guía del GDD sugiere %s." % [cls, stam, rango])
 
 static func _type_ok(typ: String) -> bool:
 	for p in TYPE_PREFIXES:
@@ -72,6 +100,7 @@ static func _check_pool(pool: Array, typ: String, label: String, errors: Array, 
 		errors.append("%s: el pool de ataque está vacío." % label)
 		return
 	var has_red := false
+	var red_w := 0.0
 	var total := 0.0
 	for seg in pool:
 		var col := String(seg.get("col", ""))
@@ -79,6 +108,9 @@ static func _check_pool(pool: Array, typ: String, label: String, errors: Array, 
 			errors.append("%s: color inválido '%s'." % [label, col])
 		if col == "red":
 			has_red = true
+			red_w += float(seg.get("w", 1.0))
+		if col == "purple" and String(seg.get("fx", "")) == "" and not seg.has("disp"):
+			warnings.append("%s: Púrpura sin efecto elegido — ganaría el duelo pero no aplicaría NADA." % label)
 		if int(seg.get("pow", 0)) < 0:
 			errors.append("%s: daño negativo." % label)
 		if seg.has("stars"):
@@ -94,3 +126,5 @@ static func _check_pool(pool: Array, typ: String, label: String, errors: Array, 
 		errors.append("%s: las probabilidades suman %.0f%%, deben sumar 100%%." % [label, total])
 	if not has_red:
 		warnings.append("%s: sin segmento Rojo (Fallo) — el GDD lo recomienda." % label)
+	elif typ.begins_with("Ruleta") and total > 0.0 and red_w / total < 0.1:
+		warnings.append("%s: el Fallo es solo %.0f%% — el GDD recomienda un riesgo de fallo real (≥10%%)." % [label, 100.0 * red_w / total])
