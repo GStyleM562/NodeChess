@@ -14,6 +14,8 @@ var _passives_box: VBoxContainer
 var _evos_box: VBoxContainer
 var _edit_btn: Button
 var _copy_btn: Button
+var _info_panel: PanelContainer
+var _info_toggle: Button
 
 func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
@@ -104,6 +106,19 @@ func _build_ui() -> void:
 	panel.offset_right = -10
 	panel.add_theme_stylebox_override("panel", UITheme.panel(Color(0.08, 0.09, 0.16, 0.97), UITheme.BORDER, 16, 1, 10))
 	layer.add_child(panel)
+	_info_panel = panel
+	# Toggle: hide the big info card so the 3D model can actually be admired.
+	_info_toggle = Button.new()
+	_info_toggle.text = "▼ Ocultar info"
+	_info_toggle.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_info_toggle.offset_left = 120
+	_info_toggle.offset_right = -120
+	_info_toggle.offset_top = -506
+	_info_toggle.offset_bottom = -472
+	UITheme.button_font(_info_toggle, 13, UITheme.TEXT2, true, 700)
+	UITheme.style_surface(_info_toggle, UITheme.SURFACE, UITheme.BORDER, 12)
+	_info_toggle.pressed.connect(_toggle_info)
+	layer.add_child(_info_toggle)
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	panel.add_child(scroll)
@@ -255,6 +270,13 @@ func _evo_row(text: String) -> void:
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lbl.text = "• " + text
 	_evos_box.add_child(lbl)
+
+## Show/hide the info card. Hidden -> the toggle drops to the bottom, next to nav.
+func _toggle_info() -> void:
+	_info_panel.visible = not _info_panel.visible
+	_info_toggle.text = "▼ Ocultar info" if _info_panel.visible else "▲ Ver info"
+	_info_toggle.offset_top = -506 if _info_panel.visible else -110
+	_info_toggle.offset_bottom = -472 if _info_panel.visible else -76
 
 func _switch(d: int) -> void:
 	_index = wrapi(_index + d, 0, Roster.FIGURES.size())
