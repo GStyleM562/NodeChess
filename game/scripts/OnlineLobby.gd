@@ -195,29 +195,32 @@ func _leave() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 # ---------------------------------------------------------------- deck
-## The saved team as full figure dicts + any figures referenced by evolution
-## (evolves_id closure), so the opponent can render and simulate them.
-func _my_deck() -> Array:
-	var out: Array = []
+## El mazo viaja SEPARADO: "team" = exactamente las figuras jugables (en orden,
+## duplicados incluidos) y "lib" = el cierre de evoluciones (evolves_id), solo
+## para renderizar/simular rank-ups. ANTES todo iba en UNA lista y el cierre la
+## inflaba distinto en cada cliente -> uids/modelos desalineados (el caos online:
+## controlar piezas del rival, modelos cambiados, pantallas distintas).
+func _my_deck() -> Dictionary:
+	var team: Array = []
 	var seen := {}
-	var queue: Array = []
 	for ri in Loadout.player_team:
 		if ri >= 0 and ri < Roster.FIGURES.size():
-			queue.append(Roster.FIGURES[ri])
+			team.append(Roster.FIGURES[ri])
+			seen[String(Roster.FIGURES[ri].get("id", ""))] = true
+	var lib: Array = []
+	var queue := team.duplicate()
 	while not queue.is_empty():
 		var f: Dictionary = queue.pop_front()
-		var id := String(f.get("id", ""))
-		if id == "" or seen.has(id):
-			continue
-		seen[id] = true
-		out.append(f)
 		for st in f.get("ranks", []):
 			var eid := String(st.get("evolves_id", ""))
 			if eid != "" and not seen.has(eid):
+				seen[eid] = true
 				for g in Roster.FIGURES:
 					if String(g.get("id", "")) == eid:
+						lib.append(g)
 						queue.append(g)
-	return out
+						break
+	return {"team": team, "lib": lib}
 
 # ---------------------------------------------------------------- maps / widgets
 func _build_maps(is_host := true) -> void:

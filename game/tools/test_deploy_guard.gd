@@ -38,6 +38,12 @@ func _initialize() -> void:
 	ok = _expect("A puede moverse desde la entrada", gs.move_targets(a, gs.effective_stamina(a)).size() > 0, true) and ok
 	ok = _expect("B puede moverse desde la entrada", gs.move_targets(b, gs.effective_stamina(b)).size() > 0, true) and ok
 
+	# ANTI-STACK: mover sobre un nodo ocupado se RECHAZA (jamás dos en un nodo)
+	ok = _expect("move a nodo ocupado rechazado", gs.move_unit(a, e2), false) and ok
+	ok = _expect("A no se movió", int(gs.units[a]["node"]), e1) and ok
+	ok = _expect("B sigue dueño de e2", int(gs.board.get(e2, -1)), b) and ok
+	ok = _expect("tablero consistente", gs.board_consistent(), true) and ok
+
 	print("DEPLOY_GUARD_OK" if ok else "DEPLOY_GUARD_FAIL")
 	quit()
 

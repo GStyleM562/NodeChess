@@ -257,12 +257,30 @@ func deploy(uid: int, node: int) -> void:
 	board[node] = uid
 	_check_goal(u)
 
-func move_unit(uid: int, node: int) -> void:
+## Mueve una figura. JAMÁS apila: si el destino está ocupado por otra figura
+## (p.ej. una acción remota desincronizada), se rechaza y devuelve false.
+func move_unit(uid: int, node: int) -> bool:
+	if board.has(node) and int(board[node]) != uid:
+		return false
 	var u: Dictionary = units[uid]
 	board.erase(u["node"])
 	u["node"] = node
 	board[node] = uid
 	_check_goal(u)
+	return true
+
+## Auditoría: el tablero es consistente si board <-> units es un mapeo 1:1
+## (cada entrada apunta a una unidad viva parada exactamente ahí, sin fantasmas).
+func board_consistent() -> bool:
+	for nid in board.keys():
+		var uid := int(board[nid])
+		if not units.has(uid) or not units[uid]["alive"] or int(units[uid]["node"]) != int(nid):
+			return false
+	for uid in units.keys():
+		var n := int(units[uid]["node"])
+		if units[uid]["alive"] and n >= 0 and int(board.get(n, -1)) != int(uid):
+			return false
+	return true
 
 ## Rolls an attack: returns { "seg": buffed segment (what the figure WILL do, with
 ## buff-node/modifier bonuses already baked in), "idx": the pool face that came up

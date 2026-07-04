@@ -362,21 +362,24 @@ func _build_buttons(layer: CanvasLayer) -> void:
 	play.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/deck_builder.tscn"))
 	layer.add_child(play)
 
-	var row := HBoxContainer.new()
-	row.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	row.offset_top = -198
-	row.offset_bottom = -138
-	row.offset_left = 12
-	row.offset_right = -12
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 8)
-	layer.add_child(row)
-	row.add_child(_menu_button("🃏", "Mazos", func(): get_tree().change_scene_to_file("res://scenes/deck_builder.tscn")))
-	row.add_child(_menu_button("📖", "Colección", func(): get_tree().change_scene_to_file("res://scenes/dex.tscn")))
-	row.add_child(_menu_button("📦", "Inventario", func(): get_tree().change_scene_to_file("res://scenes/inventory.tscn")))
-	row.add_child(_menu_button("🌐", "Online", func(): get_tree().change_scene_to_file("res://scenes/online_lobby.tscn")))
-	row.add_child(_menu_button("🛠", "Crear", func(): get_tree().change_scene_to_file("res://scenes/character_creator.tscn")))
-	row.add_child(_menu_button("🎲", "Probar", func(): get_tree().change_scene_to_file("res://scenes/attack_tester.tscn")))
+	# UNA sola parrilla grande (3×2) — antes había dos barras con botones
+	# duplicados (Colección/Probar) y todo se veía chiquito.
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	grid.offset_top = -204
+	grid.offset_bottom = -72
+	grid.offset_left = 12
+	grid.offset_right = -12
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	layer.add_child(grid)
+	grid.add_child(_menu_button("🃏", "Mazos", func(): get_tree().change_scene_to_file("res://scenes/deck_builder.tscn")))
+	grid.add_child(_menu_button("📖", "Colección", func(): get_tree().change_scene_to_file("res://scenes/dex.tscn")))
+	grid.add_child(_menu_button("📦", "Inventario", func(): get_tree().change_scene_to_file("res://scenes/inventory.tscn")))
+	grid.add_child(_menu_button("🌐", "Online", func(): get_tree().change_scene_to_file("res://scenes/online_lobby.tscn")))
+	grid.add_child(_menu_button("🛠", "Crear", func(): get_tree().change_scene_to_file("res://scenes/character_creator.tscn")))
+	grid.add_child(_menu_button("🎲", "Probar", func(): get_tree().change_scene_to_file("res://scenes/attack_tester.tscn")))
 
 func _build_nav(layer: CanvasLayer) -> void:
 	var nav := PanelContainer.new()
@@ -386,12 +389,10 @@ func _build_nav(layer: CanvasLayer) -> void:
 	layer.add_child(nav)
 	var nb := HBoxContainer.new()
 	nb.alignment = BoxContainer.ALIGNMENT_CENTER
-	nb.add_theme_constant_override("separation", 22)
+	nb.add_theme_constant_override("separation", 26)
 	nav.add_child(nb)
 	nb.add_child(_nav_btn("🏠", "Home", true, func(): pass))
 	nb.add_child(_nav_btn("🛍", "Tienda", false, _soon))
-	nb.add_child(_nav_btn("📖", "Colección", false, func(): get_tree().change_scene_to_file("res://scenes/dex.tscn")))
-	nb.add_child(_nav_btn("🎲", "Probar", false, func(): get_tree().change_scene_to_file("res://scenes/attack_tester.tscn")))
 	nb.add_child(_nav_btn("👤", "Perfil", false, _soon))
 
 func _soon() -> void:
@@ -631,7 +632,8 @@ func _big_button(text: String, subtitle: String) -> Button:
 
 func _menu_button(icon: String, text: String, cb: Callable) -> Button:
 	var b := Button.new()
-	b.custom_minimum_size = Vector2(94, 58)
+	b.custom_minimum_size = Vector2(0, 62)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UITheme.style_surface(b, UITheme.SURFACE, UITheme.BORDER, 14)
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -639,8 +641,8 @@ func _menu_button(icon: String, text: String, cb: Callable) -> Button:
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_theme_constant_override("separation", 0)
 	b.add_child(v)
-	v.add_child(_lbl(icon, 20, UITheme.PRIMARY_EDGE, false, 600))
-	v.add_child(_lbl(text, 12, UITheme.TEXT2, true, 600))
+	v.add_child(_lbl(icon, 24, UITheme.PRIMARY_EDGE, false, 600))
+	v.add_child(_lbl(text, 14, UITheme.TEXT2, true, 700))
 	b.pressed.connect(cb)
 	return b
 

@@ -120,21 +120,30 @@ func _ready() -> void:
 func _setup_online_state() -> void:
 	_online = true
 	_seat = NetSession.seat
-	var mine: Array = NetSession.decks_by_seat.get(_seat, [])
-	var theirs: Array = NetSession.decks_by_seat.get(1 - _seat, [])
-	_half = mine.size()
-	# Swap the roster to [my figures, opponent figures]; restored on leaving the match.
+	# El mazo viaja como {"team": jugables, "lib": cierre de evoluciones}. SOLO el
+	# team se convierte en unidades (mismo tamaño en ambos lados -> mirror exacto);
+	# las libs van al final del roster únicamente para resolver modelos/rank-ups.
+	var mine_raw = NetSession.decks_by_seat.get(_seat, {})
+	var theirs_raw = NetSession.decks_by_seat.get(1 - _seat, {})
+	var my_team: Array = NetSession.team_of(mine_raw)
+	var their_team: Array = NetSession.team_of(theirs_raw)
+	_half = my_team.size()
+	# Swap the roster to [my team, their team, libs]; restored on leaving the match.
 	_saved_roster = Roster.FIGURES
 	var roster: Array = []
-	for f in mine:
+	for f in my_team:
 		roster.append(f)
-	for f in theirs:
+	for f in their_team:
+		roster.append(f)
+	for f in NetSession.lib_of(mine_raw):
+		roster.append(f)
+	for f in NetSession.lib_of(theirs_raw):
 		roster.append(f)
 	Roster.FIGURES = roster
 	_gs = GameState.new(MapData.new(NetSession.map))
-	for i in mine.size():
+	for i in my_team.size():
 		_gs.add_to_bench("player", i)                 # uids 0.._half-1
-	for i in theirs.size():
+	for i in their_team.size():
 		_gs.add_to_bench("enemy", _half + i)          # uids _half..
 	if _seat == 1:
 		_gs.turn_team = "enemy"                        # the host (seat 0) moves first
@@ -996,7 +1005,7 @@ func _preview_figure(uid: int) -> void:
 	panel.add_child(vb)
 	var card := FigureCard.new()
 	vb.add_child(card)
-	card.setup(fd, 0, _team_color("player"), false)
+	card.setup(fd, 0, _team_color(String(_gs.units[uid]["team"])), false)
 	# Description (custom figures carry one) — a reminder of what it is.
 	var desc := String(base.get("desc", ""))
 	if desc != "":
@@ -1148,6 +1157,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			if not _busy and not _over and _gs.turn_team == "player":
 				_on_board_click(mb.position)
+			elif not _over:
+				# Turno rival / animando: tocar cualquier figura abre su ficha
+				# (solo lectura) — para saber a QUÉ te enfrentas.
+				var nid := _node_under_cursor(mb.position)
+				var uid: int = _gs.board.get(nid, -1) if nid != -1 else -1
+				if uid != -1:
+					_preview_figure(uid)
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_UP:
 			_cam.position *= 0.93
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
@@ -1192,10 +1208,16 @@ func _on_board_click(mouse: Vector2) -> void:
 		var uid2: int = _gs.board.get(nid, -1)
 		if uid2 != -1 and _gs.units[uid2]["team"] == "player" and not _committed:
 			_activate_unit(uid2)
+		elif uid2 != -1 and _gs.units[uid2]["team"] != "player":
+			_preview_figure(uid2)   # rival NO atacable ahora: ver su ficha
 		return
 	var uid: int = _gs.board.get(nid, -1)
-	if uid != -1 and _gs.units[uid]["team"] == "player":
+	if uid == -1:
+		return
+	if _gs.units[uid]["team"] == "player":
 		_activate_unit(uid)
+	else:
+		_preview_figure(uid)        # ficha del rival (solo lectura)
 
 # ---------------------------------------------------------------- activation
 func _begin_deploy(uid: int) -> void:
@@ -1306,7 +1328,12 @@ func _player_move(node: int) -> void:
 	_committed = true
 	_refresh_bench_ui()
 	_update_status()
-	_gs.move_unit(_active_uid, node)
+	if not _gs.move_unit(_active_uid, node):
+		_busy = false
+		_committed = false
+		_refresh_active_highlights()
+		_update_status()
+		return
 	_net_send({"kind": "move", "uid": _active_uid, "to": node})
 	# A jump (over ONE enemy) always uses up all stamina and ends this figure's
 	# actions — you cannot jump again nor keep moving (no chaining through units).
@@ -1472,8 +1499,10 @@ func _apply_remote(a: Dictionary) -> void:
 			var uid := _mirror_uid(int(a["uid"]))
 			var tnode := _mirror_node(int(a["to"]))
 			var path := _gs.move_path(uid, tnode)
-			_gs.move_unit(uid, tnode)
-			await _walk_path(uid, path)
+			# Si el estado rechaza el movimiento (nodo ocupado por desync), NO se
+			# anima: la vista jamás diverge del estado.
+			if _gs.move_unit(uid, tnode):
+				await _walk_path(uid, path)
 		"modifier":
 			_gs.activate_modifier("enemy", String(a["mid"]))
 			var m: Dictionary = GameState.MODIFIERS.get(String(a["mid"]), {})
@@ -1553,13 +1582,15 @@ func _walk_path(uid: int, nodes: Array) -> void:
 		# Bloqueado si el estado O la VISTA tienen una figura ahí: aunque el estado
 		# se desincronizara, jamás se debe ATRAVESAR una figura visible (se salta).
 		var blocked: bool = (_gs.board.has(nid) and int(_gs.board[nid]) != uid) or _vis_occupied(nid, uid)
-		if blocked and not phasing and i + 1 < nodes.size():
-			# JUMP: leap OVER the occupant to the node beyond it (announce it).
+		if blocked and not phasing:
+			# SALTO: SIEMPRE en arco por encima del ocupante (aunque sea el último
+			# nodo del camino por un desync — nunca se camina a través de nadie).
 			if not announced:
 				_dramatize_effect(uid, "Salto")
 				announced = true
-			await _hop_over(fig, _gs.map.pos_of(nid), _gs.map.pos_of(int(nodes[i + 1])))
-			i += 2
+			var land := i + 1 if i + 1 < nodes.size() else i
+			await _hop_over(fig, _gs.map.pos_of(nid), _gs.map.pos_of(int(nodes[land])))
+			i = land + 1
 		else:
 			# PHASE: walk straight THROUGH the occupant (announce it).
 			if blocked and phasing and not announced:

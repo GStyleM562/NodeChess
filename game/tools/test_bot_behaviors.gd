@@ -42,21 +42,27 @@ func _initialize() -> void:
 	var occ2: int = gs.board.get(gs.map.goal_enemy, -1)
 	ok = _expect("el portero sigue en su meta", occ2 != -1 and String(gs.units[occ2]["team"]) == "enemy", true) and ok
 
-	# 5) partida completa bot-vs-bot con las nuevas prioridades: corre limpia
+	# 5) partida completa bot-vs-bot: corre limpia y el tablero queda CONSISTENTE
+	# tras CADA acción (sin fichas apiladas ni ocupaciones fantasma).
 	var g2 := GameState.new(MapData.new())
 	g2.bot_difficulty = 2
 	for ri in [0, 1, 2, 3, 4]:
 		g2.add_to_bench("player", ri)
 		g2.add_to_bench("enemy", ri)
 	var guard := 0
+	var consistent := true
 	while g2.winner == "" and guard < 400:
 		guard += 1
 		g2.bot_action(g2.turn_team)
 		g2.check_surround()
+		if not g2.board_consistent():
+			consistent = false
+			break
 		g2.turn_team = "enemy" if g2.turn_team == "player" else "player"
 		g2.turn_no += 1
 		g2._process_ko_returns()
 	ok = _expect("bot-vs-bot corre sin colgarse", guard <= 400, true) and ok
+	ok = _expect("tablero consistente SIEMPRE (sin stacks)", consistent, true) and ok
 	print("  (bot-vs-bot: winner='%s' acciones=%d)" % [g2.winner, guard])
 
 	print("BOT_AI_OK" if ok else "BOT_AI_FAIL")

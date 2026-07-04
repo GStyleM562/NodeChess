@@ -25,16 +25,21 @@ func _run() -> void:
 	ok = await _wait(func(): return a.is_open() and b.is_open(), 6.0) and ok
 	ok = _expect("both connected", a.is_open() and b.is_open(), true) and ok
 
-	a.create_room("Host", [{"id": "stone_golem"}], 1)
+	# formato nuevo de mazo: {"team": jugables, "lib": cierre} — opaco para el relay
+	a.create_room("Host", {"team": [{"id": "stone_golem"}], "lib": [{"id": "emberborn"}]}, 1)
 	ok = await _wait(func(): return code != "", 3.0) and ok
 	ok = _expect("room code (4)", code.length() == 4, true) and ok
 
-	b.join_room(code, "Guest", [{"id": "nightblade"}])
+	b.join_room(code, "Guest", {"team": [{"id": "nightblade"}], "lib": []})
 	await create_timer(0.4).timeout
 	a.start_match()
 	ok = await _wait(func(): return not b_start.is_empty(), 3.0) and ok
 	ok = _expect("B received start", not b_start.is_empty(), true) and ok
-	ok = _expect("start carries 2 decks", (b_start.get("decks", []) as Array).size(), 2) and ok
+	var decks: Array = b_start.get("decks", [])
+	ok = _expect("start carries 2 decks", decks.size(), 2) and ok
+	var d0 = decks[0].get("deck", {}) if decks.size() > 0 else {}
+	ok = _expect("deck viaja como dict con team", d0 is Dictionary and (d0.get("team", []) as Array).size() == 1, true) and ok
+	ok = _expect("lib viaja intacta", (d0.get("lib", []) as Array).size(), 1) and ok
 
 	a.send_action({"kind": "move", "uid": 3, "to": 8})
 	ok = await _wait(func(): return not b_action.is_empty(), 3.0) and ok

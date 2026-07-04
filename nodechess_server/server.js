@@ -39,7 +39,10 @@ function playerList(room) {
   return room.players.map((p) => ({ id: p.id, name: p.name, seat: p.seat, ready: p.ready, host: p.id === room.hostId }));
 }
 function mkPlayer(ws, msg, seat) {
-  return { ws, id: ws.nc.id, name: String(msg.name || "P").slice(0, 16), seat, ready: false, deck: Array.isArray(msg.deck) ? msg.deck : [] };
+  // El deck es OPACO para el relay: hoy es {team:[...], lib:[...]} (antes Array).
+  // Aceptar cualquier objeto/array; solo se rechaza lo que no sea JSON estructurado.
+  const deck = msg.deck && typeof msg.deck === "object" ? msg.deck : [];
+  return { ws, id: ws.nc.id, name: String(msg.name || "P").slice(0, 16), seat, ready: false, deck };
 }
 
 wss.on("connection", (ws) => {

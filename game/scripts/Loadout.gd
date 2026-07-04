@@ -8,7 +8,8 @@ const DECK_SIZE := 5
 
 static var player_team: Array = [0, 1, 2, 3, 4]   # default until the player picks
 # A fixed, reasonable opponent deck (the smarter-CPU task can vary this later).
-static var enemy_team: Array = [1, 0, 2, 4, 5]
+# Sin storm_valkyrie (índice 5): su modelo "ave" está buggeado y tapa la pantalla.
+static var enemy_team: Array = [1, 0, 2, 4, 3]
 
 # Equipped modifier cards (ids into GameState.MODIFIERS), up to 3.
 static var player_modifiers: Array = ["power_surge", "cleanse", "adrenaline"]

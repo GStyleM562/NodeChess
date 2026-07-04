@@ -41,12 +41,25 @@ func build_match(decks: Array, my_seat: int, s: int, m: int) -> void:
 		if int(d.get("seat", 0)) != my_seat:
 			opp_name = String(d.get("name", "Rival"))
 	decks_by_seat = by_seat
-	for f in by_seat[0]:
+	for f in team_of(by_seat[0]):
 		team_p0.append(match_roster.size())
 		match_roster.append(f)
-	for f in by_seat[1]:
+	for f in team_of(by_seat[1]):
 		team_p1.append(match_roster.size())
 		match_roster.append(f)
+
+## Figuras JUGABLES de un payload de mazo. Formato nuevo {"team": [...], "lib":
+## [...]} o legado (Array plano = todo era equipo).
+static func team_of(payload) -> Array:
+	if payload is Dictionary:
+		return payload.get("team", [])
+	return payload if payload is Array else []
+
+## Biblioteca (cierre de evoluciones) de un payload de mazo — solo para render.
+static func lib_of(payload) -> Array:
+	if payload is Dictionary:
+		return payload.get("lib", [])
+	return []
 
 func end_online() -> void:
 	online = false

@@ -186,10 +186,11 @@ func _send(obj: Dictionary) -> void:
 		_ws.send_text(JSON.stringify(obj))
 
 # --- API --------------------------------------------------------------------
-func create_room(pname: String, deck: Array, map: int) -> void:
+## `deck` es opaco para el relay: hoy {"team": [...], "lib": [...]} (antes Array).
+func create_room(pname: String, deck, map: int) -> void:
 	_send({"t": "create", "name": pname, "deck": deck, "map": map})
 
-func join_room(code: String, pname: String, deck: Array) -> void:
+func join_room(code: String, pname: String, deck) -> void:
 	_send({"t": "join", "code": code.to_upper(), "name": pname, "deck": deck})
 
 func set_map(map: int) -> void:
