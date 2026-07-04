@@ -65,6 +65,16 @@ func _initialize() -> void:
 	ok = _expect("tablero consistente SIEMPRE (sin stacks)", consistent, true) and ok
 	print("  (bot-vs-bot: winner='%s' acciones=%d)" % [g2.winner, guard])
 
+	# 6) despliega Y CAMINA con la estamina restante en la MISMA acción (como el
+	# jugador): desplegar cuesta 1, el resto avanza hacia su prioridad.
+	var g3 := GameState.new(MapData.new())
+	g3.bot_difficulty = 2
+	var nb3 := g3.add_to_bench("enemy", 2)   # nightblade: estamina 3
+	var a3 := g3.bot_action("enemy")
+	ok = _expect("deploy encadena caminata", String(a3["type"]) == "deploy" and a3.has("move_to"), true) and ok
+	ok = _expect("terminó fuera de la entrada", int(g3.units[nb3]["node"]) != int(a3["node"]), true) and ok
+	ok = _expect("consistente tras deploy+walk", g3.board_consistent(), true) and ok
+
 	print("BOT_AI_OK" if ok else "BOT_AI_FAIL")
 	quit()
 

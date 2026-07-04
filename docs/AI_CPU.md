@@ -34,6 +34,10 @@
 5. **DESPLEGAR TODO** — *"no dejes personajes en la banca"*: mientras haya banca
    y entradas libres, despliega (la figura más fuerte primero) por la entrada
    más cercana a la meta rival. Sin tope de figuras en tablero.
+   **Despliega y CAMINA** (igual que el jugador): desplegar cuesta 1 de
+   estamina y el resto se usa en la misma acción para avanzar hacia su
+   prioridad (el guardián hacia la propia meta, el resto hacia la rival),
+   esquivando rivales y sin apilarse jamás.
 6. **BUFF NODE** — toma el nodo de buff si está libre y no es una trampa.
 7. **AVANZAR ESQUIVANDO** — *"ir a la portería enemiga evitando enemigos"*:
    elige el movimiento con mejor `progreso − 0.8·riesgo`, donde `riesgo` = nº de

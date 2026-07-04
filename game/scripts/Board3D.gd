@@ -590,7 +590,9 @@ func _add_node_core(n: Dictionary) -> void:
 	add_child(mi)
 
 # ---------------------------------------------------------------- figures
-func _spawn_vis(uid: int) -> void:
+## `at_node` >= 0: aparece AHÍ aunque el estado ya esté más adelante (la CPU
+## despliega y camina en la misma acción; la vista debe partir de la entrada).
+func _spawn_vis(uid: int, at_node := -1) -> void:
 	Sfx.play("deploy")
 	var u: Dictionary = _gs.units[uid]
 	var data: Dictionary = _gs.model_data(uid)   # rank-aware (ranked figures keep their model after KO)
@@ -598,7 +600,7 @@ func _spawn_vis(uid: int) -> void:
 	add_child(fig)
 	fig.setup(data["glb"], data["clips"], float(data.get("size", 1.0)))
 	fig.set_meta("glb", String(data["glb"]))
-	fig.position = _gs.map.pos_of(u["node"])
+	fig.position = _gs.map.pos_of(at_node if at_node >= 0 else int(u["node"]))
 	_face(fig, Vector3(0, 0, 1.0) if u["team"] == "player" else Vector3(0, 0, -1.0))
 	_add_team_ring(fig, u["team"])
 	fig.play_clip("idle")
@@ -1575,8 +1577,11 @@ func _bot_loop() -> void:
 func _animate_bot(rec: Dictionary) -> void:
 	match String(rec.get("type", "pass")):
 		"deploy":
-			_spawn_vis(int(rec["uid"]))
+			_spawn_vis(int(rec["uid"]), int(rec["node"]))   # aparece en la ENTRADA
 			await get_tree().create_timer(0.3).timeout
+			# La CPU puede CAMINAR tras desplegar (estamina restante), como tú.
+			if rec.has("move_to"):
+				await _walk_path(int(rec["uid"]), rec.get("path", [int(rec["move_to"])]))
 			await _resolve_surround()
 		"move":
 			await _walk_path(int(rec["uid"]), rec.get("path", [int(rec["node"])]))

@@ -739,7 +739,8 @@ func _bot_guard_goal(team: String, own_goal: int) -> Dictionary:
 		var p := _bot_path(best_uid, own_goal)
 		move_unit(best_uid, own_goal)
 		return {"type": "move", "uid": best_uid, "node": own_goal, "path": p}
-	# nadie llega: sembrar guardia desde la banca por la entrada más cercana a MI meta
+	# nadie llega: sembrar guardia desde la banca por la entrada más cercana a MI
+	# meta y CAMINAR hacia ella con la estamina restante (como el jugador).
 	if can_deploy(team):
 		var fe := free_entrances(team)
 		var node: int = fe[0]
@@ -751,7 +752,9 @@ func _bot_guard_goal(team: String, own_goal: int) -> Dictionary:
 				node = n
 		var uid := _best_bench(team)
 		deploy(uid, node)
-		return {"type": "deploy", "uid": uid, "node": node}
+		var rec := {"type": "deploy", "uid": uid, "node": node}
+		_bot_deploy_walk(rec, uid, own_goal, team)
+		return rec
 	return {}
 
 # 3) CERCO: si a un rival le falta EXACTAMENTE un nodo para quedar rodeado,
@@ -806,7 +809,7 @@ func _bot_attack(team: String, target_goal: int, own_goal: int) -> Dictionary:
 	return rec
 
 # 5) DESPLEGAR TODO: nunca dejar figuras en la banca (la mejor primero, por la
-# entrada más cercana a la meta rival).
+# entrada más cercana a la meta rival) y AVANZAR con la estamina restante.
 func _bot_deploy(team: String, target_goal: int) -> Dictionary:
 	if not can_deploy(team):
 		return {}
@@ -820,7 +823,40 @@ func _bot_deploy(team: String, target_goal: int) -> Dictionary:
 			node = n
 	var uid := _best_bench(team)
 	deploy(uid, node)
-	return {"type": "deploy", "uid": uid, "node": node}
+	var rec := {"type": "deploy", "uid": uid, "node": node}
+	_bot_deploy_walk(rec, uid, target_goal, team)
+	return rec
+
+## Tras desplegar, camina con la estamina RESTANTE (desplegar cuesta 1, igual
+## que el jugador) hacia donde quiere estar, esquivando rivales y sin apilarse.
+## Anota "move_to"/"path" en el record para que la vista anime el paseo.
+func _bot_deploy_walk(rec: Dictionary, uid: int, toward: int, team: String) -> void:
+	var budget := effective_stamina(uid) - 1
+	if budget <= 0 or not can_move(uid):
+		return
+	var opp := _enemy_team(team)
+	var cur := _dist(units[uid]["node"], toward)
+	var best_node := -1
+	var best_score := 0.01
+	for nid in move_targets(uid, budget).keys():
+		if _all_neighbours_held(nid, opp):
+			continue                                   # no meterse solo a un cerco
+		var impr := cur - _dist(nid, toward)
+		var risk := 0.0
+		for nb in map.adj[nid]:
+			var occ := _node_occupant(nb)
+			if occ != -1 and units[occ]["team"] == opp and units[occ]["alive"]:
+				risk += 1.0
+		var score := impr - risk * 0.8
+		if score > best_score:
+			best_score = score
+			best_node = nid
+	if best_node == -1:
+		return
+	var p := _bot_path(uid, best_node)
+	if move_unit(uid, best_node):
+		rec["move_to"] = best_node
+		rec["path"] = p
 
 # 6) BUFF NODE: tomar el centro si está libre y no es una trampa.
 func _bot_buff(team: String, own_goal: int) -> Dictionary:
