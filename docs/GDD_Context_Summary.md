@@ -52,6 +52,11 @@ Six "Figures" per player move across a node board, fight via **probability comba
 - **Deck:** **6 Figures + 3 Modifiers** (no duplicate Modifiers). Must be 6/6 + 3/3 to queue. Up to 20 saved decks; sharing via codes.
 - **Collection:** favorites, tags, wishlist, search/filter/sort, skins (cosmetic only), Encyclopedia (silhouette → seen → owned), completion %.
 - **Maps:** symmetrical (MVP), 18–60 nodes, 2–3 entrances, 0–4 buff nodes. Archetypes: Aggro / Control / Fortress / Triple Spawn / Ring / Crossroads / Temple. Combat expected by turn 2–6 depending on type. Connections can be H/V/Diagonal. Map Validator enforces symmetry, reachability, spawn fairness, mobile readability.
+- **Map pacing rules (2026-07, implemented):**
+  - **Distancia mínima**: entrada → meta rival ≥ 6 nodos con todo abierto (≥ 7 mientras haya candados). Evita ganar en 2 turnos (despliegue+caminata con estamina 3 avanza máx. 5). Túneles queda en 6 por su portal (identidad del mapa).
+  - **Candados temporales** (`MapData.locked_until`): los caminos MÁS CORTOS (rieles medios) arrancan cerrados (🔒 visible en tablero) y ABREN en `LOCK_OPEN_AT` (turn_no 6 ≈ ronda 3 de cada bando). El inicio se pelea por el centro; los rieles se vuelven expreso tardío. Movimiento, saltos, rutas, desplazamientos y la IA los respetan.
+  - **Espejo 180° automórfico**: toda arista [a,b] tiene su gemela [mirror(a),mirror(b)] — requisito duro del online sin voltear tablero (test_map_rules lo verifica).
+- **Reglas aclaradas en código (fuente: este GDD):** Blanco vs Oro se decide POR DAÑO (no triángulo duro); despliegue solo desde banca a nodo libre; jamás dos figuras en un nodo (anti-stack en motor); salto aterriza en cualquier casilla libre adyacente al rival (imposible si todo está tapado). IA de la CPU: ver `docs/AI_CPU.md`.
 
 ## 3. PvE (Part 3) — *the MVP focus*
 

@@ -139,12 +139,23 @@ func reachable_for(uid: int) -> Dictionary:
 func _can_phase(uid: int) -> bool:
 	return has_passive(uid, "phase") or has_passive(uid, "aerial")
 
+## Nodo con CANDADO temporal (camino corto cerrado los primeros turnos).
+func node_locked(nid: int) -> bool:
+	return turn_no < int(map.locked_until.get(nid, 0))
+
+## Suma al dict `d` los nodos aún candadeados (intransitables por ahora).
+func _add_locked(d: Dictionary) -> Dictionary:
+	for nid in map.locked_until.keys():
+		if node_locked(int(nid)):
+			d[int(nid)] = true
+	return d
+
 func move_targets(uid: int, budget: int) -> Dictionary:
 	if not can_move(uid) or budget <= 0:
 		return {}
 	var u: Dictionary = units[uid]
 	var phasing := _can_phase(uid)
-	var blocked := {}
+	var blocked := _add_locked({})
 	if not phasing:
 		for nid in board.keys():
 			if nid != u["node"]:
@@ -165,7 +176,7 @@ func move_targets(uid: int, budget: int) -> Dictionary:
 			if occ == -1 or units[occ]["team"] == u["team"] or not units[occ]["alive"]:
 				continue                                  # only hop over a live enemy
 			for f in map.adj[e]:
-				if f == u["node"] or board.has(f) or f in map.obstacles:
+				if f == u["node"] or board.has(f) or f in map.obstacles or node_locked(f):
 					continue                              # land on a free, walkable node beyond it
 				if not reach.has(f) or int(reach[f]) > 2:
 					reach[f] = 2                          # a jump costs 2 stamina (one enemy only)
@@ -176,7 +187,7 @@ func move_targets(uid: int, budget: int) -> Dictionary:
 func move_path(uid: int, target: int) -> Array:
 	var u: Dictionary = units[uid]
 	var phasing := _can_phase(uid)
-	var blocked := {}
+	var blocked := _add_locked({})
 	if not phasing:
 		for nid in board.keys():
 			if nid != u["node"]:
@@ -579,7 +590,7 @@ func _apply_displacement(winner_uid: int, loser_uid: int, seg: Dictionary) -> Di
 		var best := -1
 		var best_score := 0.15   # require a clear directional match
 		for nb in map.adj[cur]:
-			if board.has(nb):
+			if board.has(nb) or nb in map.obstacles or node_locked(nb):
 				continue
 			var score := (map.pos_of(nb) - cur_pos).normalized().dot(want)
 			if score > best_score:

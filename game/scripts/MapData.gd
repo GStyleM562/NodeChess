@@ -17,7 +17,13 @@ var goal_enemy := -1
 var buffs := []
 var obstacles := []      # impassable node ids (cannot move onto/through)
 var teleporters := []    # portal pairs [[a, b], ...] (already linked as graph edges)
+## Candados temporales: id -> turn_no en que el nodo se ABRE. Los caminos más
+## cortos arrancan cerrados (variedad de aperturas) y se habilitan después.
+var locked_until := {}
 var map_name := ""
+
+## turn_no cuenta MEDIO-turnos (cada end_turn). 6 ≈ 3 rondas de cada bando.
+const LOCK_OPEN_AT := 6
 
 func _init(layout := 0) -> void:
 	match layout:
@@ -119,23 +125,34 @@ func _build_duel(tunnels := false) -> void:
 	var n17 := _add(Vector3(-2.85, 0, 4.2))   # enemy entrance L (corner)
 	var n18 := _add(Vector3(2.85, 0, 4.2))    # enemy entrance R (corner)
 	var n19 := _add(Vector3(0.0, 0, 5.7))     # enemy goal
+	# v4 — UNA FILA MÁS: rieles con nodo medio + centro en columna (evita ganar
+	# en 2 turnos: mínimo entrada->meta rival = 7 por riel, 8 por el centro).
+	var nL := _add(Vector3(-2.85, 0, 0.0))    # rail L mid (candado inicial)
+	var nR := _add(Vector3(2.85, 0, 0.0))     # rail R mid (candado inicial)
+	var cA := _add(Vector3(0.0, 0, -0.5))     # centro bajo
+	var cB := _add(Vector3(0.0, 0, 0.5))      # centro alto
 
 	var edges := [
 		# goals (each degree 3)
 		[n0, n1], [n0, n2], [n0, n3], [n19, n16], [n19, n17], [n19, n18],
 		# bottom / top centre branch to the inner nodes
 		[n3, n8], [n3, n9], [n16, n10], [n16, n11],
-		# LONG left rail: PeL-L1-L2-L3-L4-EeL
-		[n1, n4], [n4, n6], [n6, n12], [n12, n14], [n14, n17],
-		# LONG right rail: PeR-R1-R2-R3-R4-EeR
-		[n2, n5], [n5, n7], [n7, n13], [n13, n15], [n15, n18],
+		# LONG left rail (ahora con nodo medio): PeL-L1-L2-Lmid-L3-L4-EeL
+		[n1, n4], [n4, n6], [n6, nL], [nL, n12], [n12, n14], [n14, n17],
+		# LONG right rail: PeR-R1-R2-Rmid-R3-R4-EeR
+		[n2, n5], [n5, n7], [n7, nR], [nR, n13], [n13, n15], [n15, n18],
 		# inner nodes hook into the rails
 		[n8, n4], [n9, n5], [n10, n14], [n11, n15],
-		# central X (two crossing diagonals; no node at the crossing -> no degree 4)
-		[n8, n11], [n9, n10],
+		# columna central (automórfica al espejo 180°: mirror(cA)=cB,
+		# mirror(n8)=n11, mirror(n9)=n10 -> cada arista tiene su gemela)
+		[n8, cA], [n9, cA], [cA, cB], [cB, n10], [cB, n11],
 	]
 	for e in edges:
 		_edge(e[0], e[1])
+
+	# candado inicial: los nodos medios del riel (el camino más corto) abren
+	# en el turno LOCK_OPEN_AT — al inicio se pelea por el centro.
+	locked_until = {nL: LOCK_OPEN_AT, nR: LOCK_OPEN_AT}
 
 	goal_player = n0
 	goal_enemy = n19
@@ -161,18 +178,34 @@ func _build_duel(tunnels := false) -> void:
 		nodes[n3]["role"] = "obstacle"
 		obstacles = [n3]
 
-## Shared 16-node layout: an X of crossing diagonals (no node at the crossing, so
-## no degree-4 hub), 2 entrances per side, goals top/bottom. `P` = 16 positions,
-## `bf` = buff node ids. Topology is fixed; geometry/buffs vary per map.
+## Shared layout (antes 16 nodos, hoy 16+6): columna central en vez del cruce en
+## X (mínimo entrada->meta = 7) y rieles laterales completos con nodos medios
+## CANDADEADOS al inicio (abren en LOCK_OPEN_AT; luego el riel cuesta 6).
+## `P` = 16 posiciones base, `bf` = buff node ids. Topología fija por mapa.
 func _build_x16(mname: String, P: Array, bf: Array) -> void:
 	map_name = mname
 	for p in P:
 		_add(p)
+	# UNA FILA MÁS: centro (cA/cB) + rieles medios por lado (rl1/rl2, rr1/rr2).
+	var zc: float = absf((P[6] as Vector3).z) * 0.45
+	var zr: float = absf((P[4] as Vector3).z) * 0.35
+	var xl: float = (P[4] as Vector3).x
+	var xr: float = (P[5] as Vector3).x
+	var cA := _add(Vector3(0, 0, -zc))         # 16 centro bajo
+	var cB := _add(Vector3(0, 0, zc))          # 17 centro alto
+	var rl1 := _add(Vector3(xl, 0, -zr))       # 18 riel L bajo (candado)
+	var rl2 := _add(Vector3(xl, 0, zr))        # 19 riel L alto (candado)
+	var rr1 := _add(Vector3(xr, 0, -zr))       # 20 riel R bajo (candado)
+	var rr2 := _add(Vector3(xr, 0, zr))        # 21 riel R alto (candado)
 	var edges := [
 		[0, 1], [0, 2], [0, 3], [15, 13], [15, 14], [15, 12],
 		[1, 4], [2, 5], [3, 6], [3, 7], [12, 8], [12, 9],
-		[4, 6], [5, 7], [6, 9], [7, 8], [8, 10], [9, 11],
+		[4, 6], [5, 7], [8, 10], [9, 11],
 		[10, 13], [11, 14], [13, 15], [14, 15],
+		# columna central automórfica (mirror: 6<->9, 7<->8, cA<->cB)
+		[6, cA], [7, cA], [cA, cB], [cB, 8], [cB, 9],
+		# rieles laterales (mirror: 4<->11, 5<->10, rl1<->rr2, rl2<->rr1)
+		[4, rl1], [rl1, rl2], [rl2, 10], [5, rr1], [rr1, rr2], [rr2, 11],
 	]
 	for e in edges:
 		_edge(e[0], e[1])
@@ -189,6 +222,8 @@ func _build_x16(mname: String, P: Array, bf: Array) -> void:
 	for b in bf:
 		nodes[b]["role"] = "buff"
 	buffs = bf
+	# los rieles (el camino más corto una vez abiertos) arrancan con candado
+	locked_until = {rl1: LOCK_OPEN_AT, rl2: LOCK_OPEN_AT, rr1: LOCK_OPEN_AT, rr2: LOCK_OPEN_AT}
 
 func _build_hourglass() -> void:
 	# Tall, pinched in the middle — short side lanes, tight centre (easy surrounds).

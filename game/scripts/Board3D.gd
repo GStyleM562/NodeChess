@@ -22,8 +22,10 @@ const HILITE_ATK := Color(1.0, 0.322, 0.278)
 const HILITE_DEPLOY := Color(0.212, 0.82, 0.498)
 const HILITE_JUMP := Color(1.0, 0.78, 0.25)    # dorado: aterrizaje de SALTO
 ## Loseta Meshy por rol (carpeta en assets/board/). Sin asset -> disco procedural.
+## El buff usa SU PROPIO asset como tile de piso (la plataforma ya trae su
+## diamante): nada de doble tile con otro cristal flotando encima.
 const TILE_SLUG := {
-	"normal": "node_tile", "buff": "node_tile",
+	"normal": "node_tile", "buff": "buff_crystal",
 	"goal_player": "goal_player", "goal_enemy": "goal_enemy",
 	"entrance_player": "entrance_player", "entrance_enemy": "entrance_enemy",
 }
@@ -51,6 +53,7 @@ var _tiled := {}         # nid -> true si tiene loseta Meshy (disco = overlay tr
 static var _tile_scenes := {}
 var _assets_on := true   # Configuración: "3d" = losetas Meshy · "2d" = digital
 var _last_turn := ""     # para anunciar "¡ES TU TURNO!" solo cuando cambia
+var _lock_vis := {}      # nid -> visual de candado (nodo cerrado los 1ros turnos)
 var _highlighted := []
 var _entrance_owner := {}      # entrance node id -> owning team (for the "blocked" siren)
 var _sirening := {}            # entrance nodes currently pulsing red
@@ -277,10 +280,49 @@ func _build_board() -> void:
 			_add_goal_beacon(g)
 	for b in _gs.map.buffs:
 		_add_buff_crystal(b)
+	for nid in _gs.map.locked_until.keys():
+		_add_lock_vis(int(nid))
 	for e in _gs.map.entrances_player:
 		_entrance_owner[e] = "player"
 	for e in _gs.map.entrances_enemy:
 		_entrance_owner[e] = "enemy"
+
+## Candado visible sobre un nodo cerrado los primeros turnos: aro rojo + 🔒.
+## Se oculta solo cuando el camino se abre (_refresh_locks en _update_status).
+func _add_lock_vis(nid: int) -> void:
+	var grp := Node3D.new()
+	add_child(grp)
+	var p := _gs.map.pos_of(nid)
+	var ring := MeshInstance3D.new()
+	var t := TorusMesh.new()
+	t.inner_radius = 0.42
+	t.outer_radius = 0.58
+	ring.mesh = t
+	ring.position = p + Vector3(0, 0.14, 0)
+	ring.scale = Vector3(1, 0.45, 1)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.85, 0.2, 0.2)
+	mat.emission_enabled = true
+	mat.emission = Color(1.0, 0.25, 0.2)
+	mat.emission_energy_multiplier = 1.0
+	ring.material_override = mat
+	grp.add_child(ring)
+	var lbl := Label3D.new()
+	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.no_depth_test = true
+	lbl.text = "🔒"
+	lbl.font_size = 96
+	lbl.pixel_size = 0.006
+	lbl.outline_size = 18
+	lbl.position = p + Vector3(0, 0.9, 0)
+	grp.add_child(lbl)
+	_lock_vis[nid] = grp
+
+func _refresh_locks() -> void:
+	for nid in _lock_vis.keys():
+		var v = _lock_vis[nid]
+		if is_instance_valid(v):
+			v.visible = _gs.node_locked(int(nid))
 
 # ---------------------------------------------------------------- board assets
 ## Primer GLB dentro de assets/board/<slug>/ (cacheado). null si no hay.
@@ -338,9 +380,14 @@ func _place_tile(role: String, pos: Vector3) -> bool:
 		bb = Transform3D(Basis(Vector3.RIGHT, -PI / 2.0), Vector3.ZERO) * bb
 	var s := 1.28 / maxf(bb.size.x, bb.size.z)
 	inst.scale = Vector3.ONE * s
+	var y := TILE_TOP - (bb.position.y + bb.size.y) * s
+	if slug == "buff_crystal":
+		# plataforma+cristal: se ASIENTA por su BASE (el cristal queda de pie
+		# sobre su propio tile — alinear por la cima lo enterraría).
+		y = -0.02 - bb.position.y * s
 	inst.position = Vector3(
 		pos.x - (bb.position.x + bb.size.x * 0.5) * s,
-		TILE_TOP - (bb.position.y + bb.size.y) * s,
+		y,
 		pos.z - (bb.position.z + bb.size.z * 0.5) * s)
 	return true
 
@@ -459,43 +506,30 @@ func _add_goal_beacon(id: int) -> void:
 	beam.material_override = mat
 	add_child(beam)
 
-## Reliquia flotante girando sobre el buff node ("objeto de poder"). Flota ALTO
-## (por encima de las cabezas) para que ninguna figura la atraviese al pararse ahí.
-## Con asset Meshy usa la plataforma-cristal; sin asset, el prisma procedural.
+## Marcador del buff node. En 3D con asset NO se agrega nada: la loseta del buff
+## ya ES la plataforma con su diamante (asentada en el piso por _place_tile).
+## En 2D digital (o sin asset) se usa el prisma flotante procedural.
 func _add_buff_crystal(id: int) -> void:
-	var c: Node3D
-	var ps := _board_scene("buff_crystal") if _assets_on else null
-	if ps != null:
-		c = ps.instantiate() as Node3D
-		add_child(c)
-		var bb := _scene_aabb(c)
-		var s := 0.8 / maxf(bb.size.x, bb.size.z)
-		c.scale = Vector3.ONE * s
-		var p := _gs.map.pos_of(id)
-		c.position = Vector3(
-			p.x - (bb.position.x + bb.size.x * 0.5) * s,
-			2.2 - (bb.position.y + bb.size.y * 0.5) * s,
-			p.z - (bb.position.z + bb.size.z * 0.5) * s)
-	else:
-		var mi := MeshInstance3D.new()
-		var pm := PrismMesh.new()
-		pm.size = Vector3(0.34, 0.5, 0.34)
-		mi.mesh = pm
-		mi.position = _gs.map.pos_of(id) + Vector3(0, 2.2, 0)
-		var col: Color = ROLE_COLOR.get("buff", Color(1.0, 0.6, 0.2))
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = col.darkened(0.15)
-		mat.emission_enabled = true
-		mat.emission = col
-		mat.emission_energy_multiplier = 1.4
-		mi.material_override = mat
-		add_child(mi)
-		c = mi
+	if _assets_on and _board_scene("buff_crystal") != null:
+		return
+	var mi := MeshInstance3D.new()
+	var pm := PrismMesh.new()
+	pm.size = Vector3(0.34, 0.5, 0.34)
+	mi.mesh = pm
+	mi.position = _gs.map.pos_of(id) + Vector3(0, 2.2, 0)
+	var col: Color = ROLE_COLOR.get("buff", Color(1.0, 0.6, 0.2))
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = col.darkened(0.15)
+	mat.emission_enabled = true
+	mat.emission = col
+	mat.emission_energy_multiplier = 1.4
+	mi.material_override = mat
+	add_child(mi)
 	var tw := create_tween().set_loops()
-	tw.tween_property(c, "rotation:y", TAU, 5.0).from(0.0)
+	tw.tween_property(mi, "rotation:y", TAU, 5.0).from(0.0)
 	var bob := create_tween().set_loops()
-	bob.tween_property(c, "position:y", c.position.y + 0.16, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	bob.tween_property(c, "position:y", c.position.y, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	bob.tween_property(mi, "position:y", mi.position.y + 0.16, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	bob.tween_property(mi, "position:y", mi.position.y, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 ## Línea de energía que CONECTA dos nodos (ambos modos: es la lectura del grafo).
 ## En 2D digital lleva además una pasarela oscura como cuerpo del camino.
@@ -1077,6 +1111,7 @@ func _update_status() -> void:
 		_last_turn = _gs.turn_team
 		if _gs.turn_team == "player":
 			_show_banner("✨ ¡ES TU TURNO! ✨", UITheme.SUCCESS)
+	_refresh_locks()
 	_end_btn.visible = _gs.turn_team == "player"
 	# Can't end the turn without acting — unless there is genuinely nothing to do.
 	_end_btn.disabled = _busy or (not _committed and _player_has_actions())
