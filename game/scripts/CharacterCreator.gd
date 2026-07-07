@@ -88,8 +88,17 @@ var _status_lbl: Label
 var _save_btn: Button
 var _model_ids: Array = []
 var _editing_id := ""             # non-empty when editing -> save overwrites it
+var _edit_original := {}          # figura tal como se cargó (economía: cobrar solo el delta)
+var _orig_keys := {}              # piezas ya invertidas en la original (cuentan como propias)
 
 func _ready() -> void:
+	# ANTES de construir los controles: si venimos a EDITAR, las piezas ya
+	# invertidas en la figura original cuentan como propias (no se re-cobran
+	# ni aparecen con candado).
+	if not edit_figure.is_empty():
+		_edit_original = edit_figure.duplicate(true)
+		for k in _inv().required_pieces(_edit_original):
+			_orig_keys[k] = true
 	var bg := ColorRect.new()
 	bg.color = UITheme.BG_DEEP
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -320,7 +329,7 @@ func _build_passives(form: VBoxContainer) -> void:
 		tg.tooltip_text = pdesc
 		_style_toggle(tg)
 		tg.toggled.connect(func(_p): _revalidate())
-		if not _inv().is_admin() and not _inv().has_piece("passive:" + String(pid)):
+		if not _inv().is_admin() and not _piece_ok("passive:" + String(pid)):
 			tg.disabled = true
 			tg.text = "🔒 " + pname
 		item.add_child(tg)
@@ -645,7 +654,7 @@ func _revalidate() -> void:
 	for w in r["warnings"]:
 		msgs.append("⚠ " + String(w))
 	# MODO USUARIO: solo puede guardar con piezas de su inventario (regla dura).
-	var missing: Array = _inv().missing_pieces(fig)
+	var missing: Array = _inv().missing_pieces_for(fig, _edit_original)
 	if not missing.is_empty():
 		var names: Array = []
 		for key in missing:
@@ -662,7 +671,7 @@ func _revalidate() -> void:
 func _on_save() -> void:
 	var fig: Dictionary = build_figure()
 	var r: Dictionary = FigureValidator.validate(fig)
-	if String(r["state"]) == "INVALID" or not _inv().missing_pieces(fig).is_empty():
+	if String(r["state"]) == "INVALID" or not _inv().missing_pieces_for(fig, _edit_original).is_empty():
 		_revalidate()
 		return
 	if _editing_id != "":
@@ -677,6 +686,18 @@ func _on_save() -> void:
 		fig["id"] = id
 	CustomFigures.add(fig)               # persist (overwrites by id)
 	CustomFigures.apply_live(fig)        # update the in-memory roster now (new or edited)
+	# ECONOMÍA (modo usuario): crear GASTA las piezas; editar cobra solo las
+	# nuevas y devuelve las retiradas. La base para diffs pasa a ser lo guardado.
+	if _edit_original.is_empty():
+		_inv().consume_for(fig)
+	else:
+		_inv().adjust_for_edit(_edit_original, fig)
+	_edit_original = fig.duplicate(true)
+	_orig_keys.clear()
+	for k in _inv().required_pieces(_edit_original):
+		_orig_keys[k] = true
+	if _editing_id == "":
+		_editing_id = String(fig["id"])   # siguientes guardados = edición de ESTA figura
 	_show_saved(String(fig["name"]))
 
 func _builtin_has(id: String) -> bool:
@@ -725,6 +746,10 @@ func _show_saved(figname: String) -> void:
 func _inv() -> Node:
 	return get_node("/root/Inventory")
 
+## ¿La pieza está disponible? (en inventario, o ya invertida en la figura original)
+func _piece_ok(key: String) -> bool:
+	return _inv().has_piece(key) or _orig_keys.has(key)
+
 ## 🔒 modo usuario: deshabilita las opciones cuya pieza no está en el inventario
 ## (keys[i] = pieza de la opción i; "" = siempre permitida).
 func _lock_items(opt: OptionButton, keys: Array) -> void:
@@ -732,7 +757,7 @@ func _lock_items(opt: OptionButton, keys: Array) -> void:
 		return
 	for i in mini(opt.item_count, keys.size()):
 		var key := String(keys[i])
-		if key != "" and not _inv().has_piece(key):
+		if key != "" and not _piece_ok(key):
 			opt.set_item_disabled(i, true)
 			opt.set_item_text(i, "🔒 " + opt.get_item_text(i))
 

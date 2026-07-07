@@ -33,8 +33,15 @@ var mode := "admin"
 var pieces := {}       # key -> int (piezas completas)
 var fragments := {}    # key -> int
 var next_chest := {}   # chest_id -> unix ts en que estará listo
+var xp := 0            # experiencia dentro del nivel actual
+var level := 1         # nivel del jugador (sube jugando; da piezas de regalo)
 var _loaded := false
 var _starter := false  # kit inicial ya entregado
+
+const XP_WIN := 60
+const XP_LOSS := 25
+const XP_ONLINE_BONUS := 15
+const LEVEL_REWARD_PIECES := 2   # piezas completas al azar por cada nivel
 
 # ---------------------------------------------------------------- modo
 func is_admin() -> bool:
@@ -79,6 +86,78 @@ func convert(key: String) -> bool:
 	pieces[key] = int(pieces.get(key, 0)) + 1
 	_save()
 	return true
+
+# ---------------------------------------------------------------- economía
+## GASTA las piezas de una figura recién creada (modo usuario; admin no gasta).
+## El bloqueo previo (missing_pieces) garantiza que todas existen.
+func consume_for(fig: Dictionary) -> void:
+	_ensure_loaded()
+	if is_admin():
+		return
+	for key in required_pieces(fig):
+		pieces[key] = maxi(0, int(pieces.get(key, 0)) - 1)
+	_save()
+
+## EDICIÓN: cobra solo las piezas NUEVAS y devuelve las que se retiraron
+## (las piezas ya invertidas en la figura original no se cobran dos veces).
+func adjust_for_edit(old_fig: Dictionary, new_fig: Dictionary) -> void:
+	_ensure_loaded()
+	if is_admin():
+		return
+	var before := {}
+	for k in required_pieces(old_fig):
+		before[k] = true
+	var after := {}
+	for k in required_pieces(new_fig):
+		after[k] = true
+	for k in after.keys():
+		if not before.has(k):
+			pieces[k] = maxi(0, int(pieces.get(k, 0)) - 1)
+	for k in before.keys():
+		if not after.has(k):
+			pieces[k] = int(pieces.get(k, 0)) + 1
+	_save()
+
+## Como missing_pieces, pero al EDITAR las piezas de la figura original cuentan
+## como propias (ya están invertidas ahí).
+func missing_pieces_for(fig: Dictionary, old_fig: Dictionary) -> Array:
+	_ensure_loaded()
+	if is_admin():
+		return []
+	var invested := {}
+	if not old_fig.is_empty():
+		for k in required_pieces(old_fig):
+			invested[k] = true
+	var out: Array = []
+	for key in required_pieces(fig):
+		if invested.has(key):
+			continue
+		if int(pieces.get(key, 0)) <= 0:
+			out.append(key)
+	return out
+
+# ---------------------------------------------------------------- experiencia
+func xp_needed() -> int:
+	return level * 100   # curva simple: 100, 200, 300…
+
+## XP al terminar una partida. Sube de nivel las veces que toque y regala
+## piezas completas por cada nivel. -> {gained, leveled, level, rewards}
+func add_match_xp(won: bool, online: bool) -> Dictionary:
+	_ensure_loaded()
+	var gained := (XP_WIN if won else XP_LOSS) + (XP_ONLINE_BONUS if online else 0)
+	xp += gained
+	var leveled := 0
+	var rewards: Array = []
+	while xp >= xp_needed():
+		xp -= xp_needed()
+		level += 1
+		leveled += 1
+		for i in LEVEL_REWARD_PIECES:
+			var key := _random_piece(true)   # regalos de nivel: piezas premium
+			pieces[key] = int(pieces.get(key, 0)) + 1
+			rewards.append(key)
+	_save()
+	return {"gained": gained, "leveled": leveled, "level": level, "rewards": rewards}
 
 ## ADMIN (prueba): regala n piezas completas de CADA pieza del catálogo.
 func gift_all(n := 3) -> int:
@@ -280,6 +359,8 @@ func _ensure_loaded() -> void:
 		pieces = data.get("pieces", {})
 		fragments = data.get("fragments", {})
 		next_chest = data.get("next_chest", {})
+		xp = int(data.get("xp", 0))
+		level = maxi(1, int(data.get("level", 1)))
 		_starter = bool(data.get("starter", false))
 
 func _save() -> void:
@@ -287,6 +368,6 @@ func _save() -> void:
 	if f != null:
 		f.store_string(JSON.stringify({
 			"mode": mode, "pieces": pieces, "fragments": fragments,
-			"next_chest": next_chest, "starter": _starter,
+			"next_chest": next_chest, "xp": xp, "level": level, "starter": _starter,
 		}))
 		f.close()

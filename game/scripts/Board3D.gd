@@ -456,6 +456,67 @@ func _build_island() -> void:
 	md.roughness = 1.0
 	deep.material_override = md
 	add_child(deep)
+	if not _assets_on:
+		_build_holo_floor(ext + 1.2)
+
+## Piso FUTURISTA del tablero 2D digital: retícula emisiva + anillos + chispas
+## flotando alrededor de la isla (solo estética; cero colisiones/lógica).
+func _build_holo_floor(ext: float) -> void:
+	var gmat := StandardMaterial3D.new()
+	gmat.albedo_color = Color(0.2, 0.45, 0.85, 0.16)
+	gmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	gmat.emission_enabled = true
+	gmat.emission = Color(0.25, 0.5, 0.95)
+	gmat.emission_energy_multiplier = 0.5
+	gmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var step := 1.15
+	var k := int(ext / step)
+	for i in range(-k, k + 1):
+		var off := float(i) * step
+		var half := sqrt(maxf(0.04, ext * ext - off * off))   # recorta al círculo
+		for axis in 2:
+			var mi := MeshInstance3D.new()
+			var box := BoxMesh.new()
+			box.size = Vector3(0.025, 0.006, half * 2.0) if axis == 0 else Vector3(half * 2.0, 0.006, 0.025)
+			mi.mesh = box
+			mi.position = Vector3(off, -0.012, 0) if axis == 0 else Vector3(0, -0.012, off)
+			mi.material_override = gmat
+			add_child(mi)
+	# anillos concéntricos suaves
+	for r in [ext * 0.55, ext * 0.92]:
+		var ring := MeshInstance3D.new()
+		var t := TorusMesh.new()
+		t.inner_radius = r - 0.035
+		t.outer_radius = r + 0.035
+		ring.mesh = t
+		ring.position = Vector3(0, -0.01, 0)
+		ring.scale = Vector3(1, 0.25, 1)
+		ring.material_override = gmat
+		add_child(ring)
+	# chispas que flotan alrededor (partículas baratas con tweens)
+	for i in 14:
+		var sp := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.035
+		sm.height = 0.07
+		sp.mesh = sm
+		var smat := StandardMaterial3D.new()
+		var col: Color = [Color(0.35, 0.6, 1.0), Color(1.0, 0.78, 0.3), Color(0.7, 0.5, 1.0)][i % 3]
+		smat.albedo_color = col
+		smat.emission_enabled = true
+		smat.emission = col
+		smat.emission_energy_multiplier = 1.6
+		smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		sp.material_override = smat
+		var ang := randf() * TAU
+		var rad := ext * (0.75 + randf() * 0.45)
+		var base := Vector3(cos(ang) * rad, 0.3 + randf() * 1.6, sin(ang) * rad)
+		sp.position = base
+		add_child(sp)
+		var tw := create_tween().set_loops()
+		var dur := 1.6 + randf() * 1.8
+		tw.tween_property(sp, "position:y", base.y + 0.5 + randf() * 0.5, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(sp, "position:y", base.y, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 ## Aro emisivo alrededor de cada nodo (por rol) — decorativo, no participa en los
 ## resaltados de _set_highlight (esos siguen sobre el disco).
@@ -866,7 +927,8 @@ func _refresh_bench_ui() -> void:
 		c.queue_free()
 	_bench_cards.clear()
 	var bench: Array = _gs.bench["player"]
-	if bench.is_empty():
+	var kos: Array = _gs.ko_bench["player"]
+	if bench.is_empty() and kos.is_empty():
 		var l := Label.new()
 		l.text = "Banca vacía"
 		l.modulate = Color(0.6, 0.6, 0.7)
@@ -879,20 +941,35 @@ func _refresh_bench_ui() -> void:
 		card.modulate = Color(1, 1, 1, 0.45) if disabled else Color(1, 1, 1, 1)
 		_bench_box.add_child(card)
 		_bench_cards.append({"uid": uid, "ctrl": card})
+	# K.O.: cada caída muestra en cuántos TURNOS TUYOS regresa (⏳).
+	for uid in kos:
+		var fd2: Dictionary = Roster.FIGURES[_gs.units[uid]["rindex"]]
+		var kcard := _make_bench_card(fd2, _gs.name_for(uid))
+		kcard.modulate = Color(0.42, 0.42, 0.52, 0.9)
+		var left := maxi(0, int(_gs.units[uid].get("ko_until", 0)) - _gs.turn_no)
+		var tag := Label.new()
+		tag.text = "💀 ⏳%d" % ceili(left / 2.0)
+		tag.set_anchors_preset(Control.PRESET_FULL_RECT)
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		UITheme.label(tag, 15, Color(1.0, 0.55, 0.5), true, 800)
+		kcard.add_child(tag)
+		_bench_box.add_child(kcard)
 
-## A small bench thumbnail (rarity frame + monogram + name + stamina). Tap = preview,
-## drag = deploy. The big card is shown in the preview / drag ghost.
+## A small bench thumbnail (rarity frame + RETRATO 3D + name + stamina). Tap =
+## preview, drag = deploy. El retrato se renderiza UNA vez por modelo (cache de
+## sesión) en un SubViewport; mientras llega, se ve el monograma de siempre.
 func _make_bench_card(fd: Dictionary, display_name: String) -> Control:
 	var rar: Color = FigureCard.rarity_color(fd)
 	var accent: Color = FigureCard.accent_of(fd)
 	var p := PanelContainer.new()
-	p.custom_minimum_size = Vector2(78, 48)
+	p.custom_minimum_size = Vector2(84, 52)
 	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE2, rar, 10, 2, 3))
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 4)
 	p.add_child(hb)
 	var port := Panel.new()
-	port.custom_minimum_size = Vector2(32, 40)
+	port.custom_minimum_size = Vector2(36, 44)
 	var ps := StyleBoxFlat.new()
 	ps.bg_color = accent.darkened(0.1)
 	ps.set_corner_radius_all(7)
@@ -904,6 +981,13 @@ func _make_bench_card(fd: Dictionary, display_name: String) -> Control:
 	ini.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	UITheme.label(ini, 15, Color(1, 1, 1, 0.95), true, 800)
 	port.add_child(ini)
+	var face := TextureRect.new()
+	face.set_anchors_preset(Control.PRESET_FULL_RECT)
+	face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	port.add_child(face)
+	_portrait_into(face, fd)
 	hb.add_child(port)
 	var vb := VBoxContainer.new()
 	vb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -920,6 +1004,58 @@ func _make_bench_card(fd: Dictionary, display_name: String) -> Control:
 	vb.add_child(st)
 	hb.add_child(vb)
 	return p
+
+## Cache de retratos por GLB, compartida entre partidas de la sesión.
+static var _portrait_cache := {}
+
+## Pinta el retrato 3D del modelo en `rect` (async: renderiza una vez y cachea).
+func _portrait_into(rect: TextureRect, data: Dictionary) -> void:
+	var key := String(data.get("glb", ""))
+	if key == "":
+		return
+	if _portrait_cache.has(key):
+		rect.texture = _portrait_cache[key]
+		return
+	_render_portrait(rect, data, key)
+
+func _render_portrait(rect: TextureRect, data: Dictionary, key: String) -> void:
+	var vp := SubViewport.new()
+	vp.size = Vector2i(128, 156)
+	vp.transparent_bg = true
+	vp.own_world_3d = true
+	vp.world_3d = World3D.new()
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(vp)
+	var cam := Camera3D.new()
+	cam.fov = 28.0
+	vp.add_child(cam)
+	cam.look_at_from_position(Vector3(0.0, 1.1, 2.7), Vector3(0.0, 0.9, 0.0), Vector3.UP)
+	var sun := DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-40.0, -30.0, 0.0)
+	sun.light_energy = 1.2
+	vp.add_child(sun)
+	var we := WorldEnvironment.new()
+	var env := Environment.new()
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(0.7, 0.75, 0.9)
+	env.ambient_light_energy = 0.9
+	we.environment = env
+	vp.add_child(we)
+	var fig := Figure3D.new()
+	vp.add_child(fig)
+	fig.setup(String(data["glb"]), data.get("clips", {}), float(data.get("size", 1.0)))
+	fig.play_clip("idle")
+	await get_tree().create_timer(0.25).timeout    # deja que la pose "idle" asiente
+	await RenderingServer.frame_post_draw
+	if not is_instance_valid(vp):
+		return
+	var img := vp.get_texture().get_image()
+	if img != null and img.get_width() > 0:
+		var tex := ImageTexture.create_from_image(img)
+		_portrait_cache[key] = tex
+		if is_instance_valid(rect):
+			rect.texture = tex
+	vp.queue_free()
 
 func _initials(nm: String) -> String:
 	var s := ""
@@ -1134,6 +1270,8 @@ func _update_status() -> void:
 	_refresh_active_card()
 	if _hud_label != null:
 		_hud_label.text = "Tú: %d   ·   Rival: %d" % [_gs.units_on_board("player").size(), _gs.units_on_board("enemy").size()]
+	if _drag_uid == -1:
+		_refresh_bench_ui()   # mantiene vivos los contadores ⏳ de los K.O.
 	_music_threat()
 
 ## Música situacional: si TU figura está a ≤3 nodos de la meta rival → "ventaja";
@@ -1957,14 +2095,21 @@ func _show_winner(team: String) -> void:
 	var win := team == "player"
 	Music.stop()
 	Sfx.play("victory" if win else "defeat")
+	# XP REAL: se suma aquí, sube de nivel y regala piezas (persistente).
+	var res: Dictionary = Inventory.add_match_xp(win, _online)
+
 	var cl := CanvasLayer.new()
 	cl.layer = 20
 	add_child(cl)
 	var bg := ColorRect.new()
-	bg.color = Color(0.02, 0.03, 0.06, 0.92)
+	bg.color = Color(0.02, 0.03, 0.06, 0.0)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	cl.add_child(bg)
-	cl.add_child(_vic_glow(UITheme.GOLD if win else UITheme.DANGER))
+	create_tween().tween_property(bg, "color:a", 0.92, 0.4)
+	var glow := _vic_glow(UITheme.GOLD if win else UITheme.DANGER)
+	cl.add_child(glow)
+	glow.modulate.a = 0.0
+	create_tween().tween_property(glow, "modulate:a", 1.0, 0.6)
 
 	var card := PanelContainer.new()
 	card.set_anchors_preset(Control.PRESET_CENTER)
@@ -1974,46 +2119,64 @@ func _show_winner(team: String) -> void:
 	card.offset_bottom = 300
 	card.add_theme_stylebox_override("panel", UITheme.panel(Color(0.09, 0.10, 0.18, 0.98), (UITheme.GOLD if win else UITheme.DANGER).darkened(0.1), 22, 2, 18))
 	cl.add_child(card)
+	card.pivot_offset = Vector2(210, 300)
+	if win:
+		# VICTORIA: la tarjeta ESTALLA en pantalla + lluvia de confeti.
+		card.scale = Vector2(0.5, 0.5)
+		card.rotation_degrees = -4.0
+		var ct := create_tween()
+		ct.set_parallel(true)
+		ct.tween_property(card, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		ct.tween_property(card, "rotation_degrees", 0.0, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_confetti(cl)
+	else:
+		# DERROTA: la tarjeta CAE pesada desde arriba y la pantalla tiembla.
+		card.position.y -= 700.0
+		var dt := create_tween()
+		dt.tween_property(card, "position:y", card.position.y + 700.0, 0.55).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
+		dt.tween_callback(func():
+			var sh := create_tween()
+			for off in [10.0, -8.0, 6.0, -4.0, 0.0]:
+				sh.tween_property(card, "rotation_degrees", off * 0.35, 0.05)
+			var gt := create_tween()
+			gt.tween_property(glow, "modulate:a", 0.35, 0.08)
+			gt.tween_property(glow, "modulate:a", 1.0, 0.3))
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 12)
 	card.add_child(v)
 
-	v.add_child(_vic_lbl("★", 40, UITheme.GOLD if win else UITheme.MUTED, true, 800))
+	v.add_child(_vic_lbl("🏆" if win else "💔", 40, UITheme.GOLD if win else UITheme.MUTED, true, 800))
 	v.add_child(_vic_lbl("¡VICTORIA!" if win else "DERROTA", 42, (UITheme.GOLD if win else UITheme.DANGER), true, 800))
 	v.add_child(_vic_lbl("Buen duelo." if win else "La próxima es tuya.", 16, UITheme.TEXT2, false, 600))
 
-	# XP bar (placeholder)
-	v.add_child(_vic_lbl("Nivel 1", 14, UITheme.TEXT2, true, 700))
+	# --- barra de nivel REAL (animada hasta el progreso actual) ---
+	v.add_child(_vic_lbl("Nivel %d" % int(res["level"]), 14, UITheme.TEXT2, true, 700))
 	var xp := ProgressBar.new()
 	xp.custom_minimum_size = Vector2(360, 18)
-	xp.min_value = 0; xp.max_value = 100; xp.value = 64 if win else 28
+	xp.min_value = 0
+	xp.max_value = Inventory.xp_needed()
+	xp.value = 0
 	xp.show_percentage = false
 	var xbg := StyleBoxFlat.new(); xbg.bg_color = Color(0.1, 0.13, 0.22); xbg.set_corner_radius_all(9)
 	var xfg := StyleBoxFlat.new(); xfg.bg_color = UITheme.GOLD; xfg.set_corner_radius_all(9)
 	xp.add_theme_stylebox_override("background", xbg)
 	xp.add_theme_stylebox_override("fill", xfg)
 	v.add_child(_center(xp))
-	v.add_child(_vic_lbl("+%d XP" % (120 if win else 35), 13, UITheme.GOLD, true, 700))
+	create_tween().tween_property(xp, "value", float(Inventory.xp), 0.9).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	v.add_child(_vic_lbl("+%d XP  (%d/%d)" % [int(res["gained"]), Inventory.xp, Inventory.xp_needed()], 13, UITheme.GOLD, true, 700))
 
-	# reward chips
-	var chips := HBoxContainer.new()
-	chips.alignment = BoxContainer.ALIGNMENT_CENTER
-	chips.add_theme_constant_override("separation", 8)
-	chips.add_child(_vic_chip("🪙 +%d Monedas" % (85 if win else 12), UITheme.GOLD))
-	chips.add_child(_vic_chip("🏆 +%d Trofeos" % (30 if win else -18), UITheme.PRIMARY_EDGE))
-	v.add_child(chips)
-
-	# chest (placeholder, §11 Chest UX)
-	if win:
-		var chest := PanelContainer.new()
-		chest.add_theme_stylebox_override("panel", UITheme.panel(Color(0.12, 0.11, 0.06), UITheme.GOLD.darkened(0.2), 14, 2, 10))
-		var cv := VBoxContainer.new()
-		cv.alignment = BoxContainer.ALIGNMENT_CENTER
-		chest.add_child(cv)
-		cv.add_child(_vic_lbl("🎁  Cofre Raro", 18, UITheme.GOLD, true, 800))
-		cv.add_child(_vic_lbl("Desbloquea en 2h  ·  o con 💎", 12, UITheme.TEXT2, false, 600))
-		v.add_child(chest)
+	# --- recompensas REALES por subir de nivel ---
+	if int(res["leveled"]) > 0:
+		v.add_child(_vic_chip("⬆ ¡SUBISTE A NIVEL %d!" % int(res["level"]), UITheme.SUCCESS))
+		var chips := HBoxContainer.new()
+		chips.alignment = BoxContainer.ALIGNMENT_CENTER
+		chips.add_theme_constant_override("separation", 6)
+		for key in res["rewards"]:
+			chips.add_child(_vic_chip("🎁 " + Inventory.piece_name(String(key)), UITheme.GOLD))
+		v.add_child(chips)
+	else:
+		v.add_child(_vic_chip("🎁 Tus cofres te esperan en el menú", UITheme.PRIMARY_EDGE))
 
 	# buttons
 	var rematch := Button.new()
@@ -2036,6 +2199,25 @@ func _show_winner(team: String) -> void:
 	v.add_child(_center(claim))
 
 	_status.text = ""
+
+## Lluvia de confeti (victoria): emojis que caen girando por toda la pantalla.
+func _confetti(cl: CanvasLayer) -> void:
+	var vw := get_viewport().get_visible_rect().size
+	var picks := ["🎉", "✨", "⭐", "🎊", "💛"]
+	for i in 16:
+		var l := Label.new()
+		l.text = picks[i % picks.size()]
+		l.add_theme_font_size_override("font_size", 26 + (i % 3) * 10)
+		l.position = Vector2(randf() * vw.x, -60.0 - randf() * 120.0)
+		l.rotation_degrees = randf_range(-40.0, 40.0)
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cl.add_child(l)
+		var tw := create_tween()
+		tw.set_parallel(true)
+		var dur := randf_range(1.4, 2.4)
+		tw.tween_property(l, "position:y", vw.y + 80.0, dur).set_delay(randf() * 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.tween_property(l, "rotation_degrees", l.rotation_degrees + randf_range(-260.0, 260.0), dur)
+		tw.chain().tween_callback(l.queue_free)
 
 func _vic_glow(col: Color) -> TextureRect:
 	var tr := TextureRect.new()

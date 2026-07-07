@@ -76,6 +76,38 @@ func _initialize() -> void:
 	ok = _expect("regalo: +3 de cada pieza", int(inv.pieces.get("passive:lunge", 0)), antes + 3) and ok
 	ok = _expect("tras regalo ya no falta nada", inv.missing_pieces(fuerte).size(), 0) and ok
 
+	# --- ECONOMÍA: crear GASTA piezas; editar cobra el delta y reembolsa ---
+	var figA := {"id": "eco", "name": "Eco", "stamina": 2, "type": "Ruleta", "rarity": "epic",
+		"passives": [], "model_ref": "ironclad_knight",
+		"attack": [{"col": "white", "pow": 40, "w": 80}, {"col": "red", "w": 20}]}
+	var w_before: int = int(inv.pieces.get("color:white", 0))
+	inv.consume_for(figA)
+	ok = _expect("crear gasta blanco -1", int(inv.pieces.get("color:white", 0)), w_before - 1) and ok
+	# editar: cambia blanco -> oro (cobra oro, devuelve blanco)
+	var figB = figA.duplicate(true)
+	figB["attack"] = [{"col": "gold", "pow": 40, "w": 80}, {"col": "red", "w": 20}]
+	var g_before: int = int(inv.pieces.get("color:gold", 0))
+	inv.adjust_for_edit(figA, figB)
+	ok = _expect("editar cobra oro -1", int(inv.pieces.get("color:gold", 0)), g_before - 1) and ok
+	ok = _expect("editar devuelve blanco +1", int(inv.pieces.get("color:white", 0)), w_before) and ok
+	# missing_for_edit: sin piezas sueltas, las de la figura ORIGINAL cuentan
+	inv.pieces["color:gold"] = 0
+	ok = _expect("edit: pieza invertida no falta", "color:gold" in inv.missing_pieces_for(figB, figB), false) and ok
+	ok = _expect("crear nuevo SÍ la exige", "color:gold" in inv.missing_pieces_for(figB, {}), true) and ok
+
+	# --- XP y NIVELES: sube jugando y regala piezas ---
+	inv.xp = 0
+	inv.level = 1
+	var r1: Dictionary = inv.add_match_xp(true, false)
+	ok = _expect("victoria da 60 XP", int(r1["gained"]), 60) and ok
+	ok = _expect("aún nivel 1", inv.level, 1) and ok
+	var r2: Dictionary = inv.add_match_xp(true, true)   # +75 (online) -> 135 >= 100
+	ok = _expect("sube a nivel 2", int(r2["level"]), 2) and ok
+	ok = _expect("regala %d piezas" % inv.LEVEL_REWARD_PIECES, (r2["rewards"] as Array).size(), inv.LEVEL_REWARD_PIECES) and ok
+	ok = _expect("xp sobrante correcto", inv.xp, 35) and ok
+	var r3: Dictionary = inv.add_match_xp(false, false)   # derrota: +25
+	ok = _expect("derrota da 25 XP", int(r3["gained"]), 25) and ok
+
 	# --- persistencia ---
 	var f := FileAccess.open(INV_PATH, FileAccess.READ)
 	var data = JSON.parse_string(f.get_as_text()) if f != null else null

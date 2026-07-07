@@ -104,7 +104,9 @@ func _build_ui() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(bg)
 
-	# gold glow behind the leader
+	_build_bg_particles(layer)
+
+	# gold glow behind the leader (con pulso suave para que respire)
 	var glow := _radial(UITheme.GOLD, 0.22)
 	glow.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	glow.offset_left = -190
@@ -112,6 +114,9 @@ func _build_ui() -> void:
 	glow.offset_top = 150
 	glow.offset_bottom = 560
 	layer.add_child(glow)
+	var gp := create_tween().set_loops()
+	gp.tween_property(glow, "modulate:a", 0.65, 1.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	gp.tween_property(glow, "modulate:a", 1.0, 1.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 	_build_topbar(layer)
 	_build_centerpiece(layer)
@@ -152,7 +157,7 @@ func _build_topbar(layer: CanvasLayer) -> void:
 	var nm := _lbl("Jugador", 17, UITheme.TEXT, true, 700)
 	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	who.add_child(nm)
-	var lv := _lbl("Nivel 1", 12, UITheme.TEXT2, false, 600)
+	var lv := _lbl("Nivel %d  ·  %d/%d XP" % [Inventory.level, Inventory.xp, Inventory.xp_needed()], 12, UITheme.GOLD, false, 700)
 	lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	who.add_child(lv)
 	tb.add_child(who)
@@ -374,12 +379,12 @@ func _build_buttons(layer: CanvasLayer) -> void:
 	grid.add_theme_constant_override("h_separation", 8)
 	grid.add_theme_constant_override("v_separation", 8)
 	layer.add_child(grid)
-	grid.add_child(_menu_button("🃏", "Mazos", func(): get_tree().change_scene_to_file("res://scenes/deck_builder.tscn")))
-	grid.add_child(_menu_button("📖", "Colección", func(): get_tree().change_scene_to_file("res://scenes/dex.tscn")))
-	grid.add_child(_menu_button("📦", "Inventario", func(): get_tree().change_scene_to_file("res://scenes/inventory.tscn")))
-	grid.add_child(_menu_button("🌐", "Online", func(): get_tree().change_scene_to_file("res://scenes/online_lobby.tscn")))
-	grid.add_child(_menu_button("🛠", "Crear", func(): get_tree().change_scene_to_file("res://scenes/character_creator.tscn")))
-	grid.add_child(_menu_button("🎲", "Probar", func(): get_tree().change_scene_to_file("res://scenes/attack_tester.tscn")))
+	grid.add_child(_menu_button("🃏", "Mazos", UITheme.PRIMARY_EDGE, func(): get_tree().change_scene_to_file("res://scenes/deck_builder.tscn")))
+	grid.add_child(_menu_button("📖", "Colección", UITheme.R_EPIC, func(): get_tree().change_scene_to_file("res://scenes/dex.tscn")))
+	grid.add_child(_menu_button("📦", "Inventario", UITheme.GOLD, func(): get_tree().change_scene_to_file("res://scenes/inventory.tscn")))
+	grid.add_child(_menu_button("🌐", "Online", UITheme.ENERGY, func(): get_tree().change_scene_to_file("res://scenes/online_lobby.tscn")))
+	grid.add_child(_menu_button("🛠", "Crear", UITheme.SUCCESS, func(): get_tree().change_scene_to_file("res://scenes/character_creator.tscn")))
+	grid.add_child(_menu_button("🎲", "Probar", UITheme.ORANGE, func(): get_tree().change_scene_to_file("res://scenes/attack_tester.tscn")))
 
 func _build_nav(layer: CanvasLayer) -> void:
 	var nav := PanelContainer.new()
@@ -403,6 +408,28 @@ func _soon() -> void:
 	box.visible = true
 	var t := get_tree().create_timer(1.4)
 	t.timeout.connect(func(): if is_instance_valid(box): box.visible = false)
+
+## Partículas suaves de fondo: puntos de luz que flotan lentamente (el menú
+## deja de verse estático/triste sin costar nada de rendimiento).
+func _build_bg_particles(layer: CanvasLayer) -> void:
+	var vw := get_viewport().get_visible_rect().size
+	var cols := [UITheme.PRIMARY, UITheme.GOLD, Color(0.72, 0.45, 1.0), UITheme.ENERGY]
+	for i in 12:
+		var d := _radial(cols[i % cols.size()], 0.16 + randf() * 0.12)
+		var size := 26.0 + randf() * 64.0
+		d.position = Vector2(randf() * vw.x, randf() * vw.y)
+		d.size = Vector2(size, size)
+		d.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		layer.add_child(d)
+		var tw := create_tween().set_loops()
+		var dur := 2.2 + randf() * 2.6
+		var rise := 40.0 + randf() * 70.0
+		tw.tween_property(d, "position:y", d.position.y - rise, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(d, "position:y", d.position.y, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		var tx := create_tween().set_loops()
+		var sway := 18.0 + randf() * 26.0
+		tx.tween_property(d, "position:x", d.position.x + sway, dur * 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tx.tween_property(d, "position:x", d.position.x, dur * 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 # ----------------------------------------------------------------- widgets
 func _radial(col: Color, alpha: float) -> TextureRect:
@@ -630,18 +657,18 @@ func _big_button(text: String, subtitle: String) -> Button:
 	v.add_child(_lbl(subtitle, 12, Color(1, 1, 1, 0.82), false, 600))
 	return b
 
-func _menu_button(icon: String, text: String, cb: Callable) -> Button:
+func _menu_button(icon: String, text: String, accent: Color, cb: Callable) -> Button:
 	var b := Button.new()
 	b.custom_minimum_size = Vector2(0, 62)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UITheme.style_surface(b, UITheme.SURFACE, UITheme.BORDER, 14)
+	UITheme.style_surface(b, UITheme.SURFACE.lerp(accent, 0.06), accent.darkened(0.35), 14)
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.set_anchors_preset(Control.PRESET_FULL_RECT)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_theme_constant_override("separation", 0)
 	b.add_child(v)
-	v.add_child(_lbl(icon, 24, UITheme.PRIMARY_EDGE, false, 600))
+	v.add_child(_lbl(icon, 24, accent, false, 600))
 	v.add_child(_lbl(text, 14, UITheme.TEXT2, true, 700))
 	b.pressed.connect(cb)
 	return b
