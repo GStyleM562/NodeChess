@@ -9,6 +9,7 @@ class_name FigureValidator
 
 const COLORS := ["white", "gold", "purple", "blue", "red"]
 const MAX_PASSIVES := 3
+const MAX_RESISTS := 2
 const MAX_STAGES := 4          # base stage + up to 3 ranks
 const TYPE_PREFIXES := ["Ruleta", "Dado", "Moneda", "Doble Moneda", "Suma"]
 
@@ -43,6 +44,11 @@ static func validate(fig: Dictionary) -> Dictionary:
 	for pid in passives:
 		if not Roster.PASSIVES.has(String(pid)):
 			warnings.append("Pasiva desconocida: '%s'." % str(pid))
+
+	# --- resistencias a estados (máx. 2) ---
+	var resists: Array = fig.get("resists", [])
+	if resists.size() > MAX_RESISTS:
+		errors.append("Demasiadas resistencias (%d > %d)." % [resists.size(), MAX_RESISTS])
 
 	# --- base attack pool ---
 	_check_pool(fig.get("attack", []), typ, "Pool base", errors, warnings)

@@ -17,6 +17,8 @@ const FX_STATUS := {
 }
 const STATUS_DUR := 4   # default status length, in game-turns (~2 rounds)
 const KO_COOLDOWN := 6  # game-turns before a KO'd figure returns to the bench
+const BUFF_CHARGE_TURNS := 2   # turnos PROPIOS parado para cargar el buff node
+const BUFF_NODE_CD := 10       # medio-turnos de cooldown del nodo tras cargarse
 # Damage-over-time statuses KO the figure when their timer elapses (unless cleansed
 # by Rank Up / the Cleanse modifier). There is no HP, so the timer IS the lethality.
 const BURN_TURNS := 6     # Quemadura: faster, also weakens the burning unit's damage
@@ -48,6 +50,8 @@ var winner := ""
 var energy := {"player": 0, "enemy": 0}
 var pending_buff := {"player": {}, "enemy": {}}   # one-shot combat buffs from modifiers
 var mod_used := {"player": false, "enemy": false} # one modifier per turn
+var buff_charge := {}   # buff node id -> {"team", "n"} (progreso de carga)
+var buff_cd := {}       # buff node id -> turn_no en que vuelve a poder cargarse
 var _att_moved_ctx := 0                           # nodes the attacker moved this turn (for Lunge/Dive)
 var _next_uid := 0
 
@@ -66,9 +70,18 @@ func add_to_bench(team: String, rindex: int) -> int:
 	return uid
 
 # --- statuses --------------------------------------------------------------
+## RESISTENCIAS (GDD): una figura con `resists: ["fear", …]` es INMUNE a esos
+## estados — apply_status los ignora y devuelve false.
+func resists_status(uid: int, s: String) -> bool:
+	return s in (rank_data(uid).get("resists", []) as Array)
+
 ## dur < 0 → use the status' own default length (DOTs last longer than debuffs).
-func apply_status(uid: int, s: String, dur: int = -1) -> void:
+## Devuelve false si la figura RESISTIÓ el estado (no se aplicó).
+func apply_status(uid: int, s: String, dur: int = -1) -> bool:
+	if resists_status(uid, s):
+		return false
 	units[uid]["statuses"][s] = turn_no + (dur if dur >= 0 else _status_dur(s))
+	return true
 
 func _status_dur(s: String) -> int:
 	match s:
@@ -155,13 +168,21 @@ func move_targets(uid: int, budget: int) -> Dictionary:
 		return {}
 	var u: Dictionary = units[uid]
 	var phasing := _can_phase(uid)
-	var blocked := _add_locked({})
+	var hover := has_passive(uid, "hover")
+	var blocked := {} if hover else _add_locked({})   # Hover ignora candados al pasar
 	if not phasing:
 		for nid in board.keys():
 			if nid != u["node"]:
 				blocked[nid] = true
-	var reach := map.reachable(u["node"], budget, blocked)
+	var reach := map.reachable(u["node"], budget, blocked, hover)
 	reach.erase(u["node"])
+	if hover:
+		# No puede TERMINAR sobre terreno bloqueado (solo lo sobrevuela).
+		for nid in map.obstacles:
+			reach.erase(int(nid))
+		for nid in map.locked_until.keys():
+			if node_locked(int(nid)):
+				reach.erase(int(nid))
 	if phasing:
 		# Pass-through: cannot END on an occupied node, but keeps moving / may attack.
 		for nid in board.keys():
@@ -187,12 +208,13 @@ func move_targets(uid: int, budget: int) -> Dictionary:
 func move_path(uid: int, target: int) -> Array:
 	var u: Dictionary = units[uid]
 	var phasing := _can_phase(uid)
-	var blocked := _add_locked({})
+	var hover := has_passive(uid, "hover")
+	var blocked := {} if hover else _add_locked({})
 	if not phasing:
 		for nid in board.keys():
 			if nid != u["node"]:
 				blocked[nid] = true
-	var normal := map.path_to(u["node"], target, blocked)
+	var normal := map.path_to(u["node"], target, blocked, hover)
 	if phasing:
 		return normal                                     # walks straight through figures
 	var jump: Array = []
@@ -322,8 +344,10 @@ func _roll_full(uid: int, is_attacker := false, forced := -1) -> Dictionary:
 	# CONFUSION — an attacking, confused figure fumbles half the time.
 	if is_attacker and has_status(uid, "confusion") and randf() < 0.5:
 		s = {"col": "red", "name": "Confusión"}
-	# BUFF NODE — a unit standing on a buff node rolls stronger.
-	if int(units[uid]["node"]) in map.buffs:
+	# BUFF NODE (GDD): ya no basta pisarlo — hay que CARGARLO (2 turnos propios
+	# parado). La figura que completa la carga queda potenciada PERMANENTE
+	# (hasta caer K.O.): +daño/+★ en todas sus tiradas.
+	if bool(units[uid].get("buffed", false)):
 		_boost_seg(s, BUFF_DMG, BUFF_STARS)
 	# MODIFIERS — one-shot attacker buffs (baked into the shown number).
 	if is_attacker:
@@ -398,12 +422,13 @@ func attack(att_uid: int, def_uid: int, att_moved: int = 0, fidx_a: int = -1, fi
 		var wcol := String(ws.get("col", ""))
 		var fx := String(ws.get("fx", ""))
 		if FX_STATUS.has(fx):
-			apply_status(loser_uid, FX_STATUS[fx])   # DOTs use their own longer timer
-			applied = {"status": FX_STATUS[fx], "target": loser_uid, "fx": fx}
+			if apply_status(loser_uid, FX_STATUS[fx]):   # DOTs use their own longer timer
+				applied = {"status": FX_STATUS[fx], "target": loser_uid, "fx": fx}
+			else:
+				applied = {"status": "", "target": loser_uid, "fx": fx, "resisted": true}
 		# PASSIVE — Venom Hex: a Purple win also Weakens the loser.
 		if wcol == "purple" and has_passive(winner_uid, "venom_hex"):
-			apply_status(loser_uid, "weakened", STATUS_DUR)
-			if applied.is_empty():
+			if apply_status(loser_uid, "weakened", STATUS_DUR) and applied.is_empty():
 				applied = {"status": "weakened", "target": loser_uid, "fx": "Venom Hex"}
 		if ws.has("disp"):
 			disp = _apply_displacement(winner_uid, loser_uid, ws)
@@ -413,8 +438,8 @@ func attack(att_uid: int, def_uid: int, att_moved: int = 0, fidx_a: int = -1, fi
 	else:
 		# PASSIVE — Hold the Line: a tie while defending Immobilizes the attacker.
 		if has_passive(def_uid, "hold_the_line"):
-			apply_status(att_uid, "immobilized", STATUS_DUR)
-			applied = {"status": "immobilized", "target": att_uid, "fx": "Hold the Line"}
+			if apply_status(att_uid, "immobilized", STATUS_DUR):
+				applied = {"status": "immobilized", "target": att_uid, "fx": "Hold the Line"}
 		# PASSIVE — Hexstep: the Witch retreats 1 node (away from the attacker) on a tie.
 		if has_passive(def_uid, "hexstep"):
 			disp = _apply_displacement(att_uid, def_uid, {"disp": "push", "n": 1})
@@ -467,6 +492,7 @@ func rank_data(uid: int) -> Dictionary:
 			"type": eff.get("type", st.get("type", base.get("type", "Ruleta"))),
 			"stamina": eff.get("stamina", st.get("stamina", base.get("stamina", 2))),
 			"passives": eff.get("passives", st.get("passives", base.get("passives", []))),
+			"resists": eff.get("resists", st.get("resists", base.get("resists", []))),
 			"coin_a": eff.get("coin_a", base.get("coin_a", [])),
 			"coin_b": eff.get("coin_b", base.get("coin_b", [])),
 			"glb": m["glb"], "clips": m["clips"], "size": m["size"],
@@ -475,6 +501,7 @@ func rank_data(uid: int) -> Dictionary:
 		"id": base.get("id", ""),
 		"name": base["name"], "attack": base["attack"], "type": base.get("type", "Ruleta"),
 		"stamina": base.get("stamina", 2), "passives": base.get("passives", []),
+		"resists": base.get("resists", []),
 		"coin_a": base.get("coin_a", []), "coin_b": base.get("coin_b", []),
 		"glb": base.get("glb", ""), "clips": base.get("clips", {}), "size": base.get("size", 1.0),
 	}
@@ -560,11 +587,40 @@ func _displacement_immune(uid: int) -> bool:
 	return false
 
 func _apply_displacement(winner_uid: int, loser_uid: int, seg: Dictionary) -> Dictionary:
-	if _displacement_immune(loser_uid):
-		return {"type": "immune", "uid": loser_uid}
 	var w: Dictionary = units[winner_uid]
 	var l: Dictionary = units[loser_uid]
 	var typ := String(seg.get("disp", ""))
+	# DASH / RETIRADA mueven al PROPIO ganador (la inmunidad del rival no aplica).
+	if typ == "dash" or typ == "retreat":
+		var to := _step_node(int(w["node"]), int(l["node"]), typ == "dash")
+		if to == -1:
+			return {}
+		board.erase(int(w["node"]))
+		w["node"] = to
+		board[to] = winner_uid
+		_check_goal(w)
+		return {"type": typ, "uid": winner_uid, "to": to}
+	if _displacement_immune(loser_uid):
+		return {"type": "immune", "uid": loser_uid}
+	# TELETRANSPORTE: manda al perdedor a su entrada LIBRE más cercana a su meta
+	# (determinista: mismo resultado en ambos clientes del online).
+	if typ == "teleport":
+		var best := -1
+		var bd := INF
+		var own_goal: int = map.goal_enemy if l["team"] == "enemy" else map.goal_player
+		for e in entrances(String(l["team"])):
+			if board.has(int(e)):
+				continue
+			var dd := _dist(int(e), own_goal)
+			if dd < bd or (dd == bd and int(e) < best):
+				bd = dd
+				best = int(e)
+		if best == -1:
+			return {}
+		board.erase(int(l["node"]))
+		l["node"] = best
+		board[best] = loser_uid
+		return {"type": "teleport", "uid": loser_uid, "to": best}
 	if typ == "swap":
 		var wn: int = w["node"]
 		var ln: int = l["node"]
@@ -605,11 +661,28 @@ func _apply_displacement(winner_uid: int, loser_uid: int, seg: Dictionary) -> Di
 	_check_goal(l)
 	return {"type": typ, "uid": loser_uid, "to": l["node"]}
 
+## Vecino libre de `from` que acerca (toward=true) o aleja del nodo `ref`.
+## Determinista: desempata por id de nodo menor.
+func _step_node(from: int, ref: int, toward: bool) -> int:
+	var best := -1
+	var bd := INF if toward else -INF
+	for nb in map.adj[from]:
+		if board.has(int(nb)) or int(nb) in map.obstacles or node_locked(int(nb)):
+			continue
+		var dd := _dist(int(nb), ref)
+		var better := (dd < bd) if toward else (dd > bd)
+		if better or (dd == bd and int(nb) < best):
+			bd = dd
+			best = int(nb)
+	return best
+
 func _ko(uid: int) -> void:
 	var u: Dictionary = units[uid]
 	u["alive"] = false
 	u["statuses"] = {}
-	u["ko_until"] = turn_no + KO_COOLDOWN
+	# PASSIVE — Fast Recovery: regresa una ronda antes (2 medio-turnos).
+	var cd := KO_COOLDOWN - (2 if has_passive(uid, "fast_recovery") else 0)
+	u["ko_until"] = turn_no + maxi(2, cd)
 	if u["node"] >= 0 and board.get(u["node"]) == uid:
 		board.erase(u["node"])
 	u["node"] = -1
@@ -621,6 +694,7 @@ func _check_goal(u: Dictionary) -> void:
 		winner = u["team"]
 
 func end_turn() -> void:
+	_tick_buff_charge(turn_team)                  # el equipo que TERMINA carga sus buffs
 	turn_no += 1
 	_process_ko_returns()
 	turn_team = "enemy" if turn_team == "player" else "player"
@@ -630,6 +704,38 @@ func end_turn() -> void:
 	_tick_dots(turn_team)                         # Burn/Poison may KO at turn start
 	if winner == "" and not can_act(turn_team):
 		winner = "enemy" if turn_team == "player" else "player"
+
+## CARGA del buff node (GDD): quédate parado BUFF_CHARGE_TURNS turnos propios y
+## tu figura queda potenciada permanente (hasta K.O.); irse/rival lo REINICIA;
+## al completarse, el nodo entra en cooldown. Determinista (corre en end_turn).
+func _tick_buff_charge(team: String) -> void:
+	for b in map.buffs:
+		var bid := int(b)
+		if turn_no < int(buff_cd.get(bid, 0)):
+			continue                                   # nodo en cooldown
+		var occ := int(board.get(bid, -1))
+		if occ == -1 or not units[occ]["alive"] or String(units[occ]["team"]) != team:
+			# vacío o del rival al terminar TU turno: TU progreso se pierde
+			var e: Dictionary = buff_charge.get(bid, {})
+			if String(e.get("team", "")) == team:
+				buff_charge.erase(bid)
+			continue
+		if bool(units[occ].get("buffed", false)):
+			continue                                   # ya está potenciada
+		var entry: Dictionary = buff_charge.get(bid, {"team": team, "n": 0})
+		if String(entry.get("team", "")) != team:
+			entry = {"team": team, "n": 0}
+		entry["n"] = int(entry["n"]) + 1
+		if int(entry["n"]) >= BUFF_CHARGE_TURNS:
+			units[occ]["buffed"] = true
+			buff_cd[bid] = turn_no + BUFF_NODE_CD
+			buff_charge.erase(bid)
+		else:
+			buff_charge[bid] = entry
+
+## Progreso visible de carga de un buff node (0 = sin carga).
+func buff_progress(bid: int) -> int:
+	return int((buff_charge.get(bid, {}) as Dictionary).get("n", 0))
 
 ## Burning Aura: at the start of the team's turn, its aura-bearers Weaken adjacent enemies.
 func _apply_turn_start_auras(team: String) -> void:
@@ -762,8 +868,8 @@ func _bot_guard_goal(team: String, own_goal: int) -> Dictionary:
 func _bot_surround(team: String, own_goal: int) -> Dictionary:
 	var opp := _enemy_team(team)
 	for uid in units_on_board(team):
-		if not can_move(uid) or int(units[uid]["node"]) == own_goal:
-			continue                                       # el portero no abandona
+		if not can_move(uid) or int(units[uid]["node"]) == own_goal or _bot_is_charging(uid):
+			continue                                       # portero y cargadores se quedan
 		for nid in reachable_for(uid).keys():
 			if _all_neighbours_held(nid, opp):
 				continue                                   # no meterse a un cerco rival
@@ -873,6 +979,11 @@ func _bot_buff(team: String, own_goal: int) -> Dictionary:
 				return {"type": "move", "uid": uid, "node": b, "path": p}
 	return {}
 
+## ¿Esta figura está a media CARGA de un buff node? (la IA no la mueve de ahí)
+func _bot_is_charging(uid: int) -> bool:
+	var n := int(units[uid]["node"])
+	return n in map.buffs and not bool(units[uid].get("buffed", false)) and turn_no >= int(buff_cd.get(n, 0))
+
 # 7) AVANZAR ESQUIVANDO: máximo progreso hacia la meta rival, penalizando
 # terminar junto a rivales (evita peleas gratis) y sin meterse a cercos.
 func _bot_advance(team: String, target_goal: int, own_goal: int) -> Dictionary:
@@ -881,8 +992,8 @@ func _bot_advance(team: String, target_goal: int, own_goal: int) -> Dictionary:
 	var mv_node := -1
 	var best_score := 0.01
 	for uid in units_on_board(team):
-		if not can_move(uid) or int(units[uid]["node"]) == own_goal:
-			continue                                       # el portero se queda
+		if not can_move(uid) or int(units[uid]["node"]) == own_goal or _bot_is_charging(uid):
+			continue                                       # portero y cargadores se quedan
 		var cur := _dist(units[uid]["node"], target_goal)
 		for nid in reachable_for(uid).keys():
 			if _all_neighbours_held(nid, opp):

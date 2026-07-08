@@ -246,6 +246,20 @@ func _build_passives(d: Dictionary) -> void:
 		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		lbl.text = "• %s — %s" % [String(info.get("name", pid)), String(info.get("desc", ""))]
 		_passives_box.add_child(lbl)
+	# Resistencias a estados (inmunidades de esta figura)
+	var res: Array = d.get("resists", [])
+	if not res.is_empty():
+		var names: Array = []
+		for sid in res:
+			for label in GameState.FX_STATUS.keys():
+				if String(GameState.FX_STATUS[label]) == String(sid):
+					names.append(String(label))
+		var rl := Label.new()
+		rl.add_theme_font_size_override("font_size", 16)
+		rl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		rl.text = "🛡 Resiste: " + ", ".join(names)
+		rl.modulate = Color(0.6, 0.9, 1.0)
+		_passives_box.add_child(rl)
 
 func _build_evolutions(d: Dictionary) -> void:
 	for c in _evos_box.get_children():

@@ -4,12 +4,12 @@ class_name Loadout
 ## A team is a list of roster indices (rindex into Roster.FIGURES); duplicates
 ## allowed. Static so it survives scene changes without an autoload.
 
-const DECK_SIZE := 5
+const DECK_SIZE := 6   # GDD: exactamente 6 figuras por jugador
 
-static var player_team: Array = [0, 1, 2, 3, 4]   # default until the player picks
+static var player_team: Array = [0, 1, 2, 3, 4, 6]   # default until the player picks
 # A fixed, reasonable opponent deck (the smarter-CPU task can vary this later).
 # Sin storm_valkyrie (índice 5): su modelo "ave" está buggeado y tapa la pantalla.
-static var enemy_team: Array = [1, 0, 2, 4, 3]
+static var enemy_team: Array = [1, 0, 2, 4, 3, 6]
 
 # Equipped modifier cards (ids into GameState.MODIFIERS), up to 3.
 static var player_modifiers: Array = ["power_surge", "cleanse", "adrenaline"]

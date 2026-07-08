@@ -244,8 +244,9 @@ func _build_plaza() -> void:
 	], [7, 8])
 
 ## BFS reachable distances from `start` up to `steps`, treating `blocked` ids as
-## impassable (cannot move through or onto them).
-func reachable(start: int, steps: int, blocked: Dictionary = {}) -> Dictionary:
+## impassable (cannot move through or onto them). `pass_terrain` (Hover) ignora
+## los obstáculos del mapa al ATRAVESAR (quien llama filtra los destinos finales).
+func reachable(start: int, steps: int, blocked: Dictionary = {}, pass_terrain := false) -> Dictionary:
 	var dist := {start: 0}
 	var q := [start]
 	while not q.is_empty():
@@ -253,7 +254,7 @@ func reachable(start: int, steps: int, blocked: Dictionary = {}) -> Dictionary:
 		if dist[cur] >= steps:
 			continue
 		for nb in adj[cur]:
-			if dist.has(nb) or blocked.has(nb) or obstacles.has(nb):
+			if dist.has(nb) or blocked.has(nb) or (not pass_terrain and obstacles.has(nb)):
 				continue
 			dist[nb] = dist[cur] + 1
 			q.append(nb)
@@ -262,7 +263,7 @@ func reachable(start: int, steps: int, blocked: Dictionary = {}) -> Dictionary:
 
 ## Shortest node path from `start` to `target` (BFS), as the list of nodes to walk
 ## THROUGH (excludes start, includes target). `blocked` = impassable node ids.
-func path_to(start: int, target: int, blocked: Dictionary = {}) -> Array:
+func path_to(start: int, target: int, blocked: Dictionary = {}, pass_terrain := false) -> Array:
 	if start == target:
 		return []
 	var prev := {start: -1}
@@ -270,7 +271,7 @@ func path_to(start: int, target: int, blocked: Dictionary = {}) -> Array:
 	while not q.is_empty():
 		var cur: int = q.pop_front()
 		for nb in adj[cur]:
-			if prev.has(nb) or blocked.has(nb) or obstacles.has(nb):
+			if prev.has(nb) or blocked.has(nb) or (not pass_terrain and obstacles.has(nb)):
 				continue
 			prev[nb] = cur
 			if nb == target:

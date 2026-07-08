@@ -54,6 +54,7 @@ static var _tile_scenes := {}
 var _assets_on := true   # Configuración: "3d" = losetas Meshy · "2d" = digital
 var _last_turn := ""     # para anunciar "¡ES TU TURNO!" solo cuando cambia
 var _lock_vis := {}      # nid -> visual de candado (nodo cerrado los 1ros turnos)
+var _buff_lbls := {}     # buff node id -> Label3D con el progreso de carga
 var _highlighted := []
 var _entrance_owner := {}      # entrance node id -> owning team (for the "blocked" siren)
 var _sirening := {}            # entrance nodes currently pulsing red
@@ -280,6 +281,17 @@ func _build_board() -> void:
 			_add_goal_beacon(g)
 	for b in _gs.map.buffs:
 		_add_buff_crystal(b)
+		# etiqueta de progreso de CARGA del buff (⚡n/2 · ✔ · ⏳ cooldown)
+		var bl := Label3D.new()
+		bl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		bl.no_depth_test = true
+		bl.font_size = 72
+		bl.pixel_size = 0.005
+		bl.outline_size = 16
+		bl.modulate = Color(1.0, 0.8, 0.3)
+		bl.position = _gs.map.pos_of(int(b)) + Vector3(0, 1.4, 0)
+		add_child(bl)
+		_buff_lbls[int(b)] = bl
 	for nid in _gs.map.locked_until.keys():
 		_add_lock_vis(int(nid))
 	for e in _gs.map.entrances_player:
@@ -323,6 +335,20 @@ func _refresh_locks() -> void:
 		var v = _lock_vis[nid]
 		if is_instance_valid(v):
 			v.visible = _gs.node_locked(int(nid))
+	for bid in _buff_lbls.keys():
+		var l: Label3D = _buff_lbls[bid]
+		if not is_instance_valid(l):
+			continue
+		var occ: int = _gs.board.get(int(bid), -1)
+		if _gs.turn_no < int(_gs.buff_cd.get(int(bid), 0)):
+			l.text = "⏳"
+			l.modulate = Color(0.6, 0.6, 0.7)
+		elif occ != -1 and bool(_gs.units[occ].get("buffed", false)):
+			l.text = ""
+		else:
+			var n := _gs.buff_progress(int(bid))
+			l.text = "⚡%d/%d" % [n, GameState.BUFF_CHARGE_TURNS] if n > 0 else "⚡"
+			l.modulate = Color(1.0, 0.8, 0.3)
 
 # ---------------------------------------------------------------- board assets
 ## Primer GLB dentro de assets/board/<slug>/ (cacheado). null si no hay.
@@ -831,9 +857,14 @@ func _build_ui() -> void:
 	bench_panel.offset_right = -8
 	bench_panel.add_theme_stylebox_override("panel", UITheme.panel(Color(0.07, 0.08, 0.14, 0.95), UITheme.BORDER, 14, 1, 6))
 	layer.add_child(bench_panel)
+	# La banca ahora es de 6 (+ K.O. con contador): scroll horizontal si no cabe.
+	var bench_scroll := ScrollContainer.new()
+	bench_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	bench_panel.add_child(bench_scroll)
 	_bench_box = HBoxContainer.new()
 	_bench_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	bench_panel.add_child(_bench_box)
+	_bench_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bench_scroll.add_child(_bench_box)
 
 	# Energy readout (top-left) + equipped modifier cards (row above End Turn).
 	var en_pill := PanelContainer.new()
@@ -1340,9 +1371,22 @@ func _unhandled_input(event: InputEvent) -> void:
 				if uid != -1:
 					_preview_figure(uid)
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_UP:
-			_cam.position *= 0.93
+			_zoom(0.93)
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			_cam.position *= 1.07
+			_zoom(1.07)
+	elif event is InputEventMagnifyGesture:
+		# PELLIZCO (Android): acercar/alejar con dos dedos, igual que la rueda.
+		_zoom(1.0 / maxf(0.05, (event as InputEventMagnifyGesture).factor))
+
+## Zoom de cámara con LÍMITES (ni pegarse al piso ni perderse en el cielo).
+func _zoom(mult: float) -> void:
+	var p := _cam.position * mult
+	var d := p.length()
+	if d < 7.0:
+		p = p.normalized() * 7.0
+	elif d > 26.0:
+		p = p.normalized() * 26.0
+	_cam.position = p
 
 func _node_under_cursor(mouse: Vector2) -> int:
 	var from := _cam.project_ray_origin(mouse)
@@ -1553,6 +1597,12 @@ func _refresh_status_labels() -> void:
 		var sl := _gs.status_list(uid)
 		lbl.text = _status_text(sl)
 		lbl.visible = not sl.is_empty()
+	# ⚡ = figura potenciada por buff node (permanente hasta caer)
+	for uid in _name_lbls.keys():
+		var nl = _name_lbls[uid]
+		if is_instance_valid(nl) and _gs.units.has(uid):
+			var base := _gs.name_for(uid)
+			nl.text = ("⚡" + base) if bool(_gs.units[uid].get("buffed", false)) else base
 
 func _status_text(list: Array) -> String:
 	var parts := []
@@ -1933,7 +1983,7 @@ func _animate_displacement(disp: Dictionary) -> void:
 				fa.play_clip("idle")
 			if fb:
 				fb.play_clip("idle")
-		"push", "pull":
+		"push", "pull", "dash", "retreat":
 			var f: Figure3D = _vis.get(int(disp["uid"]))
 			if f:
 				var to := _gs.map.pos_of(int(disp["to"]))
@@ -1943,6 +1993,16 @@ func _animate_displacement(disp: Dictionary) -> void:
 					tw2.tween_property(f, "position", to, 0.4)
 					await tw2.finished
 					f.play_clip("idle")
+		"teleport":
+			# desaparece -> reaparece en su entrada (con chispa de invocación)
+			var ft: Figure3D = _vis.get(int(disp["uid"]))
+			if ft:
+				var tw3 := create_tween()
+				tw3.tween_property(ft, "scale", Vector3.ONE * 0.05, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+				await tw3.finished
+				ft.position = _gs.map.pos_of(int(disp["to"]))
+				_summon_fx(ft, String(_gs.units[int(disp["uid"])]["team"]))   # crece + destello
+				await get_tree().create_timer(0.5).timeout
 
 func _named(uid: int) -> String:
 	return _gs.name_for(uid) + ("  (tú)" if _gs.units[uid]["team"] == "player" else "  (rival)")
@@ -2018,7 +2078,8 @@ func _combat_cutaway(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 		# Drama: pop the applied effect over the affected figure.
 		var st: Dictionary = rec.get("status", {})
 		if not st.is_empty():
-			_dramatize_effect(int(st["target"]), String(st.get("fx", "Estado")))
+			var fx_txt := "🛡 ¡RESISTIÓ!" if bool(st.get("resisted", false)) else String(st.get("fx", "Estado"))
+			_dramatize_effect(int(st["target"]), fx_txt)
 		await get_tree().create_timer(1.9).timeout
 		if _vis.has(att_uid):
 			_vis[att_uid].play_clip("idle")

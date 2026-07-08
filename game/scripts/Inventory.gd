@@ -263,6 +263,12 @@ func catalog() -> Array:
 			out.append("passive:" + String(pid))
 	for s in range(0, 7):
 		out.append("stamina:%d" % s)
+	var seen_r := {}
+	for label in GameState.FX_STATUS.keys():
+		var sid := String(GameState.FX_STATUS[label])
+		if not seen_r.has(sid):
+			seen_r[sid] = true
+			out.append("resist:" + sid)
 	return out
 
 ## Piezas que una figura NECESITA (para bloquear el guardado en modo usuario).
@@ -276,6 +282,8 @@ func required_pieces(fig: Dictionary) -> Array:
 	req["stamina:%d" % int(fig.get("stamina", 2))] = true
 	for pid in fig.get("passives", []):
 		req["passive:" + String(pid)] = true
+	for sid in fig.get("resists", []):
+		req["resist:" + String(sid)] = true
 	for seg in fig.get("attack", []):
 		req["color:" + String(seg.get("col", "white"))] = true
 		if String(seg.get("fx", "")) != "":
@@ -329,6 +337,11 @@ func piece_name(key: String) -> String:
 			return "Pasiva " + String(Roster.PASSIVES.get(p[1], {}).get("name", p[1]))
 		"stamina":
 			return "Estamina " + p[1]
+		"resist":
+			for label in GameState.FX_STATUS.keys():
+				if String(GameState.FX_STATUS[label]) == p[1]:
+					return "Resistencia " + String(label)
+			return "Resistencia " + p[1]
 	return key
 
 # ---------------------------------------------------------------- kit inicial

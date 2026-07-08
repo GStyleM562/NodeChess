@@ -20,6 +20,8 @@ const PASSIVES := {
 	"aerial": {"name": "Aerial", "desc": "Vuelo: atraviesa figuras al moverse (no da inmunidad a KO por rodear)."},
 	"parkour": {"name": "Parkour", "desc": "Puede caminar Y saltar en el mismo turno; el salto termina el turno y no permite atacar."},
 	"dive": {"name": "Dive", "desc": "Tras volar 3+ nodos, tu Empuje 1 se vuelve Empuje 2."},
+	"hover": {"name": "Hover", "desc": "Flota: ignora candados y obstáculos del terreno al moverse (no puede terminar sobre ellos)."},
+	"fast_recovery": {"name": "Fast Recovery", "desc": "Regresa del K.O. una ronda antes."},
 	# --- hidden passives (unlocked on Rank Up) ---
 	"venom_aura": {"name": "Venom Aura (oculta)", "desc": "Aura: los enemigos adyacentes tienen −1 stamina."},
 	"burning_aura": {"name": "Burning Aura (oculta)", "desc": "Aura: al inicio de tu turno, los enemigos adyacentes quedan Debilitados."},

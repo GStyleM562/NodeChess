@@ -96,7 +96,8 @@ func _rebuild_inventory() -> void:
 	for c in _inv_box.get_children():
 		c.queue_free()
 	var groups := [["model:", "FIGURAS"], ["rarity:", "RAREZAS"], ["atype:", "TIPOS DE ATAQUE"],
-		["color:", "ATAQUES (COLORES)"], ["fx:", "ESTADOS"], ["passive:", "PASIVAS"], ["stamina:", "ESTAMINA"]]
+		["color:", "ATAQUES (COLORES)"], ["fx:", "ESTADOS"], ["passive:", "PASIVAS"],
+		["stamina:", "ESTAMINA"], ["resist:", "RESISTENCIAS"]]
 	for g in groups:
 		var hdr := Label.new()
 		hdr.text = String(g[1])

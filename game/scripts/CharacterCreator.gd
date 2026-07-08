@@ -29,6 +29,9 @@ const FX_OPTS := [
 	{"label": "Empuje 1", "fx": "Empuje", "disp": "push", "n": 1},
 	{"label": "Jalón 1", "fx": "Jalón", "disp": "pull", "n": 1},
 	{"label": "Intercambio", "fx": "Intercambio", "disp": "swap"},
+	{"label": "Dash", "fx": "Dash", "disp": "dash"},
+	{"label": "Retirada", "fx": "Retirada", "disp": "retreat"},
+	{"label": "Teletransporte", "fx": "Teletransporte", "disp": "teleport"},
 ]
 # Passives that are unlocked only via Rank Up (cannot be equipped directly).
 const HIDDEN_PASSIVES := ["venom_aura", "burning_aura", "loaded_dice", "phase", "kindling_resolve"]
@@ -59,6 +62,9 @@ const FX_DESC := {
 	"Empuje 1": "Empuja al rival 1 nodo.",
 	"Jalón 1": "Atrae al rival 1 nodo hacia ti.",
 	"Intercambio": "Intercambia posiciones con el rival.",
+	"Dash": "Al ganar, TÚ avanzas 1 nodo hacia el rival (ganas espacio).",
+	"Retirada": "Al ganar, TÚ retrocedes 1 nodo (golpea y huye).",
+	"Teletransporte": "Envía al rival a su entrada libre más cercana.",
 }
 
 # Set this static before changing to the creator scene to EDIT an existing figure
@@ -81,6 +87,7 @@ var _phase_opts: Array = []        # one OptionButton per evolution phase
 var _evo_fig_ids: Array = []       # figure ids selectable as an evolution stage
 var _evo_names: Array = []
 var _passive_boxes := {}          # pid -> toggle Button
+var _resist_boxes := {}           # status id -> toggle Button (resistencias)
 var _rows: Array = []             # each: { panel, col, name, pow, stars, fx, prob }
 var _rows_box: VBoxContainer
 var _total_lbl: Label
@@ -129,6 +136,7 @@ func _ready() -> void:
 	_build_identity(form)
 	_build_combat(form)
 	_build_passives(form)
+	_build_resists(form)
 	_build_pool(form)
 
 	_build_footer()
@@ -337,6 +345,34 @@ func _build_passives(form: VBoxContainer) -> void:
 		grid.add_child(item)
 		_passive_boxes[pid] = tg
 
+## Resistencias a estados (GDD): la figura es INMUNE a los elegidos (máx. 2).
+func _build_resists(form: VBoxContainer) -> void:
+	var s := _section(form, "Resistencias a estados (máx. 2)")
+	var hint := Label.new()
+	hint.text = "Los estados elegidos NUNCA se le aplican a esta figura."
+	UITheme.label(hint, 11, UITheme.MUTED, false, 500)
+	s.add_child(hint)
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	s.add_child(grid)
+	for label in GameState.FX_STATUS.keys():
+		var sid := String(GameState.FX_STATUS[label])
+		var tg := Button.new()
+		tg.toggle_mode = true
+		tg.text = String(label)
+		tg.clip_text = true
+		tg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tg.custom_minimum_size = Vector2(0, 34)
+		_style_toggle(tg)
+		tg.toggled.connect(func(_p): _revalidate())
+		if not _inv().is_admin() and not _piece_ok("resist:" + sid):
+			tg.disabled = true
+			tg.text = "🔒 " + String(label)
+		grid.add_child(tg)
+		_resist_boxes[sid] = tg
+
 func _build_pool(form: VBoxContainer) -> void:
 	var s := _section(form, "Pool de ataque")
 	var hint := Label.new()
@@ -454,6 +490,10 @@ func build_figure() -> Dictionary:
 	for pid in _passive_boxes.keys():
 		if _passive_boxes[pid].button_pressed:
 			passives.append(pid)
+	var resists: Array = []
+	for sid in _resist_boxes.keys():
+		if _resist_boxes[sid].button_pressed:
+			resists.append(sid)
 	var model_ref := ""
 	if _model.selected >= 0 and _model.selected < _model_ids.size():
 		model_ref = String(_model_ids[_model.selected])
@@ -468,7 +508,7 @@ func build_figure() -> Dictionary:
 		"name": _name.text, "desc": _desc.text,
 		"class": CLASSES[_class.selected], "rarity": RARITIES[_rarity.selected],
 		"stamina": int(_stamina.value), "type": TYPES[_type.selected],
-		"passives": passives, "model_ref": model_ref,
+		"passives": passives, "resists": resists, "model_ref": model_ref,
 		"evolve": _evolve.button_pressed, "stages": stages,
 		"pool": pool,
 	})
@@ -539,6 +579,9 @@ func _load_figure(fig: Dictionary) -> void:
 	var pl: Array = fig.get("passives", [])
 	for pid in _passive_boxes.keys():
 		_passive_boxes[pid].button_pressed = pid in pl
+	var rl: Array = fig.get("resists", [])
+	for sid in _resist_boxes.keys():
+		_resist_boxes[sid].button_pressed = sid in rl
 	_clear_pool()
 	for seg in fig.get("attack", []):
 		_add_row(seg)
@@ -578,6 +621,7 @@ static func make_figure(p: Dictionary) -> Dictionary:
 		"stamina": int(p.get("stamina", 2)),
 		"type": String(p.get("type", "Ruleta")),
 		"passives": p.get("passives", []),
+		"resists": p.get("resists", []),
 		"model_ref": String(p.get("model_ref", "")),
 		"attack": attack,
 	}
