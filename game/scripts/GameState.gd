@@ -911,7 +911,9 @@ func _pw(k: String) -> float:
 ## CPU por lista de prioridades (ver docs/AI_CPU.md). 0 = fácil (legacy);
 ## 1+ = lista completa; 2 = además gasta modificadores en ataques ganadores.
 func bot_action(team: String) -> Dictionary:
-	if bot_difficulty <= 0:
+	if bot_difficulty < 0:
+		return _bot_tutorial(team)
+	if bot_difficulty == 0:
 		return _bot_easy(team)
 	var target_goal: int = map.goal_player if team == "enemy" else map.goal_enemy
 	var own_goal: int = map.goal_enemy if team == "enemy" else map.goal_player
@@ -1130,6 +1132,31 @@ func _bot_advance(team: String, target_goal: int, own_goal: int) -> Dictionary:
 		move_unit(mv_uid, mv_node)
 		return {"type": "move", "uid": mv_uid, "node": mv_node, "path": p}
 	return {}
+
+## BOT DE TUTORIAL: despliega y avanza lento; al quedar junto a un rival se
+## detiene como muñeco de práctica y JAMÁS ataca.
+func _bot_tutorial(team: String) -> Dictionary:
+	var tg: int = map.goal_player if team == "enemy" else map.goal_enemy
+	if can_deploy(team):
+		return _bot_deploy(team, tg)
+	for uid in units_on_board(team):
+		if not can_move(uid):
+			continue
+		if not adjacent_enemies(uid).is_empty():
+			return {"type": "pass"}
+		var reach := move_targets(uid, 1)
+		var best := -1
+		var bd := INF
+		for nid in reach.keys():
+			var dd := _dist(int(nid), tg)
+			if dd < bd:
+				bd = dd
+				best = int(nid)
+		if best != -1:
+			var p := _bot_path(uid, best)
+			if move_unit(uid, best):
+				return {"type": "move", "uid": uid, "node": best, "path": p}
+	return {"type": "pass"}
 
 func _bot_easy(team: String) -> Dictionary:
 	if can_deploy(team) and units_on_board(team).size() < 3:

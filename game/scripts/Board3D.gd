@@ -57,9 +57,24 @@ var _lock_vis := {}      # nid -> visual de candado (nodo cerrado los 1ros turno
 var _buff_lbls := {}     # buff node id -> Label3D con el progreso de carga
 var _trap_pending := false   # eligiendo nodo para el modificador Trampa
 var _trap_vis := {}      # nid -> marcador ▲ de MIS trampas (el rival no lo ve)
+## Pasos del TUTORIAL guiado: kind action = avanza al hacerlo · info = botón OK.
+const TUT_STEPS := [
+	{"text": "1/6 · DESPLIEGA: arrastra una carta de tu BANCA (abajo) a una entrada AZUL brillante.", "kind": "deploy"},
+	{"text": "2/6 · MUÉVETE: toca tu figura y luego un nodo AZUL. La estamina ⚡ es cuántos nodos avanza.", "kind": "move"},
+	{"text": "3/6 · ATACA: párate junto al muñeco rival y toca su nodo ROJO. ¡Gira la ruleta!", "kind": "attack"},
+	{"text": "4/6 · SALTOS: los nodos DORADOS saltan POR ENCIMA de un rival (cuestan 2). Los 🔒 se abren en la ronda 3.", "kind": "info"},
+	{"text": "5/6 · BUFF: párate 2 turnos en el nodo ⚡ del centro y tu figura quedará POTENCIADA para siempre.", "kind": "info"},
+	{"text": "6/6 · ¡GANA!: lleva CUALQUIER figura a la META dorada del rival (arriba).", "kind": "win"},
+]
+var _tut_step := -1          # -1 = sin tutorial
+var _tut_panel: PanelContainer
+var _tut_lbl: Label
+var _tut_ok: Button
+
 const TURN_LIMIT := 75.0     # online: segundos por turno (al agotarse, pasa solo)
 var _turn_left := 0.0
 var _timer_lbl: Label
+var _skip_btn: Button        # ⏭ saltar la animación de combate
 var _net_blocked := false    # reconectando o rival offline: se pausa la partida
 var _net_banner: PanelContainer
 var _net_banner_lbl: Label
@@ -110,11 +125,12 @@ func _ready() -> void:
 	if NetSession.online:
 		_setup_online_state()
 	else:
-		_gs = GameState.new(MapData.new(Loadout.map_index))
+		_gs = GameState.new(MapData.new(0 if Loadout.tutorial else Loadout.map_index))
 		# Teams come from the Deck Builder (player) + a preset enemy deck.
 		for ri in Loadout.player_team:
 			_gs.add_to_bench("player", int(ri))
-		for ri in Loadout.enemy_team:
+		# Tutorial: la CPU usa UNA figura pasiva (muñeco de práctica).
+		for ri in ([0] if Loadout.tutorial else Loadout.enemy_team):
 			_gs.add_to_bench("enemy", int(ri))
 	_build_board()
 	_overlay = CombatOverlay.new()
@@ -130,6 +146,9 @@ func _ready() -> void:
 		NetSession.client.match_start.connect(_on_rematch_start)
 		NetSession.net_paused.connect(_on_net_paused)
 		_turn_left = TURN_LIMIT
+	elif Loadout.tutorial:
+		_gs.bot_difficulty = -1        # bot pasivo de tutorial
+		_tut_start()
 	else:
 		# Dificultad elegida en el Deck Builder + personalidad al azar (variedad).
 		_gs.bot_difficulty = Settings.cpu_level
@@ -183,6 +202,8 @@ func _net_send(action: Dictionary) -> void:
 		NetSession.client.send_action(action)
 
 func _leave_to_menu() -> void:
+	Engine.time_scale = 1.0
+	Loadout.tutorial = false
 	if _online:
 		Roster.FIGURES = _saved_roster                 # un-swap the roster
 		NetSession.end_online()
@@ -190,9 +211,10 @@ func _leave_to_menu() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 func _process(delta: float) -> void:
-	# ONLINE: reloj de turno (al agotarse TU turno, se pasa solo).
+	# ONLINE: reloj de turno (al agotarse TU turno, se pasa solo). Se divide por
+	# time_scale para que la velocidad ×2 del combate NO drene el reloj más rápido.
 	if _online and not _over and not _net_blocked:
-		_turn_left = maxf(0.0, _turn_left - delta)
+		_turn_left = maxf(0.0, _turn_left - delta / maxf(0.02, Engine.time_scale))
 		if _timer_lbl != null:
 			_timer_lbl.text = "⏱ %d s" % int(ceil(_turn_left))
 			_timer_lbl.add_theme_color_override("font_color",
@@ -325,10 +347,88 @@ func _build_board() -> void:
 		_buff_lbls[int(b)] = bl
 	for nid in _gs.map.locked_until.keys():
 		_add_lock_vis(int(nid))
+	# PORTALES (Túneles): anillo violeta girando sobre cada teleporter.
+	for pair in _gs.map.teleporters:
+		for pn in pair:
+			_add_portal_vis(int(pn))
 	for e in _gs.map.entrances_player:
 		_entrance_owner[e] = "player"
 	for e in _gs.map.entrances_enemy:
 		_entrance_owner[e] = "enemy"
+
+# ---------------------------------------------------------------- tutorial
+func _tut_start() -> void:
+	_tut_panel = PanelContainer.new()
+	_tut_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_tut_panel.offset_left = 12
+	_tut_panel.offset_right = -12
+	_tut_panel.offset_top = 96
+	_tut_panel.offset_bottom = 178
+	_tut_panel.add_theme_stylebox_override("panel", UITheme.panel(Color(0.05, 0.1, 0.08, 0.97), UITheme.SUCCESS, 14, 2, 10))
+	_ui_layer.add_child(_tut_panel)
+	var vb := VBoxContainer.new()
+	_tut_panel.add_child(vb)
+	_tut_lbl = Label.new()
+	_tut_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.label(_tut_lbl, 14, UITheme.TEXT, true, 700)
+	vb.add_child(_tut_lbl)
+	_tut_ok = Button.new()
+	_tut_ok.text = "Entendido ✓"
+	_tut_ok.custom_minimum_size = Vector2(0, 34)
+	UITheme.button_font(_tut_ok, 13, UITheme.TEXT, true, 700)
+	UITheme.style_primary(_tut_ok, UITheme.SUCCESS, 10)
+	_tut_ok.pressed.connect(func(): _tut_advance())
+	vb.add_child(_tut_ok)
+	_tut_step = 0
+	_tut_show()
+
+func _tut_show() -> void:
+	if _tut_step < 0 or _tut_step >= TUT_STEPS.size() or _tut_panel == null:
+		return
+	var st: Dictionary = TUT_STEPS[_tut_step]
+	_tut_lbl.text = String(st["text"])
+	_tut_ok.visible = String(st["kind"]) == "info"
+
+## Avanza el tutorial cuando el jugador HIZO la acción del paso actual.
+func _tut_action(kind: String) -> void:
+	if _tut_step < 0 or _tut_step >= TUT_STEPS.size():
+		return
+	if String(TUT_STEPS[_tut_step]["kind"]) == kind:
+		_tut_advance()
+
+func _tut_advance() -> void:
+	_tut_step += 1
+	if _tut_step >= TUT_STEPS.size():
+		if _tut_panel != null:
+			_tut_panel.visible = false
+		return
+	_tut_show()
+	Sfx.play("ui_click")
+
+## PORTAL: halo violeta que gira + chispa orbitando (los dos extremos del túnel).
+func _add_portal_vis(nid: int) -> void:
+	var p := _gs.map.pos_of(nid)
+	var ring := MeshInstance3D.new()
+	var t := TorusMesh.new()
+	t.inner_radius = 0.5
+	t.outer_radius = 0.62
+	ring.mesh = t
+	ring.position = p + Vector3(0, 0.16, 0)
+	ring.scale = Vector3(1, 0.5, 1)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.72, 0.45, 1.0, 0.85)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.emission_enabled = true
+	mat.emission = Color(0.72, 0.45, 1.0)
+	mat.emission_energy_multiplier = 1.3
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ring.material_override = mat
+	add_child(ring)
+	var tw := create_tween().set_loops()
+	tw.tween_property(ring, "rotation:y", TAU, 3.2).from(0.0)
+	var bob := create_tween().set_loops()
+	bob.tween_property(ring, "scale", Vector3(1.12, 0.5, 1.12), 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	bob.tween_property(ring, "scale", Vector3(1.0, 0.5, 1.0), 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 ## Candado visible sobre un nodo cerrado los primeros turnos: aro rojo + 🔒.
 ## Se oculta solo cuando el camino se abre (_refresh_locks en _update_status).
@@ -936,6 +1036,20 @@ func _build_ui() -> void:
 	_banner_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	UITheme.label(_banner_lbl, 18, UITheme.GOLD, true, 700)
 	_banner.add_child(_banner_lbl)
+
+	# ⏭ Saltar la animación de combate (visible solo durante el combate).
+	_skip_btn = Button.new()
+	_skip_btn.text = "⏭ Saltar"
+	_skip_btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_skip_btn.offset_left = 10
+	_skip_btn.offset_top = 54
+	_skip_btn.offset_right = 120
+	_skip_btn.offset_bottom = 92
+	UITheme.button_font(_skip_btn, 14, UITheme.TEXT, true, 700)
+	UITheme.style_surface(_skip_btn, UITheme.SURFACE, UITheme.BORDER, 10)
+	_skip_btn.visible = false
+	_skip_btn.pressed.connect(func(): Engine.time_scale = 12.0)   # fast-forward
+	layer.add_child(_skip_btn)
 
 	# Online: reloj de turno (arriba a la derecha, bajo el menú).
 	_timer_lbl = Label.new()
@@ -1655,6 +1769,7 @@ func _set_highlight(nid: int, col: Color) -> void:
 
 # ---------------------------------------------------------------- player actions
 func _player_deploy(uid: int, node: int) -> void:
+	_tut_action("deploy")
 	_clear_highlights()
 	_deploy_uid = -1
 	_gs.deploy(uid, node)
@@ -1671,6 +1786,7 @@ func _player_deploy(uid: int, node: int) -> void:
 func _player_move(node: int) -> void:
 	var cost: int = int(_reach[node])
 	# Compute the path BEFORE moving (board state is still current). Jump-aware.
+	_tut_action("move")
 	var path := _gs.move_path(_active_uid, node)
 	# Phasing figures walk THROUGH occupants (keep moving/attacking); a non-phasing
 	# move onto a path that starts with an occupied node is a JUMP (ends the turn).
@@ -1781,6 +1897,7 @@ func _dramatize_effect(uid: int, fx_text: String) -> void:
 	tw.tween_callback(l.queue_free)
 
 func _player_attack(foe_uid: int) -> void:
+	_tut_action("attack")
 	var att := _active_uid
 	var moved := maxi(0, int(_gs.units[att]["stamina"]) - _remaining)   # for Lunge / Dive
 	_clear_highlights()
@@ -2033,6 +2150,10 @@ func _hop_over(fig: Figure3D, over_pos: Vector3, land_pos: Vector3) -> void:
 
 # ---------------------------------------------------------------- combat
 func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:
+	# Velocidad de combate (Configuración) + botón ⏭ para saltarlo del todo.
+	Engine.time_scale = float(maxi(1, Settings.combat_speed))
+	if _skip_btn != null:
+		_skip_btn.visible = true
 	var a_name := _named(att_uid)
 	var b_name := _named(def_uid)
 	var a_col := _team_color(_gs.units[att_uid]["team"])
@@ -2072,6 +2193,9 @@ func _play_combat(att_uid: int, def_uid: int, rec: Dictionary) -> void:
 		_show_rankup(ranked)
 	_refresh_status_labels()
 	await _resolve_surround()
+	Engine.time_scale = 1.0        # fin del combate: velocidad normal
+	if _skip_btn != null:
+		_skip_btn.visible = false
 
 func _show_rankup(uid: int) -> void:
 	Sfx.play("rankup")
@@ -2320,6 +2444,9 @@ func _check_and_show_winner() -> bool:
 	return true
 
 func _show_winner(team: String) -> void:
+	Engine.time_scale = 1.0
+	if _skip_btn != null:
+		_skip_btn.visible = false
 	_over = true
 	_busy = true
 	_reset_activation()
@@ -2327,6 +2454,10 @@ func _show_winner(team: String) -> void:
 	var win := team == "player"
 	Music.stop()
 	Sfx.play("victory" if win else "defeat")
+	if Loadout.tutorial and win:
+		Settings.set_tutorial_done(true)
+		if _tut_panel != null:
+			_tut_panel.visible = false
 	# XP REAL: se suma aquí, sube de nivel y regala piezas (persistente).
 	var res: Dictionary = Inventory.add_match_xp(win, _online)
 
@@ -2381,6 +2512,8 @@ func _show_winner(team: String) -> void:
 	v.add_child(_vic_lbl("🏆" if win else "💔", 40, UITheme.GOLD if win else UITheme.MUTED, true, 800))
 	v.add_child(_vic_lbl("¡VICTORIA!" if win else "DERROTA", 42, (UITheme.GOLD if win else UITheme.DANGER), true, 800))
 	v.add_child(_vic_lbl("Buen duelo." if win else "La próxima es tuya.", 16, UITheme.TEXT2, false, 600))
+	if Loadout.tutorial and win:
+		v.add_child(_vic_chip("🎓 ¡TUTORIAL COMPLETADO! Ya sabes jugar.", UITheme.SUCCESS))
 
 	# --- barra de nivel REAL (animada hasta el progreso actual) ---
 	v.add_child(_vic_lbl("Nivel %d" % int(res["level"]), 14, UITheme.TEXT2, true, 700))
@@ -2398,15 +2531,10 @@ func _show_winner(team: String) -> void:
 	create_tween().tween_property(xp, "value", float(Inventory.xp), 0.9).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	v.add_child(_vic_lbl("+%d XP  (%d/%d)" % [int(res["gained"]), Inventory.xp, Inventory.xp_needed()], 13, UITheme.GOLD, true, 700))
 
-	# --- recompensas REALES por subir de nivel ---
+	# --- recompensas REALES por subir de nivel: COFRES reclamables en el lobby ---
 	if int(res["leveled"]) > 0:
 		v.add_child(_vic_chip("⬆ ¡SUBISTE A NIVEL %d!" % int(res["level"]), UITheme.SUCCESS))
-		var chips := HBoxContainer.new()
-		chips.alignment = BoxContainer.ALIGNMENT_CENTER
-		chips.add_theme_constant_override("separation", 6)
-		for key in res["rewards"]:
-			chips.add_child(_vic_chip("🎁 " + Inventory.piece_name(String(key)), UITheme.GOLD))
-		v.add_child(chips)
+		v.add_child(_vic_chip("🏅 +%d Cofre de Nivel — recógelo en el menú" % int(res["chests"]), UITheme.GOLD))
 	else:
 		v.add_child(_vic_chip("🎁 Tus cofres te esperan en el menú", UITheme.PRIMARY_EDGE))
 

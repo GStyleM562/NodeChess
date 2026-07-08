@@ -1,87 +1,109 @@
 # NodeChess — Estado del proyecto y registro de cambios
 
 > Resumen vivo: qué está HECHO, qué entró en la última tanda, y qué queda
-> PENDIENTE (mecánicas / diseño / mapa / técnico). Actualizado: 2026-07-04.
+> PENDIENTE (mecánicas / diseño / mapa / técnico). Actualizado: 2026-07-08.
+> Plan de la vuelta y estados por punto: `docs/PENDIENTES_Vuelta01.md`.
 
 ## ✅ Sistemas funcionando hoy
 
 **Núcleo de juego**
 - Combate por colores del GDD (Blanco vs Oro POR DAÑO), 13 estados, pasivas,
-  desplazamientos (empuje/jalón/intercambio), KO por rodeo, Rank Up en partida
-  con cambio de modelo, energía + modificadores, buff node.
-- Saltos: aterrizan en cualquier casilla libre adyacente al rival (imposible si
-  está tapado); aterrizajes en DORADO + banner "¡SALTO!".
+  KO por rodeo, Rank Up en partida con cambio de modelo, energía, buff node.
+- MAZO DE 6 figuras (GDD exacto) en builder, banca, online y CPU.
+- RESISTENCIAS por figura (`resists: []`, máx 2): anulan el estado en combate
+  ("RESISTIÓ"), editables en el Creador (pieza de inventario `resist:*`),
+  visibles en la Dex, validadas por FigureValidator.
+- Desplazamientos completos y deterministas: empuje / jalón / intercambio /
+  DASH (el ganador avanza) / RETIRADA / TELETRANSPORte (a entrada propia libre).
+- Pasivas de movimiento: HOVER (cruza candados/terreno sin parar en ellos) y
+  FAST RECOVERY (K.O. −2 medio-turnos); + WARCRY, GOALKEEPER (+20/+1★ en su
+  meta), SCAVENGER (+2 energía por K.O. rival).
+- BUFF NODES GDD completos: 2 finales de turno propios parado en el nodo ⚡ →
+  figura POTENCIADA permanente (+20 daño/+1★ hasta K.O.), cooldown del nodo
+  10 medio-turnos, progreso visible en el tablero y prefijo ⚡ en el nombre.
+- 10 MODIFICADORES: power_surge, surge_big, cleanse, adrenaline + iron_wall
+  (inmune a desplazamientos), shield (Fallo→Azul), haste (+1 estamina equipo),
+  energy_drain, revive (saca del K.O.), trap (nodo oculto que inmoviliza).
+- K.O.: 3 rondas (6 medio-turnos) — decisión Vuelta01 (el GDD decía 5 turnos).
 - Anti-stack de motor (`move_unit` rechaza ocupados) + auditor `board_consistent`.
-- Mapas (4): +1 fila (mínimo entrada→meta 6–8), candados temporales 🔒 que abren
-  en la ronda 3, espejo 180° automórfico verificado (requisito online).
+- Mapas (5, +“Cruce” nuevo): mínimo entrada→meta 6–8, candados 🔒 que abren en
+  la ronda 3, espejo 180° automórfico verificado por test (requisito online).
 - IA CPU (docs/AI_CPU.md): GANAR YA → PORTERO → CERCO → ATAQUE ÚTIL →
-  DESPLIEGA TODO (y camina con la estamina restante) → BUFF → AVANZA ESQUIVANDO.
+  DESPLIEGA TODO (y camina) → BUFF → AVANZA. Dificultad Fácil/Media/Difícil
+  (selector en Deck Builder) + 5 PERSONALIDADES (equilibrada/agresiva/defensiva/
+  corredora/cazadora) elegidas al azar y anunciadas en un banner.
 
 **Online 1v1**
-- Relay Node en Render (free, con arranque en frío tolerado por el cliente:
-  wake-GET + reintentos ~3 min). Salas por código de 4 letras.
-- Lockstep determinista + perspectiva local sin voltear tablero.
-- Mazo viaja {"team", "lib"} (cierre de evoluciones separado) → uids/modelos
-  idénticos en ambas pantallas.
+- Relay Node en Render (free, arranque en frío tolerado: wake-GET + reintentos
+  ~3 min). Salas por código de 4 letras.
+- Lockstep determinista + perspectiva local sin voltear tablero; el mazo viaja
+  {"team", "lib"} → uids/modelos idénticos en ambas pantallas.
+- TIMER de 75 s por turno (⏱ en pantalla; al agotarse pasa solo).
+- RECONEXIÓN: si se corta la red, el cliente reconecta y hace re-join a la sala
+  (el server guarda el asiento 90 s y avisa al rival con banner de pausa).
+- REVANCHA online: botón en la pantalla final; si ambos aceptan, nueva partida
+  en la misma sala con nuevo seed y los mismos mazos.
 
 **Progresión / economía (base de monetización)**
 - Modo ADMIN (todo ∞) / USUARIO (regla dura) en Configuración.
 - Inventario persistente de PIEZAS del Creador (figuras, rarezas, tipos,
-  colores, estados, pasivas, estamina) + fragmentos (10 = 1 pieza).
-- Cofres en el lobby con animación de apertura: Gratis (fragmentos) +
-  5/10/15 min por reloj real (rearman al reclamar; mejores piezas por nivel).
-- ECONOMÍA REAL: crear un personaje GASTA sus piezas; editar cobra solo lo
-  nuevo y reembolsa lo retirado; las piezas invertidas no bloquean la edición.
-- XP y NIVELES persistentes: +60 victoria / +25 derrota (+15 online); cada
-  nivel regala piezas premium; barra animada al final de la partida y nivel
-  visible en el menú.
-- Personajes custom: guardado local + códigos de respaldo/compartir
-  (NCFIG1/NCPACK1) con importación validada.
-- TODO el progreso persiste local en user:// (inventario, ajustes, mazos,
-  customs) + respaldo automático de Google activado en el export.
+  colores, estados, pasivas, resistencias, estamina) + fragmentos (10 = 1).
+- Cofres en el lobby: Gratis (fragmentos) + 5/10/15 min por reloj real
+  (rearman al reclamar) + COFRE DE NIVEL 🏅 (al subir de nivel: 3 piezas,
+  1 premium garantizada; reclamable con la misma animación).
+- ECONOMÍA REAL: crear GASTA piezas; editar cobra el delta y reembolsa.
+- XP y NIVELES persistentes: +60 victoria / +25 derrota (+15 online).
+- MAZOS MÚLTIPLES (hasta 20) con pestañas en el Deck Builder + código de mazo
+  NCDECK1 para compartir/importar. En modo USUARIO el builder exige POSEER las
+  figuras (integradas via pieza `model:`; customs propias siempre).
+- Dex/Colección 2.0: búsqueda, filtros (todas/⭐favoritas/poseídas/tuyas),
+  favoritos persistentes y % de completado.
+- Personajes custom: guardado local + códigos NCFIG1/NCPACK1 validados.
 
-**Presentación**
-- Tablero 3D con assets Meshy o 2D digital futurista (grid emisivo + chispas),
-  elegible en Configuración. Cache estática de GLBs (carga rápida tras la 1ª).
-- Banca con RETRATOS 3D de tus personajes + contador ⏳ de regreso de cada K.O.
-- Invocación al desplegar, luces de victoria/derrota en combate, banner
-  "¡ES TU TURNO!", preview de CUALQUIER figura (aliada/rival, cualquier turno).
-- Victoria: tarjeta que estalla + confeti; Derrota: tarjeta que cae + sacudida.
-- Música por estado (menú/partida/ventaja/peligro con retorno) + 11 slots SFX;
-  volúmenes en Configuración ⚙ (y vista Admin/Usuario, tablero 3D/2D).
+**Presentación / UX**
+- Tablero 3D con assets Meshy o 2D digital futurista, elegible en Configuración.
+- PINCH-TO-ZOOM táctil en el tablero (gesto de 2 dedos, 7–26 de altura).
+- Velocidad de combate ×2 (Configuración) + botón ⏭ para saltar la animación.
+- MODO DALTÓNICO: paleta Okabe-Ito + símbolo por color (■◆✦⬟✖) en ruletas.
+- Portal visual (toro violeta girando) en los teleporters de Túneles.
+- TUTORIAL jugable: primera partida guiada (o 🎓 en Configuración) — panel de
+  6 pasos (despliega→mueve→ataca→saltos/candados→buff→gana) contra un muñeco
+  de práctica que camina pero JAMÁS ataca; al ganar queda marcado como hecho.
+- Banca con RETRATOS 3D + ⏳ de K.O.; victoria/derrota animadas con XP real.
+- Música por estado + 11 slots SFX; volúmenes y toggles en Configuración ⚙.
 
-## 🕐 PENDIENTES (revisión honesta)
+## 🕐 PENDIENTES
+**Del lado de GOJAN (assets, no bloquean código)**
+- SFX reales (11 carpetas en `game/assets/audio/sfx/`).
+- Meshy: Storm Valkyrie nueva (sigue excluida de la CPU), isla real,
+  rocas/árboles de borde, clips de ataque extra por figura.
+- Iconografía propia para piezas/cofres/botones (hoy emojis).
+- Probar build nueva en dos teléfonos (online) y reportar.
 
-**Mecánicas**
-- Buff nodes del GDD completos (cargas, cooldown, ownership; hoy: bono al pisar).
-- Catálogo de modificadores GDD (trampas, revive, escudos…) — hoy 4 básicos.
-- Resistencias a estados por figura (GDD) — no implementadas.
-- Timer por turno online (dejado preparado, no activado).
-- Reconexión a partida online tras cerrar la app.
-- Cofre por nivel (hoy los niveles regalan piezas directas) y XP→misiones.
-
-**Diseño / UX**
-- Tienda y Perfil reales (placeholders a propósito).
-- Dex/Colección: búsqueda, filtros, favoritos (GDD Collection).
-- Iconografía propia para piezas/cofres (hoy emojis).
-- Animaciones de ataque por tipo de figura (hoy set genérico).
-- Tutorial/onboarding (GDD contempla 10).
-
-**Mapa / assets**
-- Decoración de borde (rocas/árboles) e ISLA como asset (el GLB actual en
-  island_platform es un tramo de camino, no se usa).
-- Portal de Túneles con visual de portal; más arquetipos de mapas GDD.
-- Reemplazar el modelo de Storm Valkyrie (buggeado, "el ave") — excluida de la
-  CPU mientras tanto.
-
-**Técnico**
-- Guardado en la nube (hoy local + backup Google).
+**Vuelta 02 (decidido posponer)**
+- Tienda + monedas/gemas reales, anuncios/monetización.
+- Misiones diarias / pity (GDD las marca "MVP disabled").
+- Guardado en la nube / cuentas (hoy: local + backup Google + códigos).
 - Cobertura de pruebas de UI táctil (drag&drop de banca es manual).
 
+## 🔁 Protocolo de reanudación (si se corta la sesión)
+1. Leer este archivo y `docs/PENDIENTES_Vuelta01.md` (estados por punto).
+2. Suite: `run_suite.sh` estilo — cada `game/tools/test_*.gd` headless
+   (`Godot_v4.6.3-stable_win64_console.exe --headless --path game --script
+   res://tools/test_X.gd`); `test_net.gd` necesita `node nodechess_server/server.js`
+   local; `test_net_live.gd` pega al Render desplegado.
+3. El .aab solo cuando Gojan lo pida (script en scratchpad; keystore en
+   `F:\GodotProjects\keystores\` — JAMÁS commitear).
+
 ## 📜 Historial breve de tandas recientes
+- **Vuelta01 completa (F0–F6)**: zoom táctil, mazo de 6, resistencias,
+  hover/fast-recovery, dash/retirada/teleport, buff nodes con carga,
+  10 modificadores (trampas/revive/escudo…), gating de mazos por posesión,
+  multi-mazos + NCDECK1, Dex 2.0, dificultad+personalidades CPU, timer online,
+  reconexión, revancha, combate ×2/skip, modo daltónico, portal visual,
+  mapa "Cruce", cofre de nivel y tutorial jugable.
 - Cofres al lobby + animación de apertura; Inventario como pantalla propia.
 - IA CPU 5 comportamientos + despliega-y-camina; salto verificado con tests.
 - FIX online desincronizado (mazo team/lib) + anti-stack + preview universal.
 - Mapas +1 fila con candados temporales; buff aterrizado como su propio tile.
-- Economía real de piezas + XP/niveles + retratos de banca + animaciones de
-  fin de partida + menú con acentos/partículas + piso 2D futurista + ⏳ de K.O.
+- Economía real de piezas + XP/niveles + retratos de banca + animaciones de fin.

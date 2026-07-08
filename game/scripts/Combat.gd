@@ -82,18 +82,19 @@ static func outcome(a: Dictionary, b: Dictionary) -> Dictionary:
 ## The colour (hierarchy) is conveyed by the cell/coin colour, not the text.
 static func label(s: Dictionary) -> String:
 	var col := String(s.get("col", "red"))
+	var sym := symbol_of(s)   # modo daltónico: símbolo del color al frente
 	if col == "red":
-		return String(s.get("name", "Fallo"))
+		return sym + String(s.get("name", "Fallo"))
 	if col == "blue":
-		return String(s.get("name", "Bloqueo"))
+		return sym + String(s.get("name", "Bloqueo"))
 	if col == "purple":
 		var base := String(s.get("name", String(s.get("fx", "Especial"))))
-		return base + " " + "★".repeat(int(s.get("stars", 1)))
+		return sym + base + " " + "★".repeat(int(s.get("stars", 1)))
 	# white or gold: name + damage value
 	var dmg := str(int(s.get("pow", 0)))
 	if col == "gold":
-		return String(s.get("name", "Oro")) + " " + dmg
-	return String(s.get("name", "Daño")) + " " + dmg
+		return sym + String(s.get("name", "Oro")) + " " + dmg
+	return sym + String(s.get("name", "Daño")) + " " + dmg
 
 ## Human reason WHY this resolved the way it did (for combat transparency).
 ## Damage/★ only decide SAME colour; otherwise the colour hierarchy decides.
@@ -130,7 +131,31 @@ static func _cname(c: String) -> String:
 		"blue": return "Azul"
 		_: return "Rojo"
 
+## Modo daltónico (Settings): paleta Okabe-Ito de alto contraste + símbolo por
+## color en las etiquetas, para que el tipo de segmento nunca dependa del tono.
+static func _colorblind() -> bool:
+	var ml := Engine.get_main_loop()
+	if ml is SceneTree:
+		var s := (ml as SceneTree).root.get_node_or_null("Settings")
+		if s != null:
+			return bool(s.get("colorblind"))
+	return false
+
+const COL_SYMBOL := {"white": "■", "gold": "◆", "purple": "✦", "blue": "⬟", "red": "✖"}
+
+static func symbol_of(s: Dictionary) -> String:
+	if not _colorblind():
+		return ""
+	return String(COL_SYMBOL.get(String(s.get("col", "red")), "")) + " "
+
 static func color_of(s: Dictionary) -> Color:
+	if _colorblind():
+		match String(s.get("col", "red")):
+			"white": return Color(1.0, 1.0, 1.0)
+			"gold": return Color(0.94, 0.89, 0.26)     # amarillo Okabe-Ito
+			"purple": return Color(0.8, 0.47, 0.65)    # rosa
+			"blue": return Color(0.34, 0.71, 0.91)     # celeste
+			_: return Color(0.25, 0.25, 0.28)          # fallo = casi negro
 	match String(s.get("col", "red")):
 		"white": return Color(0.92, 0.94, 1.0)
 		"gold": return Color(1.0, 0.82, 0.25)

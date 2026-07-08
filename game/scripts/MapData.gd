@@ -6,7 +6,7 @@ class_name MapData
 
 ## The three playable maps (same rules: goals top/bottom + connected, two entrances
 ## per side, a buff node, every node <= 3 connections, symmetric left/right).
-const NAMES := ["Rieles", "Reloj de Arena", "Plaza", "Túneles"]
+const NAMES := ["Rieles", "Reloj de Arena", "Plaza", "Túneles", "Cruce"]
 
 var nodes := []          # [{id, pos:Vector3, role:String}]
 var adj := {}            # id -> Array[int]
@@ -33,6 +33,8 @@ func _init(layout := 0) -> void:
 			_build_plaza()
 		3:
 			_build_duel(true)
+		4:
+			_build_cross()
 		_:
 			_build_duel()
 
@@ -232,6 +234,16 @@ func _build_hourglass() -> void:
 		Vector3(-2.9, 0, -2.3), Vector3(2.9, 0, -2.3), Vector3(-1.2, 0, -1.1), Vector3(1.2, 0, -1.1),
 		Vector3(-1.2, 0, 1.1), Vector3(1.2, 0, 1.1), Vector3(-2.9, 0, 2.3), Vector3(2.9, 0, 2.3),
 		Vector3(0, 0, 4.2), Vector3(-2.9, 0, 4.2), Vector3(2.9, 0, 4.2), Vector3(0, 0, 5.7),
+	], [6, 9])
+
+func _build_cross() -> void:
+	# Cruce — ancho y alto: rieles muy abiertos (±3.1) e interior amplio (±1.8).
+	# Misma topología x16+6 (columna central + rieles con candado), otra geometría.
+	_build_x16(NAMES[4], [
+		Vector3(0, 0, -5.4), Vector3(-2.9, 0, -4.0), Vector3(2.9, 0, -4.0), Vector3(0, 0, -4.0),
+		Vector3(-3.1, 0, -2.2), Vector3(3.1, 0, -2.2), Vector3(-1.8, 0, -1.0), Vector3(1.8, 0, -1.0),
+		Vector3(-1.8, 0, 1.0), Vector3(1.8, 0, 1.0), Vector3(-3.1, 0, 2.2), Vector3(3.1, 0, 2.2),
+		Vector3(0, 0, 4.0), Vector3(-2.9, 0, 4.0), Vector3(2.9, 0, 4.0), Vector3(0, 0, 5.4),
 	], [6, 9])
 
 func _build_plaza() -> void:

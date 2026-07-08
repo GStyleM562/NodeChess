@@ -10,6 +10,7 @@ const CHEST_LOBBY := {
 	"t5": {"icon": "🧰", "col": Color(0.212, 0.82, 0.498), "name": "Común"},
 	"t10": {"icon": "💎", "col": Color(0.722, 0.451, 1.0), "name": "Épico"},
 	"t15": {"icon": "👑", "col": Color(1.0, 0.773, 0.239), "name": "Legendario"},
+	"level": {"icon": "🏅", "col": Color(0.95, 0.5, 0.2), "name": "Nivel"},
 }
 
 var _pivot: Node3D
@@ -17,6 +18,7 @@ var _leader: Figure3D
 var _toast: Label
 var _chest_states := {}   # id -> Label del estado (timer / ¡LISTO!)
 var _chest_tick := 0.0
+var _level_slot: Control   # slot del cofre de NIVEL (oculto sin pendientes)
 
 func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
@@ -33,12 +35,18 @@ func _process(delta: float) -> void:
 		_refresh_chest_states()
 
 func _refresh_chest_states() -> void:
+	if _level_slot != null and is_instance_valid(_level_slot):
+		_level_slot.visible = Inventory.level_chests > 0
 	for id in _chest_states.keys():
 		var lbl: Label = _chest_states[id]
 		if not is_instance_valid(lbl):
 			continue
 		if id == "free":
 			lbl.text = "¡Gratis!"
+			continue
+		if id == "level":
+			lbl.text = "×%d" % Inventory.level_chests
+			lbl.add_theme_color_override("font_color", UITheme.SUCCESS)
 			continue
 		var left: int = Inventory.chest_left(id)
 		if left <= 0:
@@ -206,8 +214,11 @@ func _build_gifts(layer: CanvasLayer) -> void:
 	gifts.alignment = BoxContainer.ALIGNMENT_CENTER
 	gifts.add_theme_constant_override("separation", 10)
 	layer.add_child(gifts)
-	for id in ["free", "t5", "t10", "t15"]:
-		gifts.add_child(_chest_slot(id))
+	for id in ["free", "t5", "t10", "t15", "level"]:
+		var slot := _chest_slot(id)
+		gifts.add_child(slot)
+		if id == "level":
+			_level_slot = slot   # visible solo si hay cofres de nivel pendientes
 	_refresh_chest_states()
 
 ## Slot de cofre del lobby: icono + nombre + estado en vivo; toca para abrir.
@@ -215,7 +226,7 @@ func _chest_slot(id: String) -> Control:
 	var st: Dictionary = CHEST_LOBBY[id]
 	var col: Color = st["col"]
 	var p := PanelContainer.new()
-	p.custom_minimum_size = Vector2(108, 92)
+	p.custom_minimum_size = Vector2(96, 92)   # caben 5 slots (incluye Nivel)
 	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE.lerp(col, 0.08), col, 14, 2, 6))
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -240,6 +251,16 @@ func _tap_chest(id: String) -> void:
 		for key in got:
 			lines.append("%s %s  +%d fragmentos" % [_piece_icon(String(key)), Inventory.piece_name(String(key)), int(got[key])])
 		_open_chest_anim(id, lines)
+		return
+	if id == "level":
+		var lp: Array = Inventory.open_level_chest()
+		if lp.is_empty():
+			return
+		var llines: Array = []
+		for key in lp:
+			llines.append("%s %s" % [_piece_icon(String(key)), Inventory.piece_name(String(key))])
+		_open_chest_anim(id, llines)
+		_refresh_chest_states()
 		return
 	if not Inventory.chest_ready(id):
 		var left: int = Inventory.chest_left(id)
@@ -364,7 +385,13 @@ func _build_buttons(layer: CanvasLayer) -> void:
 	play.offset_bottom = -212
 	play.offset_left = 22
 	play.offset_right = -22
-	play.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/deck_builder.tscn"))
+	play.pressed.connect(func():
+		# Primera vez: tutorial guiado directo al tablero (mapa 0, CPU pasiva).
+		if not Settings.tutorial_done:
+			Loadout.tutorial = true
+			get_tree().change_scene_to_file("res://scenes/board.tscn")
+		else:
+			get_tree().change_scene_to_file("res://scenes/deck_builder.tscn"))
 	layer.add_child(play)
 
 	# UNA sola parrilla grande (3×2) — antes había dos barras con botones
@@ -553,6 +580,44 @@ func _show_settings() -> void:
 	bhint.custom_minimum_size = Vector2(430, 0)
 	UITheme.label(bhint, 11, UITheme.TEXT2, false, 600)
 	vb.add_child(bhint)
+
+	# --- combate: velocidad y accesibilidad ---
+	var ch := _lbl("COMBATE Y ACCESIBILIDAD", 11, UITheme.MUTED, true, 700)
+	ch.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	vb.add_child(ch)
+	var crow := HBoxContainer.new()
+	crow.add_theme_constant_override("separation", 8)
+	vb.add_child(crow)
+	var spd := Button.new()
+	var cbb := Button.new()
+	var cstyle := func():
+		spd.text = ("⏩ Combate ×2  ✓" if Settings.combat_speed == 2 else "▶ Combate ×1")
+		cbb.text = ("👁 Daltónico  ✓" if Settings.colorblind else "👁 Daltónico")
+		if Settings.combat_speed == 2:
+			UITheme.style_primary(spd, UITheme.ORANGE, 10)
+		else:
+			UITheme.style_surface(spd, UITheme.SURFACE2, UITheme.BORDER, 10)
+		if Settings.colorblind:
+			UITheme.style_primary(cbb, UITheme.PRIMARY, 10)
+		else:
+			UITheme.style_surface(cbb, UITheme.SURFACE2, UITheme.BORDER, 10)
+	for b in [spd, cbb]:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.custom_minimum_size = Vector2(0, 42)
+		UITheme.button_font(b, 14, UITheme.TEXT, true, 700)
+		crow.add_child(b)
+	spd.pressed.connect(func(): Settings.set_combat_speed(3 - Settings.combat_speed); cstyle.call())
+	cbb.pressed.connect(func(): Settings.set_colorblind(not Settings.colorblind); cstyle.call())
+	cstyle.call()
+	var tut := Button.new()
+	tut.text = "🎓 Repetir tutorial"
+	tut.custom_minimum_size = Vector2(0, 42)
+	UITheme.button_font(tut, 14, UITheme.TEXT, true, 700)
+	UITheme.style_surface(tut, UITheme.SURFACE2, UITheme.BORDER, 10)
+	tut.pressed.connect(func():
+		Loadout.tutorial = true
+		get_tree().change_scene_to_file("res://scenes/board.tscn"))
+	vb.add_child(tut)
 
 	# --- vista Admin / Usuario (progresión e inventario) ---
 	var mh := _lbl("VISTA (progresión)", 11, UITheme.MUTED, true, 700)

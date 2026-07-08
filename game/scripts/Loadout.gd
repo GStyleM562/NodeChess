@@ -17,6 +17,9 @@ static var player_modifiers: Array = ["power_surge", "cleanse", "adrenaline"]
 # Chosen map (index into MapData layouts).
 static var map_index := 0
 
+# TUTORIAL guiado: la próxima partida arranca en modo tutorial (CPU pasiva).
+static var tutorial := false
+
 static func valid(team: Array) -> bool:
 	return team.size() == DECK_SIZE
 

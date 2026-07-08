@@ -34,7 +34,8 @@ var pieces := {}       # key -> int (piezas completas)
 var fragments := {}    # key -> int
 var next_chest := {}   # chest_id -> unix ts en que estará listo
 var xp := 0            # experiencia dentro del nivel actual
-var level := 1         # nivel del jugador (sube jugando; da piezas de regalo)
+var level := 1         # nivel del jugador (sube jugando; da COFRES de nivel)
+var level_chests := 0  # cofres de nivel pendientes de reclamar en el lobby
 var _loaded := false
 var _starter := false  # kit inicial ya entregado
 
@@ -140,24 +141,32 @@ func missing_pieces_for(fig: Dictionary, old_fig: Dictionary) -> Array:
 func xp_needed() -> int:
 	return level * 100   # curva simple: 100, 200, 300…
 
-## XP al terminar una partida. Sube de nivel las veces que toque y regala
-## piezas completas por cada nivel. -> {gained, leveled, level, rewards}
+## XP al terminar una partida. Cada nivel otorga un COFRE DE NIVEL, que se
+## reclama en el lobby (con su animación). -> {gained, leveled, level, chests}
 func add_match_xp(won: bool, online: bool) -> Dictionary:
 	_ensure_loaded()
 	var gained := (XP_WIN if won else XP_LOSS) + (XP_ONLINE_BONUS if online else 0)
 	xp += gained
 	var leveled := 0
-	var rewards: Array = []
 	while xp >= xp_needed():
 		xp -= xp_needed()
 		level += 1
 		leveled += 1
-		for i in LEVEL_REWARD_PIECES:
-			var key := _random_piece(true)   # regalos de nivel: piezas premium
-			pieces[key] = int(pieces.get(key, 0)) + 1
-			rewards.append(key)
+	level_chests += leveled
 	_save()
-	return {"gained": gained, "leveled": leveled, "level": level, "rewards": rewards}
+	return {"gained": gained, "leveled": leveled, "level": level, "chests": leveled}
+
+## Cofre de NIVEL: 3 piezas (1 premium garantizada). Consume un cofre pendiente.
+func open_level_chest() -> Array:
+	_ensure_loaded()
+	if level_chests <= 0:
+		return []
+	level_chests -= 1
+	var got: Array = [_random_piece(true), _random_piece(false), _random_piece(false)]
+	for key in got:
+		pieces[key] = int(pieces.get(key, 0)) + 1
+	_save()
+	return got
 
 ## ADMIN (prueba): regala n piezas completas de CADA pieza del catálogo.
 func gift_all(n := 3) -> int:
@@ -374,6 +383,7 @@ func _ensure_loaded() -> void:
 		next_chest = data.get("next_chest", {})
 		xp = int(data.get("xp", 0))
 		level = maxi(1, int(data.get("level", 1)))
+		level_chests = int(data.get("lvl_chests", 0))
 		_starter = bool(data.get("starter", false))
 
 func _save() -> void:
@@ -381,6 +391,7 @@ func _save() -> void:
 	if f != null:
 		f.store_string(JSON.stringify({
 			"mode": mode, "pieces": pieces, "fragments": fragments,
-			"next_chest": next_chest, "xp": xp, "level": level, "starter": _starter,
+			"next_chest": next_chest, "xp": xp, "level": level,
+			"lvl_chests": level_chests, "starter": _starter,
 		}))
 		f.close()

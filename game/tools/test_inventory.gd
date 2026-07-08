@@ -95,16 +95,22 @@ func _initialize() -> void:
 	ok = _expect("edit: pieza invertida no falta", "color:gold" in inv.missing_pieces_for(figB, figB), false) and ok
 	ok = _expect("crear nuevo SÍ la exige", "color:gold" in inv.missing_pieces_for(figB, {}), true) and ok
 
-	# --- XP y NIVELES: sube jugando y regala piezas ---
+	# --- XP y NIVELES: sube jugando y otorga COFRES de nivel ---
 	inv.xp = 0
 	inv.level = 1
+	inv.level_chests = 0
 	var r1: Dictionary = inv.add_match_xp(true, false)
 	ok = _expect("victoria da 60 XP", int(r1["gained"]), 60) and ok
 	ok = _expect("aún nivel 1", inv.level, 1) and ok
 	var r2: Dictionary = inv.add_match_xp(true, true)   # +75 (online) -> 135 >= 100
 	ok = _expect("sube a nivel 2", int(r2["level"]), 2) and ok
-	ok = _expect("regala %d piezas" % inv.LEVEL_REWARD_PIECES, (r2["rewards"] as Array).size(), inv.LEVEL_REWARD_PIECES) and ok
+	ok = _expect("otorga 1 cofre de nivel", int(r2["chests"]), 1) and ok
+	ok = _expect("cofre pendiente", inv.level_chests, 1) and ok
 	ok = _expect("xp sobrante correcto", inv.xp, 35) and ok
+	var lp: Array = inv.open_level_chest()
+	ok = _expect("cofre de nivel da 3 piezas", lp.size(), 3) and ok
+	ok = _expect("cofre consumido", inv.level_chests, 0) and ok
+	ok = _expect("sin cofres no abre", inv.open_level_chest().size(), 0) and ok
 	var r3: Dictionary = inv.add_match_xp(false, false)   # derrota: +25
 	ok = _expect("derrota da 25 XP", int(r3["gained"]), 25) and ok
 

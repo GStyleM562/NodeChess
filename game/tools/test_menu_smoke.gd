@@ -1,7 +1,7 @@
 extends SceneTree
-## Menú principal: construye la escena, verifica los 4 cofres del lobby con su
-## estado en vivo, y abre la caja GRATIS (animación completa) sin crashear.
-## Respalda user://inventory.json para no ensuciar el inventario real.
+## Menú principal: construye la escena, verifica los 5 cofres del lobby con su
+## estado en vivo (gratis + t5/t10/t15 + nivel 🏅), y abre la caja GRATIS
+## (animación completa) sin crashear. Respalda user://inventory.json.
 
 const INV_PATH := "user://inventory.json"
 var _backup := ""
@@ -20,7 +20,7 @@ func _initialize() -> void:
 func _run(mm) -> void:
 	var ok := true
 	await create_timer(0.7).timeout   # _ready + primer refresh de estados
-	ok = _expect("4 cofres en el lobby", mm._chest_states.size(), 4) and ok
+	ok = _expect("5 cofres en el lobby", mm._chest_states.size(), 5) and ok
 	var free_lbl: Label = mm._chest_states["free"]
 	ok = _expect("gratis siempre lista", free_lbl.text, "¡Gratis!") and ok
 	ok = _expect("t5 con estado", String(mm._chest_states["t5"].text) != "…", true) and ok
