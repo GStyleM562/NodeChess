@@ -16,6 +16,9 @@ signal room_map(map: int)
 signal match_start(seed: int, map: int, decks: Array)
 signal remote_action(action: Dictionary)
 signal player_left(id: int)
+signal rejoined(code: String, you: int, map: int)
+signal peer_status(seat: int, online: bool)
+signal rematch_wait(seat: int)
 
 ## Ventana total de reintentos para el arranque en frio de Render free (~30-60s).
 ## Son "var" (no const) para que los tests puedan acortarlas.
@@ -178,6 +181,12 @@ func _handle(text: String) -> void:
 			remote_action.emit(data.get("action", {}))
 		"left":
 			player_left.emit(int(data.get("id", -1)))
+		"rejoined":
+			rejoined.emit(String(data["code"]), int(data["you"]), int(data.get("map", 0)))
+		"peer":
+			peer_status.emit(int(data.get("seat", -1)), bool(data.get("online", true)))
+		"rematch_wait":
+			rematch_wait.emit(int(data.get("seat", -1)))
 		"error":
 			error_msg.emit(String(data.get("msg", "Error")))
 
@@ -201,6 +210,12 @@ func start_match() -> void:
 
 func send_action(action: Dictionary) -> void:
 	_send({"t": "action", "action": action})
+
+func rejoin(code: String, seat: int) -> void:
+	_send({"t": "rejoin", "code": code.to_upper(), "seat": seat})
+
+func request_rematch() -> void:
+	_send({"t": "rematch"})
 
 func leave_room() -> void:
 	_send({"t": "leave"})

@@ -55,6 +55,15 @@ var _assets_on := true   # Configuración: "3d" = losetas Meshy · "2d" = digita
 var _last_turn := ""     # para anunciar "¡ES TU TURNO!" solo cuando cambia
 var _lock_vis := {}      # nid -> visual de candado (nodo cerrado los 1ros turnos)
 var _buff_lbls := {}     # buff node id -> Label3D con el progreso de carga
+var _trap_pending := false   # eligiendo nodo para el modificador Trampa
+var _trap_vis := {}      # nid -> marcador ▲ de MIS trampas (el rival no lo ve)
+const TURN_LIMIT := 75.0     # online: segundos por turno (al agotarse, pasa solo)
+var _turn_left := 0.0
+var _timer_lbl: Label
+var _net_blocked := false    # reconectando o rival offline: se pausa la partida
+var _net_banner: PanelContainer
+var _net_banner_lbl: Label
+var _ending_by_time := false
 var _highlighted := []
 var _entrance_owner := {}      # entrance node id -> owning team (for the "blocked" siren)
 var _sirening := {}            # entrance nodes currently pulsing red
@@ -117,6 +126,17 @@ func _ready() -> void:
 	if _online:
 		NetSession.client.remote_action.connect(_on_remote_action)
 		NetSession.client.player_left.connect(_on_opp_left)
+		NetSession.client.peer_status.connect(_on_peer_status)
+		NetSession.client.match_start.connect(_on_rematch_start)
+		NetSession.net_paused.connect(_on_net_paused)
+		_turn_left = TURN_LIMIT
+	else:
+		# Dificultad elegida en el Deck Builder + personalidad al azar (variedad).
+		_gs.bot_difficulty = Settings.cpu_level
+		_gs.bot_personality = ["balanced", "aggressive", "defensive", "rusher", "hunter"].pick_random()
+		var pname: String = GameState.PERSONA_ES.get(_gs.bot_personality, "Equilibrada")
+		var dname: String = ["Fácil", "Media", "Difícil"][clampi(Settings.cpu_level, 0, 2)]
+		_show_banner("CPU: %s · %s" % [dname, pname], UITheme.PRIMARY_EDGE)
 
 ## Online: build the local-perspective state (I am always "player" at the bottom, the
 ## opponent is "enemy" at the top — no board flip). Both clients build the SAME figures,
@@ -170,6 +190,17 @@ func _leave_to_menu() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 func _process(delta: float) -> void:
+	# ONLINE: reloj de turno (al agotarse TU turno, se pasa solo).
+	if _online and not _over and not _net_blocked:
+		_turn_left = maxf(0.0, _turn_left - delta)
+		if _timer_lbl != null:
+			_timer_lbl.text = "⏱ %d s" % int(ceil(_turn_left))
+			_timer_lbl.add_theme_color_override("font_color",
+				UITheme.DANGER if _turn_left <= 10.0 else UITheme.GOLD)
+		if _gs.turn_team == "player" and _turn_left <= 0.0 and not _ending_by_time:
+			_ending_by_time = true
+			_show_banner("⏰ ¡Tiempo agotado! Turno pasado.", UITheme.DANGER)
+			_timeout_turn()
 	# A blocked entrance pulses like a siren: a rival figure is sitting on it (so that
 	# side can't deploy there). Highlighted nodes are left to the highlight system.
 	_siren_t += delta
@@ -906,6 +937,35 @@ func _build_ui() -> void:
 	UITheme.label(_banner_lbl, 18, UITheme.GOLD, true, 700)
 	_banner.add_child(_banner_lbl)
 
+	# Online: reloj de turno (arriba a la derecha, bajo el menú).
+	_timer_lbl = Label.new()
+	_timer_lbl.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_timer_lbl.offset_left = -140
+	_timer_lbl.offset_top = 54
+	_timer_lbl.offset_right = -10
+	_timer_lbl.offset_bottom = 82
+	_timer_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	UITheme.label(_timer_lbl, 17, UITheme.GOLD, true, 800)
+	_timer_lbl.visible = _online
+	layer.add_child(_timer_lbl)
+
+	# Online: banner de pausa de red (reconexión propia o rival offline).
+	_net_banner = PanelContainer.new()
+	_net_banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_net_banner.offset_left = -230
+	_net_banner.offset_right = 230
+	_net_banner.offset_top = 160
+	_net_banner.offset_bottom = 220
+	_net_banner.add_theme_stylebox_override("panel", UITheme.panel(Color(0.12, 0.06, 0.05, 0.97), UITheme.DANGER, 14, 2, 10))
+	_net_banner.visible = false
+	layer.add_child(_net_banner)
+	_net_banner_lbl = Label.new()
+	_net_banner_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_net_banner_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_net_banner_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.label(_net_banner_lbl, 15, UITheme.TEXT, true, 700)
+	_net_banner.add_child(_net_banner_lbl)
+
 	# In-match figure counts (top, centered).
 	_hud_label = Label.new()
 	UITheme.label(_hud_label, 15, UITheme.TEXT2, true, 700)
@@ -1099,7 +1159,7 @@ func _initials(nm: String) -> String:
 
 # ---------------------------------------------------------------- bench drag/deploy
 func _input(event: InputEvent) -> void:
-	if _over or _busy or _gs.turn_team != "player":
+	if _over or _busy or _net_blocked or _gs.turn_team != "player":
 		return
 	if _ui_layer != null and _ui_layer.get_node_or_null("FigPreview") != null:
 		return                                   # a preview overlay is open
@@ -1278,12 +1338,14 @@ func _update_status() -> void:
 	# Anuncio de turno: al pasar a "player" (vs CPU u online) se avisa UNA vez.
 	if _gs.turn_team != _last_turn:
 		_last_turn = _gs.turn_team
+		_turn_left = TURN_LIMIT       # el reloj online se rearma con cada turno
+		_ending_by_time = false
 		if _gs.turn_team == "player":
 			_show_banner("✨ ¡ES TU TURNO! ✨", UITheme.SUCCESS)
 	_refresh_locks()
 	_end_btn.visible = _gs.turn_team == "player"
 	# Can't end the turn without acting — unless there is genuinely nothing to do.
-	_end_btn.disabled = _busy or (not _committed and _player_has_actions())
+	_end_btn.disabled = _busy or _net_blocked or (not _committed and _player_has_actions())
 	if _gs.turn_team != "player":
 		_status.text = "Turno del enemigo…"
 	elif _active_uid != -1:
@@ -1303,6 +1365,7 @@ func _update_status() -> void:
 		_hud_label.text = "Tú: %d   ·   Rival: %d" % [_gs.units_on_board("player").size(), _gs.units_on_board("enemy").size()]
 	if _drag_uid == -1:
 		_refresh_bench_ui()   # mantiene vivos los contadores ⏳ de los K.O.
+	_drain_traps()
 	_music_threat()
 
 ## Música situacional: si TU figura está a ≤3 nodos de la meta rival → "ventaja";
@@ -1350,14 +1413,76 @@ func _refresh_energy_mods() -> void:
 func _on_modifier(mid: String) -> void:
 	if _busy or _over or _gs.turn_team != "player":
 		return
+	if mid == "trap":
+		_begin_trap_targeting()
+		return
 	if _gs.activate_modifier("player", mid):
 		var m: Dictionary = GameState.MODIFIERS[mid]
 		_net_send({"kind": "modifier", "mid": mid})
 		_show_banner("Usaste %s — %s" % [String(m["name"]), String(m["desc"])], Color(1.0, 0.85, 0.3))
+		_refresh_bench_ui()   # revivir devuelve una figura a la banca
 		_update_status()
+
+## TRAMPA: elegir un nodo libre (naranja) donde esconderla.
+func _begin_trap_targeting() -> void:
+	if not _gs.can_use_modifier("player", "trap"):
+		_show_banner("No te alcanza la energía para la Trampa.", UITheme.DANGER)
+		return
+	_reset_activation()
+	_trap_pending = true
+	for n in _gs.map.nodes:
+		var nid := int(n["id"])
+		var role := String(n["role"])
+		if _gs.board.has(nid) or nid in _gs.map.obstacles or _gs.traps.has(nid) \
+				or _gs.node_locked(nid) or role.begins_with("goal"):
+			continue
+		_set_highlight(nid, Color(1.0, 0.6, 0.15))
+		_highlighted.append(nid)
+	_status.text = "TRAMPA: toca un nodo naranja para esconderla (el rival no la verá)."
+
+func _place_trap(nid: int) -> void:
+	_trap_pending = false
+	_clear_highlights()
+	if _gs.activate_modifier("player", "trap", nid):
+		_net_send({"kind": "modifier", "mid": "trap", "node": nid})
+		_add_trap_marker(nid)
+		_show_banner("Trampa colocada. Shhh… 🤫", Color(1.0, 0.6, 0.15))
+	_update_status()
+
+## Marcador SOLO para ti (el rival no ve tus trampas hasta que las pisa).
+func _add_trap_marker(nid: int) -> void:
+	var l := Label3D.new()
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.text = "▲"
+	l.font_size = 56
+	l.pixel_size = 0.005
+	l.outline_size = 12
+	l.modulate = Color(1.0, 0.6, 0.15, 0.9)
+	l.position = _gs.map.pos_of(nid) + Vector3(0, 0.35, 0)
+	add_child(l)
+	_trap_vis[nid] = l
+
+## Anuncia (y limpia) los disparos de trampa pendientes del motor.
+func _drain_traps() -> void:
+	while not _gs.trap_events.is_empty():
+		var e: Dictionary = _gs.trap_events.pop_front()
+		var nid := int(e["node"])
+		if _trap_vis.has(nid):
+			if is_instance_valid(_trap_vis[nid]):
+				_trap_vis[nid].queue_free()
+			_trap_vis.erase(nid)
+		var uid := int(e["uid"])
+		if _vis.has(uid):
+			_dramatize_effect(uid, "💥 ¡TRAMPA!")
+		_show_banner("💥 ¡Trampa activada: Inmovilizado!", Color(1.0, 0.6, 0.15))
+		Sfx.play("attack_effect")
+	_refresh_status_labels()
 
 # ---------------------------------------------------------------- input
 func _unhandled_input(event: InputEvent) -> void:
+	if _net_blocked:
+		return   # partida pausada por red: nada de acciones
 	if event is InputEventMouseButton and event.pressed:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
@@ -1409,6 +1534,14 @@ func _node_under_cursor(mouse: Vector2) -> int:
 func _on_board_click(mouse: Vector2) -> void:
 	var nid := _node_under_cursor(mouse)
 	if nid == -1:
+		return
+	if _trap_pending:
+		if nid in _highlighted:
+			_place_trap(nid)
+		else:
+			_trap_pending = false
+			_clear_highlights()
+			_update_status()
 		return
 	if _deploy_uid != -1:
 		if nid in _gs.free_entrances("player"):
@@ -1487,6 +1620,7 @@ func _reset_activation() -> void:
 	_committed = false
 	_jumped = false
 	_deploy_uid = -1
+	_trap_pending = false
 	_reach = {}
 	_foe_nodes = {}
 	_clear_highlights()
@@ -1729,7 +1863,8 @@ func _apply_remote(a: Dictionary) -> void:
 			if _gs.move_unit(uid, tnode):
 				await _walk_path(uid, path)
 		"modifier":
-			_gs.activate_modifier("enemy", String(a["mid"]))
+			var mnode := _mirror_node(int(a["node"])) if a.has("node") else -1
+			_gs.activate_modifier("enemy", String(a["mid"]), mnode)
 			var m: Dictionary = GameState.MODIFIERS.get(String(a["mid"]), {})
 			if not m.is_empty():
 				_show_banner("El rival usó %s — %s" % [String(m.get("name", "")), String(m.get("desc", ""))], Color(1.0, 0.55, 0.4))
@@ -1751,6 +1886,42 @@ func _on_opp_left(_id: int) -> void:
 	_show_banner("El rival salió de la partida — ganas por abandono.", UITheme.SUCCESS)
 	_gs.winner = "player"
 	_check_and_show_winner()
+
+## Al agotarse el reloj: espera a que termine cualquier animación y pasa el turno.
+func _timeout_turn() -> void:
+	_reset_activation()
+	while _busy and not _over:
+		await get_tree().create_timer(0.2).timeout
+	if _over or _gs.turn_team != "player":
+		return
+	await _end_player_turn()
+
+## Pausa de red: yo reconectando (NetSession) — se bloquea todo hasta volver.
+func _on_net_paused(paused: bool) -> void:
+	_net_blocked = paused
+	_net_banner.visible = paused
+	if paused:
+		_net_banner_lbl.text = "📡 Conexión perdida — reconectando…"
+	else:
+		_show_banner("📡 ¡Reconectado!", UITheme.SUCCESS)
+
+## El RIVAL se cayó: pausa (sus acciones se perderían) hasta que regrese.
+func _on_peer_status(_seat: int, online_now: bool) -> void:
+	_net_blocked = not online_now
+	_net_banner.visible = not online_now
+	if not online_now:
+		_net_banner_lbl.text = "📡 El rival se desconectó — esperando su regreso (90 s)…"
+	else:
+		_show_banner("📡 El rival volvió. ¡Seguimos!", UITheme.SUCCESS)
+
+## REVANCHA aceptada por ambos: el server manda otro start (misma sala/mazos).
+func _on_rematch_start(s: int, m: int, decks: Array) -> void:
+	if not _online or not _over:
+		return
+	NetSession.build_match(decks, NetSession.seat, s, m)
+	Loadout.map_index = m
+	Roster.FIGURES = _saved_roster                 # des-swap antes de reconstruir
+	get_tree().change_scene_to_file("res://scenes/board.tscn")
 
 func _bot_loop() -> void:
 	while _gs.winner == "" and _gs.turn_team == "enemy":
@@ -2247,9 +2418,15 @@ func _show_winner(team: String) -> void:
 	UITheme.style_surface(rematch, UITheme.SURFACE, UITheme.BORDER, 14)
 	rematch.pressed.connect(func():
 		if _online:
-			_leave_to_menu()
+			NetSession.client.request_rematch()
+			rematch.disabled = true
+			rematch.text = "⌛ Esperando al rival…"
 		else:
 			get_tree().change_scene_to_file("res://scenes/board.tscn"))
+	if _online:
+		NetSession.client.rematch_wait.connect(func(_s: int):
+			if is_instance_valid(rematch) and not rematch.disabled:
+				rematch.text = "↻  ¡El rival quiere REVANCHA!")
 	v.add_child(_center(rematch))
 	var claim := Button.new()
 	claim.text = "Reclamar y volver"

@@ -22,6 +22,9 @@ const PASSIVES := {
 	"dive": {"name": "Dive", "desc": "Tras volar 3+ nodos, tu Empuje 1 se vuelve Empuje 2."},
 	"hover": {"name": "Hover", "desc": "Flota: ignora candados y obstáculos del terreno al moverse (no puede terminar sobre ellos)."},
 	"fast_recovery": {"name": "Fast Recovery", "desc": "Regresa del K.O. una ronda antes."},
+	"warcry": {"name": "Warcry", "desc": "Al DESPLEGAR, Debilita a los rivales adyacentes."},
+	"goalkeeper": {"name": "Goalkeeper", "desc": "Parado en TU meta: +20 daño / +1★ en sus tiradas."},
+	"scavenger": {"name": "Scavenger", "desc": "Al noquear a un rival ganas +2⚡."},
 	# --- hidden passives (unlocked on Rank Up) ---
 	"venom_aura": {"name": "Venom Aura (oculta)", "desc": "Aura: los enemigos adyacentes tienen −1 stamina."},
 	"burning_aura": {"name": "Burning Aura (oculta)", "desc": "Aura: al inicio de tu turno, los enemigos adyacentes quedan Debilitados."},

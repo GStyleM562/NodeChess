@@ -154,11 +154,15 @@ func _on_connected() -> void:
 
 func _on_room_created(code: String, you: int, players: Array) -> void:
 	NetSession.seat = you
+	NetSession.room_code = code
+	NetSession.server_url = _url.text.strip_edges()
 	_enter_room(code, true)
 	_refresh_players(players)
 
 func _on_room_joined(code: String, you: int, players: Array) -> void:
 	NetSession.seat = you
+	NetSession.room_code = code
+	NetSession.server_url = _url.text.strip_edges()
 	_enter_room(code, false)
 	_refresh_players(players)
 

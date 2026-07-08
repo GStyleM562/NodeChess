@@ -16,12 +16,21 @@ var _edit_btn: Button
 var _copy_btn: Button
 var _info_panel: PanelContainer
 var _info_toggle: Button
+var _search: LineEdit
+var _filter_btn: Button
+var _fav_btn: Button
+var _completion: Label
+var _filter_mode := 0          # 0 Todas · 1 ⭐ · 2 Poseídas · 3 Tuyas
+var _filtered: Array = []      # índices del roster que pasan el filtro
+
+const FILTER_NAMES := ["Todas", "⭐ Favoritas", "Poseídas", "Tuyas ✎"]
 
 func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
 	_build_env()
 	_build_ui()
-	_spawn(0)
+	_rebuild_filter()
+	_spawn(_filtered[0] if not _filtered.is_empty() else 0)
 
 func _process(delta: float) -> void:
 	if _pivot != null:
@@ -97,6 +106,40 @@ func _build_ui() -> void:
 	_copy_btn.pressed.connect(_copy_code)
 	_copy_btn.visible = false
 	top.add_child(_copy_btn)
+	# --- Colección 2.0: buscar · filtrar · favorito · % completado ---
+	var frow := HBoxContainer.new()
+	frow.add_theme_constant_override("separation", 6)
+	top.add_child(frow)
+	_search = LineEdit.new()
+	_search.placeholder_text = "🔎 Buscar…"
+	_search.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_search.text_changed.connect(func(_t): _rebuild_filter(); _goto_first())
+	frow.add_child(_search)
+	_filter_btn = Button.new()
+	_filter_btn.text = FILTER_NAMES[0]
+	_filter_btn.custom_minimum_size = Vector2(120, 38)
+	UITheme.button_font(_filter_btn, 12, UITheme.PRIMARY_EDGE, true, 700)
+	UITheme.style_surface(_filter_btn, UITheme.SURFACE2, UITheme.BORDER, 10)
+	_filter_btn.pressed.connect(func():
+		_filter_mode = (_filter_mode + 1) % FILTER_NAMES.size()
+		_filter_btn.text = FILTER_NAMES[_filter_mode]
+		_rebuild_filter()
+		_goto_first())
+	frow.add_child(_filter_btn)
+	_fav_btn = Button.new()
+	_fav_btn.text = "☆"
+	_fav_btn.custom_minimum_size = Vector2(44, 38)
+	UITheme.button_font(_fav_btn, 18, UITheme.GOLD, true, 700)
+	UITheme.style_surface(_fav_btn, UITheme.SURFACE2, UITheme.BORDER, 10)
+	_fav_btn.pressed.connect(func():
+		var id := String(Roster.FIGURES[_index].get("id", ""))
+		Settings.toggle_favorite(id)
+		_fav_btn.text = "⭐" if Settings.is_favorite(id) else "☆")
+	frow.add_child(_fav_btn)
+	_completion = Label.new()
+	_completion.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	UITheme.label(_completion, 11, UITheme.MUTED, true, 700)
+	frow.add_child(_completion)
 
 	var panel := PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -180,6 +223,7 @@ func _dex_hdr(text: String) -> Label:
 	return l
 
 func _spawn(i: int) -> void:
+	_index = i
 	if _current != null:
 		_current.queue_free()
 		_current = null
@@ -188,7 +232,10 @@ func _spawn(i: int) -> void:
 	_pivot.add_child(_current)
 	_current.setup(data["glb"], data["clips"], float(data.get("size", 1.0)))
 	_current.play_clip("idle")
-	_name_label.text = "%d/%d   %s" % [i + 1, Roster.FIGURES.size(), data["name"]]
+	var pos := _filtered.find(i)
+	_name_label.text = "%d/%d   %s" % [(pos + 1) if pos >= 0 else i + 1, maxi(1, _filtered.size()), data["name"]]
+	if _fav_btn != null:
+		_fav_btn.text = "⭐" if Settings.is_favorite(String(data.get("id", ""))) else "☆"
 	var warn := "   ⚠ anim incompleta" if not data.get("complete", true) else ""
 	_type_label.text = "Tipo de ataque: " + String(data.get("type", "?")) + warn
 	if _edit_btn != null:
@@ -292,9 +339,51 @@ func _toggle_info() -> void:
 	_info_toggle.offset_top = -506 if _info_panel.visible else -110
 	_info_toggle.offset_bottom = -472 if _info_panel.visible else -76
 
+## Índices del roster que pasan búsqueda + filtro. Nunca vacío (cae a "Todas").
+func _rebuild_filter() -> void:
+	_filtered.clear()
+	var q := (_search.text if _search != null else "").strip_edges().to_lower()
+	var owned_total := 0
+	var builtin_total := 0
+	for i in Roster.FIGURES.size():
+		var d: Dictionary = Roster.FIGURES[i]
+		var id := String(d.get("id", ""))
+		var custom := bool(d.get("custom", false))
+		var owned := custom or Inventory.is_admin() or Inventory.has_piece("model:" + id)
+		if not custom:
+			builtin_total += 1
+			if owned:
+				owned_total += 1
+		if q != "" and not String(d.get("name", "")).to_lower().contains(q):
+			continue
+		match _filter_mode:
+			1:
+				if not Settings.is_favorite(id):
+					continue
+			2:
+				if not owned:
+					continue
+			3:
+				if not custom:
+					continue
+		_filtered.append(i)
+	if _filtered.is_empty():
+		for i in Roster.FIGURES.size():
+			_filtered.append(i)
+	if _completion != null:
+		_completion.text = "%d%%" % int(100.0 * owned_total / maxf(1.0, float(builtin_total)))
+
+func _goto_first() -> void:
+	if not _filtered.is_empty():
+		_spawn(int(_filtered[0]))
+
 func _switch(d: int) -> void:
-	_index = wrapi(_index + d, 0, Roster.FIGURES.size())
-	_spawn(_index)
+	# navega DENTRO del filtro activo
+	var pos := _filtered.find(_index)
+	if pos == -1:
+		pos = 0
+	pos = wrapi(pos + d, 0, _filtered.size())
+	_spawn(int(_filtered[pos]))
 
 func _to_menu() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")

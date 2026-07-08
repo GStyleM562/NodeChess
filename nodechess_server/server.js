@@ -54,9 +54,29 @@ wss.on("connection", (ws) => {
     try { m = JSON.parse(data.toString()); } catch { return; }
     handle(ws, m);
   });
-  ws.on("close", () => leave(ws));
+  ws.on("close", () => dropped(ws));
   ws.on("error", () => {});
 });
+
+// Corte de socket: en partida INICIADA damos 90 s de gracia para RECONECTAR
+// (el rival ve "offline"); fuera de partida es un leave normal.
+function dropped(ws) {
+  const code = ws.nc && ws.nc.room;
+  if (!code) return;
+  const room = rooms.get(code);
+  if (!room) return;
+  const p = room.players.find((q) => q.id === ws.nc.id);
+  if (room.started && p) {
+    p.offline = true;
+    broadcast(room, { t: "peer", seat: p.seat, online: false }, p.id);
+    console.log(`[${code}] seat ${p.seat} offline (gracia 90s)`);
+    p.dropTimer = setTimeout(() => {
+      if (p.offline) leave(ws, p.id, code);
+    }, 90000);
+    return;
+  }
+  leave(ws, ws.nc.id, code);
+}
 
 function handle(ws, msg) {
   switch (msg.t) {
@@ -108,26 +128,57 @@ function handle(ws, msg) {
       broadcast(room, { t: "action", action: msg.action }, ws.nc.id); // al rival
       break;
     }
+    case "rejoin": {
+      // RECONEXION: {code, seat} reengancha el socket nuevo a su asiento.
+      const room = rooms.get((msg.code || "").toUpperCase());
+      if (!room || !room.started) return send(ws, { t: "error", msg: "Sala no disponible" });
+      const p = room.players.find((q) => q.seat === (msg.seat | 0) && q.offline);
+      if (!p) return send(ws, { t: "error", msg: "Nada que reconectar" });
+      clearTimeout(p.dropTimer);
+      p.offline = false;
+      p.ws = ws;
+      p.id = ws.nc.id;
+      ws.nc.room = room.code;
+      send(ws, { t: "rejoined", code: room.code, you: p.seat, map: room.map });
+      broadcast(room, { t: "peer", seat: p.seat, online: true }, p.id);
+      console.log(`[${room.code}] seat ${p.seat} reconectado`);
+      break;
+    }
+    case "rematch": {
+      // REVANCHA: cuando AMBOS la piden, nueva semilla y otro "start" (mismos mazos).
+      const room = rooms.get(ws.nc.room);
+      if (!room || !room.started || room.players.length < 2) return;
+      const p = room.players.find((q) => q.id === ws.nc.id);
+      if (p) p.rematch = true;
+      broadcast(room, { t: "rematch_wait", seat: p ? p.seat : -1 }, ws.nc.id);
+      if (room.players.every((q) => q.rematch)) {
+        room.players.forEach((q) => (q.rematch = false));
+        room.seed = ((Math.random() * 2147483646) + 1) | 0;
+        const decks = room.players.map((q) => ({ seat: q.seat, name: q.name, deck: q.deck }));
+        broadcast(room, { t: "start", seed: room.seed, map: room.map, decks });
+        console.log(`[${room.code}] REMATCH seed=${room.seed}`);
+      }
+      break;
+    }
     case "leave":
-      leave(ws);
+      leave(ws, ws.nc.id, ws.nc.room);
       break;
   }
 }
 
-function leave(ws) {
-  const code = ws.nc && ws.nc.room;
-  ws.nc.room = null;
+function leave(ws, id, code) {
+  if (ws.nc) ws.nc.room = null;
   if (!code) return;
   const room = rooms.get(code);
   if (!room) return;
-  room.players = room.players.filter((p) => p.id !== ws.nc.id);
+  room.players = room.players.filter((p) => p.id !== id);
   if (room.players.length === 0) {
     rooms.delete(code);
     console.log(`[${code}] vacia, eliminada`);
     return;
   }
-  if (room.hostId === ws.nc.id) room.hostId = room.players[0].id;
-  broadcast(room, { t: "left", id: ws.nc.id });
+  if (room.hostId === id) room.hostId = room.players[0].id;
+  broadcast(room, { t: "left", id });
   broadcast(room, { t: "players", players: playerList(room) });
 }
 

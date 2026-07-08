@@ -37,6 +37,12 @@ const MODIFIERS := {
 	"fury": {"name": "Fury", "cost": 5, "desc": "Tu próximo ataque: +40 daño / +2★"},
 	"cleanse": {"name": "Cleanse", "cost": 2, "desc": "Quita los debuffs de tus figuras"},
 	"adrenaline": {"name": "Adrenaline", "cost": 2, "desc": "Tu próximo ataque repite un Fallo"},
+	"iron_wall": {"name": "Iron Wall", "cost": 3, "desc": "Este turno tus figuras no pueden ser desplazadas"},
+	"shield": {"name": "Escudo", "cost": 4, "desc": "Tu próxima defensa convierte un Fallo en Azul"},
+	"haste": {"name": "Prisa", "cost": 3, "desc": "Tu próxima figura activada gana +1 estamina"},
+	"energy_drain": {"name": "Drenaje", "cost": 3, "desc": "Robas 2⚡ al rival"},
+	"revive": {"name": "Revivir", "cost": 6, "desc": "Tu K.O. más reciente vuelve a la banca YA"},
+	"trap": {"name": "Trampa", "cost": 4, "desc": "Coloca una trampa oculta: Inmoviliza al rival que la pise"},
 }
 
 var map: MapData
@@ -52,6 +58,8 @@ var pending_buff := {"player": {}, "enemy": {}}   # one-shot combat buffs from m
 var mod_used := {"player": false, "enemy": false} # one modifier per turn
 var buff_charge := {}   # buff node id -> {"team", "n"} (progreso de carga)
 var buff_cd := {}       # buff node id -> turn_no en que vuelve a poder cargarse
+var traps := {}         # node -> {"team"}: trampas ocultas (modificador Trampa)
+var trap_events: Array = []   # disparos de trampa pendientes de anunciar (vista)
 var _att_moved_ctx := 0                           # nodes the attacker moved this turn (for Lunge/Dive)
 var _next_uid := 0
 
@@ -288,6 +296,11 @@ func deploy(uid: int, node: int) -> void:
 	bench[u["team"]].erase(uid)
 	u["node"] = node
 	board[node] = uid
+	# PASSIVE — Warcry: al desplegar, Debilita a los rivales adyacentes.
+	if has_passive(uid, "warcry"):
+		for foe in adjacent_enemies(uid):
+			apply_status(foe, "weakened", STATUS_DUR)
+	_spring_trap(uid)
 	_check_goal(u)
 
 ## Mueve una figura. JAMÁS apila: si el destino está ocupado por otra figura
@@ -299,6 +312,7 @@ func move_unit(uid: int, node: int) -> bool:
 	board.erase(u["node"])
 	u["node"] = node
 	board[node] = uid
+	_spring_trap(uid)
 	_check_goal(u)
 	return true
 
@@ -356,7 +370,21 @@ func _roll_full(uid: int, is_attacker := false, forced := -1) -> Dictionary:
 			_boost_seg(s, BUFF_DMG, BUFF_STARS)
 		if pb.get("surge_big", false):
 			_boost_seg(s, 40, 2)
-		pending_buff[units[uid]["team"]] = {}
+		# consume SOLO los buffs de ataque (guard/haste/anchored siguen vivos)
+		pb.erase("surge")
+		pb.erase("surge_big")
+		pb.erase("adrenaline")
+	else:
+		# MODIFIER — Escudo: la defensa convierte UN Fallo en Azul (se consume).
+		var pd: Dictionary = pending_buff[units[uid]["team"]]
+		if String(s.get("col", "")) == "red" and pd.get("guard", false):
+			s = {"col": "blue", "name": "Escudo"}
+			pd.erase("guard")
+	# PASSIVE — Goalkeeper: defendiendo SU meta pega/bloquea con más autoridad.
+	if has_passive(uid, "goalkeeper"):
+		var og: int = map.goal_enemy if units[uid]["team"] == "enemy" else map.goal_player
+		if int(units[uid]["node"]) == og:
+			_boost_seg(s, 20, 1)
 	return {"seg": s, "idx": bidx}
 
 func _weighted_index(pool: Array) -> int:
@@ -413,6 +441,10 @@ func attack(att_uid: int, def_uid: int, att_moved: int = 0, fidx_a: int = -1, fi
 		ko_uid = def_uid if int(oc["result"]) > 0 else att_uid
 		_ko(ko_uid)
 		var winner_k: int = att_uid if int(oc["result"]) > 0 else def_uid
+		# PASSIVE — Scavenger: cada K.O. que anota le da +2⚡ a su equipo.
+		if has_passive(winner_k, "scavenger"):
+			var wt := String(units[winner_k]["team"])
+			energy[wt] = mini(ENERGY_MAX, int(energy[wt]) + 2)
 		if _try_rank_up(winner_k):      # RANK UP: scoring a KO evolves the figure
 			ranked = winner_k
 	elif int(oc["result"]) != 0:
@@ -565,6 +597,9 @@ func _try_rank_up(uid: int) -> bool:
 ## Movement budget after auras (Venom Aura: adjacent enemy -> -1 stamina).
 func effective_stamina(uid: int) -> int:
 	var s := int(units[uid]["stamina"])
+	# MODIFIER — Prisa: este turno tu equipo tiene +1 estamina.
+	if bool((pending_buff[units[uid]["team"]] as Dictionary).get("haste", false)):
+		s += 1
 	for nb in map.adj[units[uid]["node"]]:
 		var occ := int(board.get(nb, -1))
 		if occ != -1 and units[occ]["alive"] and units[occ]["team"] != units[uid]["team"] and has_passive(occ, "venom_aura"):
@@ -579,6 +614,9 @@ func has_passive(uid: int, pid: String) -> bool:
 ## Bedrock (self) or a neighbouring ally's Bulwark aura -> immune to push/pull/swap.
 func _displacement_immune(uid: int) -> bool:
 	if has_passive(uid, "bedrock"):
+		return true
+	# MODIFIER — Iron Wall: este turno el equipo entero está anclado.
+	if bool((pending_buff[units[uid]["team"]] as Dictionary).get("anchored", false)):
 		return true
 	for nb in map.adj[units[uid]["node"]]:
 		var occ := int(board.get(nb, -1))
@@ -598,6 +636,7 @@ func _apply_displacement(winner_uid: int, loser_uid: int, seg: Dictionary) -> Di
 		board.erase(int(w["node"]))
 		w["node"] = to
 		board[to] = winner_uid
+		_spring_trap(winner_uid)
 		_check_goal(w)
 		return {"type": typ, "uid": winner_uid, "to": to}
 	if _displacement_immune(loser_uid):
@@ -620,6 +659,7 @@ func _apply_displacement(winner_uid: int, loser_uid: int, seg: Dictionary) -> Di
 		board.erase(int(l["node"]))
 		l["node"] = best
 		board[best] = loser_uid
+		_spring_trap(loser_uid)
 		return {"type": "teleport", "uid": loser_uid, "to": best}
 	if typ == "swap":
 		var wn: int = w["node"]
@@ -628,6 +668,8 @@ func _apply_displacement(winner_uid: int, loser_uid: int, seg: Dictionary) -> Di
 		board[wn] = loser_uid
 		w["node"] = ln
 		l["node"] = wn
+		_spring_trap(winner_uid)
+		_spring_trap(loser_uid)
 		_check_goal(w)
 		_check_goal(l)
 		return {"type": "swap", "a": winner_uid, "a_to": ln, "b": loser_uid, "b_to": wn}
@@ -658,6 +700,7 @@ func _apply_displacement(winner_uid: int, loser_uid: int, seg: Dictionary) -> Di
 		cur = best
 		board[cur] = loser_uid
 		l["node"] = cur
+	_spring_trap(loser_uid)
 	_check_goal(l)
 	return {"type": typ, "uid": loser_uid, "to": l["node"]}
 
@@ -695,6 +738,9 @@ func _check_goal(u: Dictionary) -> void:
 
 func end_turn() -> void:
 	_tick_buff_charge(turn_team)                  # el equipo que TERMINA carga sus buffs
+	# los buffs "este turno" caducan al terminar el turno del equipo
+	(pending_buff[turn_team] as Dictionary).erase("anchored")
+	(pending_buff[turn_team] as Dictionary).erase("haste")
 	turn_no += 1
 	_process_ko_returns()
 	turn_team = "enemy" if turn_team == "player" else "player"
@@ -771,11 +817,18 @@ func controls_buff(team: String) -> bool:
 	return false
 
 func can_use_modifier(team: String, mod_id: String) -> bool:
-	return MODIFIERS.has(mod_id) and not bool(mod_used[team]) and int(energy[team]) >= int(MODIFIERS[mod_id]["cost"])
+	if not (MODIFIERS.has(mod_id) and not bool(mod_used[team]) and int(energy[team]) >= int(MODIFIERS[mod_id]["cost"])):
+		return false
+	if mod_id == "revive" and (ko_bench[team] as Array).is_empty():
+		return false                              # nada que revivir
+	return true
 
-func activate_modifier(team: String, mod_id: String) -> bool:
+## `node` solo lo usan los modificadores con objetivo (trampa). Determinista.
+func activate_modifier(team: String, mod_id: String, node: int = -1) -> bool:
 	if not can_use_modifier(team, mod_id):
 		return false
+	if mod_id == "trap" and (node < 0 or board.has(node) or node in map.obstacles or traps.has(node)):
+		return false                              # la trampa exige nodo libre válido
 	mod_used[team] = true                        # only one modifier per turn
 	energy[team] = int(energy[team]) - int(MODIFIERS[mod_id]["cost"])
 	match mod_id:
@@ -788,12 +841,72 @@ func activate_modifier(team: String, mod_id: String) -> bool:
 		"cleanse":
 			for uid in units_on_board(team):
 				units[uid]["statuses"] = {}
+		"iron_wall":
+			pending_buff[team]["anchored"] = true    # este turno: tus figuras no se desplazan
+		"shield":
+			pending_buff[team]["guard"] = true       # próxima defensa: un Fallo se vuelve Azul
+		"haste":
+			pending_buff[team]["haste"] = true       # próxima figura activada: +1 estamina
+		"energy_drain":
+			var opp := _enemy_team(team)
+			var stolen: int = mini(2, int(energy[opp]))
+			energy[opp] = int(energy[opp]) - stolen
+			energy[team] = mini(ENERGY_MAX, int(energy[team]) + stolen)
+		"revive":
+			# vuelve a la banca la caída MÁS RECIENTE (mayor ko_until; empate: uid menor)
+			var best := -1
+			var bu := -1
+			for uid in ko_bench[team]:
+				if int(units[uid]["ko_until"]) > bu or (int(units[uid]["ko_until"]) == bu and int(uid) < best):
+					bu = int(units[uid]["ko_until"])
+					best = int(uid)
+			if best != -1:
+				ko_bench[team].erase(best)
+				units[best]["alive"] = true
+				units[best]["statuses"] = {}
+				units[best]["node"] = -1
+				bench[team].append(best)
+		"trap":
+			traps[node] = {"team": team}             # oculta hasta que un rival la pise
 	return true
+
+## TRAMPA: si `uid` terminó sobre una trampa RIVAL, se dispara (Inmovilizado) y
+## se revela/consume. El evento queda en trap_events para que la vista lo anuncie.
+func _spring_trap(uid: int) -> void:
+	var n := int(units[uid]["node"])
+	if not traps.has(n):
+		return
+	var t: Dictionary = traps[n]
+	if String(t.get("team", "")) == String(units[uid]["team"]):
+		return                                     # tu propia trampa no te daña
+	traps.erase(n)
+	apply_status(uid, "immobilized", STATUS_DUR)
+	trap_events.append({"uid": uid, "node": n})
 
 # --- simple bot ------------------------------------------------------------
 # --- bot ------------------------------------------------------------------
 ## 0 = random/easy, 1 = medium (no surround setups), 2 = hard (default).
 var bot_difficulty := 2
+
+## PERSONALIDADES (GDD §3): re-ponderan el score del bot para dar variedad.
+##  atk = agresividad del ataque · space = valor de "ganar espacio" ·
+##  risk = miedo a terminar junto a rivales · adv = urgencia de avanzar ·
+##  th = umbral mínimo de P(ganar) para pelear.
+const PERSONA := {
+	"balanced": {"atk": 1.0, "space": 1.0, "risk": 1.0, "adv": 1.0, "th": 0.42},
+	"aggressive": {"atk": 1.4, "space": 1.6, "risk": 0.5, "adv": 1.1, "th": 0.36},
+	"defensive": {"atk": 0.9, "space": 0.6, "risk": 1.7, "adv": 0.7, "th": 0.5},
+	"rusher": {"atk": 0.7, "space": 1.0, "risk": 0.8, "adv": 1.7, "th": 0.46},
+	"hunter": {"atk": 1.5, "space": 1.2, "risk": 0.9, "adv": 0.8, "th": 0.36},
+}
+const PERSONA_ES := {
+	"balanced": "Equilibrada", "aggressive": "Agresiva", "defensive": "Defensiva",
+	"rusher": "Corredora", "hunter": "Cazadora",
+}
+var bot_personality := "balanced"
+
+func _pw(k: String) -> float:
+	return float((PERSONA.get(bot_personality, PERSONA["balanced"]) as Dictionary).get(k, 1.0))
 
 ## CPU por lista de prioridades (ver docs/AI_CPU.md). 0 = fácil (legacy);
 ## 1+ = lista completa; 2 = además gasta modificadores en ataques ganadores.
@@ -802,6 +915,9 @@ func bot_action(team: String) -> Dictionary:
 		return _bot_easy(team)
 	var target_goal: int = map.goal_player if team == "enemy" else map.goal_enemy
 	var own_goal: int = map.goal_enemy if team == "enemy" else map.goal_player
+	# Con energía de sobra, REVIVE a su caída más reciente (no gasta la acción).
+	if bot_difficulty >= 2 and int(energy[team]) >= 8 and can_use_modifier(team, "revive"):
+		activate_modifier(team, "revive")
 
 	var act := _bot_win_now(team, target_goal)          # 1) ganar YA
 	if act.is_empty():
@@ -897,9 +1013,9 @@ func _bot_attack(team: String, target_goal: int, own_goal: int) -> Dictionary:
 			var wp := _win_prob(mine, _pool_of(foe))
 			var kp := _ko_prob(mine, _pool_of(foe))
 			var threat := 1.0 - clampf(_dist(units[foe]["node"], own_goal) / md, 0.0, 1.0)
-			var space := 0.35 if _dist(units[foe]["node"], target_goal) < _dist(units[uid]["node"], target_goal) else 0.0
-			var score := wp * 0.7 + kp * 0.6 + threat * 0.5 + space
-			if (wp >= 0.42 or threat > 0.7) and score > best:
+			var space := (0.35 * _pw("space")) if _dist(units[foe]["node"], target_goal) < _dist(units[uid]["node"], target_goal) else 0.0
+			var score := (wp * 0.7 + kp * 0.6) * _pw("atk") + threat * 0.5 + space
+			if (wp >= _pw("th") or threat > 0.7) and score > best:
 				best = score
 				atk_uid = uid
 				atk_foe = foe
@@ -1004,7 +1120,7 @@ func _bot_advance(team: String, target_goal: int, own_goal: int) -> Dictionary:
 				var occ := _node_occupant(nb)
 				if occ != -1 and units[occ]["team"] == opp and units[occ]["alive"]:
 					risk += 1.0
-			var score := impr - risk * 0.8
+			var score := impr * _pw("adv") - risk * 0.8 * _pw("risk")
 			if score > best_score:
 				best_score = score
 				mv_uid = uid

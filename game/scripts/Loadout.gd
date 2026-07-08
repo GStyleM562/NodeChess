@@ -20,20 +20,75 @@ static var map_index := 0
 static func valid(team: Array) -> bool:
 	return team.size() == DECK_SIZE
 
+# --- MULTI-MAZOS (GDD: hasta 20 con pestañas) --------------------------------
+const MAX_DECKS := 20
+## Cada mazo guardado: {"name": String, "team": [ids], "mods": [ids], "map": int}.
+static var decks: Array = []
+static var active_deck := 0
+
+## Vuelca el mazo ACTIVO (player_team/mods/map actuales) a su ranura.
+static func stash_active() -> void:
+	while decks.size() <= active_deck:
+		decks.append({"name": "Mazo %d" % (decks.size() + 1), "team": [], "mods": [], "map": 0})
+	decks[active_deck] = {
+		"name": String((decks[active_deck] as Dictionary).get("name", "Mazo %d" % (active_deck + 1))),
+		"team": _ids_of(player_team), "mods": player_modifiers.duplicate(), "map": map_index,
+	}
+
+## Activa la ranura i (cargando su equipo/mods/mapa a las vars vivas).
+static func switch_deck(i: int) -> void:
+	stash_active()
+	active_deck = clampi(i, 0, decks.size() - 1)
+	var d: Dictionary = decks[active_deck]
+	var team := _indices_of(d.get("team", []))
+	if not team.is_empty():
+		player_team = team
+	player_modifiers = (d.get("mods", player_modifiers) as Array).duplicate()
+	map_index = clampi(int(d.get("map", 0)), 0, MapData.count() - 1)
+	save()
+
+## Código NCDECK1 para compartir el mazo activo.
+static func deck_code() -> String:
+	stash_active()
+	var bytes := JSON.stringify(decks[active_deck]).to_utf8_buffer().compress(FileAccess.COMPRESSION_GZIP)
+	return "NCDECK1." + Marshalls.raw_to_base64(bytes)
+
+## Importa un código NCDECK1 como mazo NUEVO. Figuras desconocidas se omiten.
+## -> {"ok": bool, "name": String, "missing": int}
+static func import_deck_code(code: String) -> Dictionary:
+	var c := code.strip_edges().replace("\n", "").replace("\r", "").replace(" ", "")
+	if not c.begins_with("NCDECK1."):
+		return {"ok": false, "name": "", "missing": 0}
+	var bytes := Marshalls.base64_to_raw(c.substr(8))
+	if bytes.is_empty():
+		return {"ok": false, "name": "", "missing": 0}
+	var raw := bytes.decompress_dynamic(1 << 20, FileAccess.COMPRESSION_GZIP)
+	var data = JSON.parse_string(raw.get_string_from_utf8()) if not raw.is_empty() else null
+	if not (data is Dictionary) or decks.size() >= MAX_DECKS:
+		return {"ok": false, "name": "", "missing": 0}
+	var ids: Array = data.get("team", [])
+	var found := _indices_of(ids)
+	stash_active()
+	decks.append({
+		"name": String(data.get("name", "Importado")),
+		"team": _ids_of(found), "mods": data.get("mods", []), "map": int(data.get("map", 0)),
+	})
+	save()
+	return {"ok": true, "name": String(data.get("name", "Importado")), "missing": ids.size() - found.size()}
+
 # --- persistence ------------------------------------------------------------
 # Saved by FIGURE ID (not roster index), so it survives custom figures being
 # added/removed between sessions. Loaded at startup (GameBoot), after custom
-# figures are merged into the roster.
+# figures are merged into the roster. v2 = multi-mazos (migra v1 en silencio).
 const PATH := "user://loadout.json"
 
 static func save() -> void:
+	stash_active()
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
 	if f == null:
 		return
 	f.store_string(JSON.stringify({
-		"team": _ids_of(player_team),
-		"mods": player_modifiers,
-		"map": map_index,
+		"v": 2, "active": active_deck, "decks": decks,
 	}, "\t"))
 	f.close()
 
@@ -47,17 +102,33 @@ static func load() -> void:
 	f.close()
 	if typeof(data) != TYPE_DICTIONARY:
 		return
-	var team := _indices_of(data.get("team", []))
-	if team.size() == DECK_SIZE:
-		player_team = team
-	var mods: Array = data.get("mods", [])
+	if int(data.get("v", 1)) >= 2:
+		decks = data.get("decks", [])
+		active_deck = clampi(int(data.get("active", 0)), 0, maxi(0, decks.size() - 1))
+		if decks.is_empty():
+			return
+		var d: Dictionary = decks[active_deck]
+		var team := _indices_of(d.get("team", []))
+		if not team.is_empty():
+			player_team = team   # equipos de otro tamaño se restauran igual (el builder los completa)
+		_load_mods(d.get("mods", []))
+		map_index = clampi(int(d.get("map", 0)), 0, MapData.count() - 1)
+		return
+	# v1 (un solo mazo) -> migrar a la ranura 0
+	var team1 := _indices_of(data.get("team", []))
+	if not team1.is_empty():
+		player_team = team1
+	_load_mods(data.get("mods", []))
+	map_index = clampi(int(data.get("map", 0)), 0, MapData.count() - 1)
+	stash_active()
+
+static func _load_mods(mods: Array) -> void:
 	var vm: Array = []
 	for m in mods:
 		if GameState.MODIFIERS.has(String(m)) and vm.size() < 3:
 			vm.append(String(m))
 	if not vm.is_empty():
 		player_modifiers = vm
-	map_index = clampi(int(data.get("map", 0)), 0, MapData.count() - 1)
 
 static func _ids_of(team: Array) -> Array:
 	var out: Array = []

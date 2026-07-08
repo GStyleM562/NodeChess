@@ -5,6 +5,8 @@ extends Node
 ## just puts the CAMERA on its own side so it sees itself at the bottom. Actions
 ## therefore reference canonical uids/nodes and mean the same on both ends.
 
+signal net_paused(paused: bool)   # true = perdimos el socket en partida (reconectando)
+
 var client                       # NetClient
 var online := false
 var seat := 0                    # 0 = host (canonical "player"), 1 = guest ("enemy")
@@ -15,11 +17,33 @@ var team_p0: Array = []          # indices into match_roster (canonical player t
 var team_p1: Array = []          # (canonical enemy team)
 var decks_by_seat := {0: [], 1: []}   # raw deck (figure dicts) per seat
 var opp_name := "Rival"
+var server_url := ""             # para RECONECTAR en medio de una partida
+var room_code := ""
+var _rejoin_pending := false
 
 func _ready() -> void:
 	client = NetClient.new()
 	client.name = "NetClient"
 	add_child(client)
+	client.disconnected.connect(_on_socket_drop)
+	client.connected.connect(_on_socket_up)
+	client.rejoined.connect(_on_rejoined)
+
+## RECONEXIÓN automática: si el socket cae EN PARTIDA, reintenta (con el mismo
+## wake patient de Render) y al abrir manda "rejoin" con el código y asiento.
+func _on_socket_drop() -> void:
+	if online and room_code != "" and server_url != "":
+		_rejoin_pending = true
+		net_paused.emit(true)
+		client.connect_to(server_url)
+
+func _on_socket_up() -> void:
+	if _rejoin_pending:
+		client.rejoin(room_code, seat)
+
+func _on_rejoined(_code: String, _you: int, _map: int) -> void:
+	_rejoin_pending = false
+	net_paused.emit(false)
 
 ## My canonical team name given my seat (seat 0 -> "player", seat 1 -> "enemy").
 func my_team() -> String:
