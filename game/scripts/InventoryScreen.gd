@@ -39,12 +39,16 @@ func _ready() -> void:
 	title.text = "Inventario"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	UITheme.label(title, 22, UITheme.GOLD, true, 800)
+	UITheme.label(title, 24, UITheme.GOLD, true, 800)
 	top.add_child(title)
+	# píldora de modo (👤 USUARIO / 👑 ADMIN) — §6.4
+	var mode_pill := PanelContainer.new()
+	mode_pill.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	mode_pill.add_theme_stylebox_override("panel", UITheme.pill(UITheme.PANEL_DEEP, UITheme.PRIMARY_EDGE, 10))
 	_mode_lbl = Label.new()
-	_mode_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	UITheme.label(_mode_lbl, 13, UITheme.TEXT2, true, 700)
-	top.add_child(_mode_lbl)
+	UITheme.label(_mode_lbl, 12, UITheme.PRIMARY_EDGE, true, 700)
+	mode_pill.add_child(_mode_lbl)
+	top.add_child(mode_pill)
 
 	var chint := Label.new()
 	chint.text = "Los COFRES se abren desde el menú principal; aquí ves tus piezas y conviertes fragmentos."
@@ -72,8 +76,7 @@ func _ready() -> void:
 
 	# --- inventario ---
 	var hdr := Label.new()
-	hdr.text = "TU INVENTARIO  ·  10 fragmentos = 1 pieza"
-	UITheme.label(hdr, 12, UITheme.MUTED, true, 700)
+	UITheme.section(hdr, "Tu inventario  ·  10 fragmentos = 1 pieza")
 	root.add_child(hdr)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -95,18 +98,64 @@ func _refresh_mode() -> void:
 func _rebuild_inventory() -> void:
 	for c in _inv_box.get_children():
 		c.queue_free()
+	# ESTADO VACÍO (§6.4): usuario sin ninguna pieza ni fragmento → invítalo a cofres.
+	if not Inventory.is_admin() and _inventory_empty():
+		_inv_box.add_child(_empty_state())
+		return
 	var groups := [["model:", "FIGURAS"], ["rarity:", "RAREZAS"], ["atype:", "TIPOS DE ATAQUE"],
 		["color:", "ATAQUES (COLORES)"], ["fx:", "ESTADOS"], ["passive:", "PASIVAS"],
 		["stamina:", "ESTAMINA"], ["resist:", "RESISTENCIAS"]]
 	for g in groups:
 		var hdr := Label.new()
-		hdr.text = String(g[1])
-		UITheme.label(hdr, 11, UITheme.MUTED, true, 700)
+		UITheme.section(hdr, String(g[1]))
 		_inv_box.add_child(hdr)
 		for key in Inventory.catalog():
 			if not String(key).begins_with(String(g[0])):
 				continue
 			_inv_box.add_child(_inv_row(String(key)))
+
+## ¿El usuario no posee NINGUNA pieza ni tiene fragmentos? (para el estado vacío)
+func _inventory_empty() -> bool:
+	for key in Inventory.catalog():
+		if Inventory.owned(String(key)) > 0 or Inventory.frags(String(key)) > 0:
+			return false
+	return true
+
+## Tarjeta de "aún no tienes piezas" + acceso directo a los cofres del lobby.
+func _empty_state() -> Control:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UITheme.group_panel(16, 22))
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 10)
+	p.add_child(v)
+	var tile := UITheme.icon_tile_node("📦", UITheme.GOLD, 64, 34)
+	v.add_child(_centered(tile))
+	var t := Label.new()
+	t.text = "Aún no tienes piezas"
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(t, 17, UITheme.TEXT, true, 800)
+	v.add_child(t)
+	var h := Label.new()
+	h.text = "Abre cofres en el menú principal para conseguir figuras, colores, estados y más."
+	h.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	h.custom_minimum_size = Vector2(300, 0)
+	UITheme.label(h, 12, UITheme.MUTED, false, 500)
+	v.add_child(h)
+	var go := Button.new()
+	go.text = "🎁 Ir a los cofres"
+	go.custom_minimum_size = Vector2(220, 46)
+	UITheme.button_font(go, 15, Color.WHITE, true, 800)
+	UITheme.style_primary(go, UITheme.PRIMARY, 12)
+	go.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+	v.add_child(_centered(go))
+	return p
+
+func _centered(c: Control) -> CenterContainer:
+	var cc := CenterContainer.new()
+	cc.add_child(c)
+	return cc
 
 func _inv_row(key: String) -> Control:
 	var row := HBoxContainer.new()

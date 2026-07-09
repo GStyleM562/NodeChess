@@ -92,6 +92,8 @@ var _rows: Array = []             # each: { panel, col, name, pow, stars, fx, pr
 var _rows_box: VBoxContainer
 var _total_lbl: Label
 var _status_lbl: Label
+var _status_box: PanelContainer   # banner de validación (§9.4)
+var _status_icon: Label
 var _save_btn: Button
 var _model_ids: Array = []
 var _editing_id := ""             # non-empty when editing -> save overwrites it
@@ -186,12 +188,24 @@ func _build_footer() -> void:
 	bar.add_theme_stylebox_override("panel", UITheme.panel(UITheme.BG, UITheme.BORDER, 0, 1, 8))
 	add_child(bar)
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 4)
+	vb.add_theme_constant_override("separation", 6)
 	bar.add_child(vb)
+	# Banner de validación: fondo/borde tintado + icono (§9.4), no texto suelto.
+	_status_box = PanelContainer.new()
+	_status_box.add_theme_stylebox_override("panel", UITheme.alert_box(UITheme.SUCCESS))
+	vb.add_child(_status_box)
+	var sbh := HBoxContainer.new()
+	sbh.add_theme_constant_override("separation", 8)
+	_status_box.add_child(sbh)
+	_status_icon = Label.new()
+	_status_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	UITheme.label(_status_icon, 15, UITheme.SUCCESS, true, 800)
+	sbh.add_child(_status_icon)
 	_status_lbl = Label.new()
 	_status_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	UITheme.label(_status_lbl, 12, UITheme.TEXT2, false, 600)
-	vb.add_child(_status_lbl)
+	_status_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UITheme.label(_status_lbl, 12, UITheme.TEXT, false, 600)
+	sbh.add_child(_status_lbl)
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 8)
 	vb.add_child(hb)
@@ -206,7 +220,7 @@ func _build_footer() -> void:
 # ---------------------------------------------------------------- sections
 func _section(parent: VBoxContainer, title: String) -> VBoxContainer:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.BORDER, 16, 1, 14))
+	p.add_theme_stylebox_override("panel", UITheme.group_panel(16, 14))
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(p)
 	var vb := VBoxContainer.new()
@@ -214,7 +228,7 @@ func _section(parent: VBoxContainer, title: String) -> VBoxContainer:
 	p.add_child(vb)
 	var t := Label.new()
 	t.text = title
-	UITheme.label(t, 14, UITheme.PRIMARY_EDGE, true, 800)
+	UITheme.label(t, 16, UITheme.SECTION, true, 800)   # título de sección Sora 800 (§4.7)
 	vb.add_child(t)
 	return vb
 
@@ -235,10 +249,12 @@ func _build_identity(form: VBoxContainer) -> void:
 	var s := _section(form, "Identidad")
 	_name = LineEdit.new()
 	_name.placeholder_text = "Nombre"
+	_style_le(_name)
 	_name.text_changed.connect(func(_t): _revalidate())
 	_field(s, "Nombre", _name)
 	_desc = LineEdit.new()
 	_desc.placeholder_text = "Descripción corta"
+	_style_le(_desc)
 	_field(s, "Descripción", _desc)
 	_class = _opt(CLASSES)
 	_field(s, "Clase", _class)
@@ -353,24 +369,32 @@ func _build_resists(form: VBoxContainer) -> void:
 	UITheme.label(hint, 11, UITheme.MUTED, false, 500)
 	s.add_child(hint)
 	var grid := GridContainer.new()
-	grid.columns = 3
+	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 6)
 	grid.add_theme_constant_override("v_separation", 6)
 	s.add_child(grid)
 	for label in GameState.FX_STATUS.keys():
 		var sid := String(GameState.FX_STATUS[label])
+		var lbl_txt := String(label)
+		var desc := _fx_desc(lbl_txt)   # descripción REAL del estado (§9.2)
+		var item := HBoxContainer.new()
+		item.add_theme_constant_override("separation", 4)
 		var tg := Button.new()
 		tg.toggle_mode = true
-		tg.text = String(label)
+		tg.text = lbl_txt
 		tg.clip_text = true
+		tg.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		tg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		tg.custom_minimum_size = Vector2(0, 34)
+		tg.custom_minimum_size = Vector2(0, 36)
+		tg.tooltip_text = desc
 		_style_toggle(tg)
 		tg.toggled.connect(func(_p): _revalidate())
 		if not _inv().is_admin() and not _piece_ok("resist:" + sid):
 			tg.disabled = true
-			tg.text = "🔒 " + String(label)
-		grid.add_child(tg)
+			tg.text = "🔒 " + lbl_txt
+		item.add_child(tg)
+		item.add_child(_info_btn(func(): _show_info("Resiste: " + lbl_txt, desc)))
+		grid.add_child(item)
 		_resist_boxes[sid] = tg
 
 func _build_pool(form: VBoxContainer) -> void:
@@ -423,6 +447,7 @@ func _add_row(seg: Dictionary) -> void:
 	nm.placeholder_text = "Nombre ataque"
 	nm.text = String(seg.get("name", ""))
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style_le(nm)
 	line1.add_child(nm)
 
 	var line2 := HBoxContainer.new()
@@ -704,12 +729,16 @@ func _revalidate() -> void:
 		for key in missing:
 			names.append(_inv().piece_name(String(key)))
 		msgs.push_front("🔒 Te falta: " + ", ".join(names) + " — consíguelo en 🎁 Cajas")
-	var head: String = {"VALID": "✓ Válido", "WARNING": "⚠ Válido con avisos", "INVALID": "✗ Inválido"}[state]
+	var head: String = {"VALID": "Válido", "WARNING": "Válido con avisos", "INVALID": "Inválido"}[state]
 	if not missing.is_empty():
-		head = "🔒 Piezas faltantes"
+		head = "Piezas faltantes"
 	_status_lbl.text = head + ("  ·  " + "  ·  ".join(msgs) if not msgs.is_empty() else "")
-	_status_lbl.add_theme_color_override("font_color",
-		UITheme.DANGER if (state == "INVALID" or not missing.is_empty()) else (UITheme.SUCCESS if state == "VALID" else UITheme.GOLD))
+	# Banner tintado por estado (§9.4): rojo inválido/faltante · oro avisos · verde ok.
+	var bad := state == "INVALID" or not missing.is_empty()
+	var tint: Color = UITheme.DANGER if bad else (UITheme.SUCCESS if state == "VALID" else UITheme.GOLD)
+	_status_box.add_theme_stylebox_override("panel", UITheme.alert_box(tint))
+	_status_icon.text = "⚠" if bad else ("✓" if state == "VALID" else "⚠")
+	_status_icon.add_theme_color_override("font_color", tint)
 	_save_btn.disabled = state == "INVALID" or not missing.is_empty()
 
 func _on_save() -> void:
@@ -811,7 +840,23 @@ func _opt(items: Array) -> OptionButton:
 	for it in items:
 		o.add_item(String(it))
 	UITheme.button_font(o, 13, UITheme.TEXT, false, 600)
+	o.add_theme_stylebox_override("normal", UITheme.input())
+	o.add_theme_stylebox_override("hover", UITheme.input(UITheme.INPUT_BG, UITheme.PRIMARY))
+	o.add_theme_stylebox_override("pressed", UITheme.input(UITheme.INPUT_BG, UITheme.PRIMARY))
+	o.add_theme_stylebox_override("disabled", UITheme.input(UITheme.INPUT_BG.darkened(0.2), UITheme.BORDER.darkened(0.2)))
 	return o
+
+## Estilo de campo de texto (input bg, borde, foco azul, fuente Manrope).
+func _style_le(e: LineEdit) -> void:
+	e.custom_minimum_size = Vector2(0, 40)
+	e.add_theme_stylebox_override("normal", UITheme.input())
+	e.add_theme_stylebox_override("focus", UITheme.input(UITheme.INPUT_BG, UITheme.PRIMARY))
+	e.add_theme_color_override("font_color", UITheme.TEXT)
+	e.add_theme_color_override("font_placeholder_color", UITheme.MUTED)
+	e.add_theme_color_override("caret_color", UITheme.PRIMARY_EDGE)
+	var mf := UITheme.body(600)
+	if mf != null:
+		e.add_theme_font_override("font", mf)
 
 func _spin(lo: float, hi: float, step: float, val: int, _suffix: String) -> SpinBox:
 	var sp := SpinBox.new()

@@ -43,7 +43,8 @@ static func rarity_name(data: Dictionary) -> String:
 func setup(data: Dictionary, rank: int = 0, team_col: Color = UITheme.PRIMARY, compact: bool = false) -> void:
 	var accent := accent_of(data)
 	var rar := rarity_color(data)
-	var sb := UITheme.panel(UITheme.SURFACE, rar, 18, 2, 8)
+	# Fondo #12172E + marco por rareza (§6.7 del handoff).
+	var sb := UITheme.panel(Color(0.071, 0.09, 0.18), rar, 16, 2, 8)
 	add_theme_stylebox_override("panel", sb)
 	if compact:
 		_build_compact(data, rank, accent, rar, team_col)

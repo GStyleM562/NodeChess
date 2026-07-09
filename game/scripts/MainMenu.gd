@@ -165,7 +165,18 @@ func _build_topbar(layer: CanvasLayer) -> void:
 	var nm := _lbl("Jugador", 17, UITheme.TEXT, true, 700)
 	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	who.add_child(nm)
-	var lv := _lbl("Nivel %d  ·  %d/%d XP" % [Inventory.level, Inventory.xp, Inventory.xp_needed()], 12, UITheme.GOLD, false, 700)
+	# barra fina de XP (6px, relleno PRIMARY) — §6.1 del handoff
+	var xpbar := ProgressBar.new()
+	xpbar.custom_minimum_size = Vector2(0, 6)
+	xpbar.show_percentage = false
+	xpbar.max_value = maxf(1.0, float(Inventory.xp_needed()))
+	xpbar.value = clampf(float(Inventory.xp), 0.0, xpbar.max_value)
+	var xbg := StyleBoxFlat.new(); xbg.bg_color = Color(0.10, 0.13, 0.22); xbg.set_corner_radius_all(3)
+	var xfg := StyleBoxFlat.new(); xfg.bg_color = UITheme.PRIMARY; xfg.set_corner_radius_all(3)
+	xpbar.add_theme_stylebox_override("background", xbg)
+	xpbar.add_theme_stylebox_override("fill", xfg)
+	who.add_child(xpbar)
+	var lv := _lbl("Nv %d  ·  %d/%d" % [Inventory.level, Inventory.xp, Inventory.xp_needed()], 11, UITheme.MUTED, false, 700)
 	lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	who.add_child(lv)
 	tb.add_child(who)
@@ -226,13 +237,15 @@ func _chest_slot(id: String) -> Control:
 	var st: Dictionary = CHEST_LOBBY[id]
 	var col: Color = st["col"]
 	var p := PanelContainer.new()
-	p.custom_minimum_size = Vector2(96, 92)   # caben 5 slots (incluye Nivel)
-	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE.lerp(col, 0.08), col, 14, 2, 6))
+	p.custom_minimum_size = Vector2(96, 96)   # caben 5 slots (incluye Nivel)
+	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.PANEL_DEEP, col, 14, 2, 6))
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_theme_constant_override("separation", 2)
+	v.add_theme_constant_override("separation", 3)
 	p.add_child(v)
-	v.add_child(_lbl(String(st["icon"]), 30, col.lightened(0.2), false, 700))
+	var tile := UITheme.icon_tile_node(String(st["icon"]), col, 38, 22)   # emoji enmarcado (§5)
+	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(_center(tile))
 	v.add_child(_lbl(String(st["name"]), 11, col, true, 700))
 	var state := _lbl("…", 12, UITheme.TEXT2, true, 700)
 	v.add_child(state)
@@ -379,6 +392,18 @@ func _open_chest_anim(id: String, lines: Array) -> void:
 	_refresh_chest_states()
 
 func _build_buttons(layer: CanvasLayer) -> void:
+	# Halo pulsante DETRÁS del botón (se añade antes para quedar por debajo).
+	var halo := _radial(UITheme.PRIMARY, 0.5)
+	halo.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	halo.offset_top = -308
+	halo.offset_bottom = -192
+	halo.offset_left = 2
+	halo.offset_right = -2
+	layer.add_child(halo)
+	var hp := create_tween().set_loops()
+	hp.tween_property(halo, "modulate:a", 0.72, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	hp.tween_property(halo, "modulate:a", 0.3, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
 	var play := _big_button("JUGAR", "Partida rápida")
 	play.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	play.offset_top = -288
@@ -393,6 +418,7 @@ func _build_buttons(layer: CanvasLayer) -> void:
 		else:
 			get_tree().change_scene_to_file("res://scenes/deck_builder.tscn"))
 	layer.add_child(play)
+	_juice_play(play)
 
 	# UNA sola parrilla grande (3×2) — antes había dos barras con botones
 	# duplicados (Colección/Probar) y todo se veía chiquito.
@@ -412,6 +438,37 @@ func _build_buttons(layer: CanvasLayer) -> void:
 	grid.add_child(_menu_button("🌐", "Online", UITheme.ENERGY, func(): get_tree().change_scene_to_file("res://scenes/online_lobby.tscn")))
 	grid.add_child(_menu_button("🛠", "Crear", UITheme.SUCCESS, func(): get_tree().change_scene_to_file("res://scenes/character_creator.tscn")))
 	grid.add_child(_menu_button("🎲", "Probar", UITheme.ORANGE, func(): get_tree().change_scene_to_file("res://scenes/attack_tester.tscn")))
+
+## Botón JUGAR "hipnótico": respiración + barrido de brillo diagonal. NO toca `pressed`.
+func _juice_play(play: Button) -> void:
+	play.clip_contents = true
+	# respiración (escala 1.0↔1.02 en bucle) — pivote al centro cuando ya tiene tamaño
+	play.resized.connect(func(): play.pivot_offset = play.size * 0.5)
+	await get_tree().process_frame
+	play.pivot_offset = play.size * 0.5
+	var br := create_tween().set_loops()
+	br.tween_property(play, "scale", Vector2(1.02, 1.02), 2.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	br.tween_property(play, "scale", Vector2.ONE, 2.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# barrido de brillo: banda diagonal blanca que cruza el botón
+	var shine := TextureRect.new()
+	shine.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 0.0)); g.set_color(1, Color(1, 1, 1, 0.0))
+	g.add_point(0.5, Color(1, 1, 1, 0.35))
+	var gt := GradientTexture2D.new()
+	gt.gradient = g
+	gt.fill_from = Vector2(0, 0); gt.fill_to = Vector2(1, 0)
+	shine.texture = gt
+	shine.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	shine.stretch_mode = TextureRect.STRETCH_SCALE
+	shine.rotation_degrees = 18.0
+	shine.size = Vector2(70, play.size.y * 2.4)
+	shine.position = Vector2(-90, -play.size.y * 0.7)
+	play.add_child(shine)
+	var sw := create_tween().set_loops()
+	sw.tween_interval(1.1)
+	sw.tween_property(shine, "position:x", play.size.x + 90.0, 0.75).set_trans(Tween.TRANS_SINE)
+	sw.tween_callback(func(): shine.position.x = -90.0)
 
 func _build_nav(layer: CanvasLayer) -> void:
 	var nav := PanelContainer.new()
@@ -535,11 +592,18 @@ func _show_settings() -> void:
 	layer.add_child(cc)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(470, 0)
-	panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.PRIMARY_EDGE, 18, 2, 18))
+	panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.PRIMARY_EDGE, 22, 2, 18))
 	cc.add_child(panel)
+	# Scroll: en teléfonos altos la Configuración no cabe entera → se desliza.
+	var scr := ScrollContainer.new()
+	scr.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var vh := get_viewport().get_visible_rect().size.y
+	scr.custom_minimum_size = Vector2(430, minf(vh * 0.82, 720.0))
+	panel.add_child(scr)
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", 12)
-	panel.add_child(vb)
+	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scr.add_child(vb)
 	var t := _lbl("⚙ Configuración", 20, UITheme.GOLD, true, 800)
 	vb.add_child(t)
 
@@ -549,7 +613,8 @@ func _show_settings() -> void:
 		Sfx.play("ui_click")))   # feedback inmediato del nuevo volumen
 
 	# --- tablero 3D con assets vs 2D digital (solo visual, no afecta gameplay) ---
-	var bh := _lbl("TABLERO (solo visual)", 11, UITheme.MUTED, true, 700)
+	var bh := Label.new()
+	UITheme.section(bh, "Tablero (solo visual)")
 	bh.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	vb.add_child(bh)
 	var brow := HBoxContainer.new()
@@ -582,7 +647,8 @@ func _show_settings() -> void:
 	vb.add_child(bhint)
 
 	# --- combate: velocidad y accesibilidad ---
-	var ch := _lbl("COMBATE Y ACCESIBILIDAD", 11, UITheme.MUTED, true, 700)
+	var ch := Label.new()
+	UITheme.section(ch, "Combate y accesibilidad")
 	ch.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	vb.add_child(ch)
 	var crow := HBoxContainer.new()
@@ -620,7 +686,8 @@ func _show_settings() -> void:
 	vb.add_child(tut)
 
 	# --- vista Admin / Usuario (progresión e inventario) ---
-	var mh := _lbl("VISTA (progresión)", 11, UITheme.MUTED, true, 700)
+	var mh := Label.new()
+	UITheme.section(mh, "Vista (progresión)")
 	mh.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	vb.add_child(mh)
 	var mrow := HBoxContainer.new()
@@ -653,9 +720,12 @@ func _show_settings() -> void:
 	vb.add_child(mhint)
 
 	# Dónde van los archivos de audio (chuleta para no buscar en el README).
-	var hdr := _lbl("¿DÓNDE PONGO LA MÚSICA? (.mp3/.ogg/.wav, 1 por carpeta)", 11, UITheme.MUTED, true, 700)
+	var hdr := Label.new()
+	UITheme.section(hdr, "¿Dónde pongo la música? (.mp3/.ogg/.wav, 1 por carpeta)")
 	hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	vb.add_child(hdr)
+	var help := PanelContainer.new()
+	help.add_theme_stylebox_override("panel", UITheme.panel(UITheme.PANEL_DEEP, UITheme.BORDER, 13, 1, 12))
 	var paths := Label.new()
 	paths.text = ("game/assets/audio/music/\n" +
 		"   menu/  ·  battle/  ·  advantage/ (tú por ganar)  ·  danger/ (rival por ganar)\n" +
@@ -663,9 +733,10 @@ func _show_settings() -> void:
 		"   ui_click/  end_turn/  deploy/  attack_hit/  attack_block/\n" +
 		"   attack_effect/  attack_miss/  ko/  rankup/  victory/  defeat/")
 	paths.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	paths.custom_minimum_size = Vector2(430, 0)
-	UITheme.label(paths, 12, UITheme.TEXT2, false, 600)
-	vb.add_child(paths)
+	paths.custom_minimum_size = Vector2(410, 0)
+	UITheme.label(paths, 12, UITheme.MUTED, false, 500)
+	help.add_child(paths)
+	vb.add_child(help)
 
 	var close := Button.new()
 	close.text = "Cerrar"
@@ -724,17 +795,19 @@ func _big_button(text: String, subtitle: String) -> Button:
 
 func _menu_button(icon: String, text: String, accent: Color, cb: Callable) -> Button:
 	var b := Button.new()
-	b.custom_minimum_size = Vector2(0, 62)
+	b.custom_minimum_size = Vector2(0, 66)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UITheme.style_surface(b, UITheme.SURFACE.lerp(accent, 0.06), accent.darkened(0.35), 14)
+	UITheme.style_surface(b, UITheme.SURFACE.lerp(accent, 0.06), Color(accent.r, accent.g, accent.b, 0.33), 14)
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.set_anchors_preset(Control.PRESET_FULL_RECT)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_theme_constant_override("separation", 0)
+	v.add_theme_constant_override("separation", 4)
 	b.add_child(v)
-	v.add_child(_lbl(icon, 24, accent, false, 600))
-	v.add_child(_lbl(text, 14, UITheme.TEXT2, true, 700))
+	var tile := UITheme.icon_tile_node(icon, accent, 34, 18)   # emoji enmarcado (§5)
+	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(_center(tile))
+	v.add_child(_lbl(text, 13, UITheme.TEXT2, true, 700))
 	b.pressed.connect(cb)
 	return b
 

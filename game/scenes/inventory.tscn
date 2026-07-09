@@ -3,4 +3,8 @@
 [ext_resource type="Script" path="res://scripts/InventoryScreen.gd" id="1_inv"]
 
 [node name="InventoryScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 script = ExtResource("1_inv")

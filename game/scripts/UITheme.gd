@@ -141,3 +141,86 @@ static func style_surface(b: Button, bg := SURFACE, border := BORDER, radius := 
 	b.add_theme_stylebox_override("hover", panel(bg.lightened(0.05), PRIMARY, radius, 1, 8))
 	b.add_theme_stylebox_override("pressed", panel(bg.darkened(0.1), border, radius, 1, 8))
 	b.add_theme_stylebox_override("disabled", panel(bg.darkened(0.2), border.darkened(0.2), radius, 1, 8))
+
+# ---- NUEVO (rediseño menús · handoff Part 6) ------------------------------
+const SECTION := PRIMARY_EDGE                      # azul de encabezados de sección
+const PANEL_DEEP := Color(0.047, 0.071, 0.165)     # #0C122A  paneles agrupadores
+const INPUT_BG := Color(0.039, 0.063, 0.125)       # #0A1020  campos de formulario
+const GROUP_BORDER := Color(0.125, 0.157, 0.267)   # borde de tarjetas agrupadoras
+
+## Encabezado de sección: azul, 12px, MAYÚSCULAS, Manrope 700.
+static func section(l: Label, text := "") -> void:
+	if text != "":
+		l.text = text.to_upper()
+	l.add_theme_font_size_override("font_size", 12)
+	l.add_theme_color_override("font_color", SECTION)
+	l.modulate = Color.WHITE
+	var f := body(700)
+	if f != null:
+		l.add_theme_font_override("font", f)
+
+## Cuadro redondeado tintado para enmarcar un emoji/icono (18–20px de glifo dentro).
+static func icon_tile(accent := PRIMARY, radius := 11) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(accent.r, accent.g, accent.b, 0.16)
+	sb.set_corner_radius_all(radius)
+	sb.set_content_margin_all(6)
+	return sb
+
+## Campo de entrada (nombre, servidor, código, dropdowns cerrados).
+static func input(bg := INPUT_BG, border := BORDER, radius := 12) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.set_corner_radius_all(radius)
+	sb.set_border_width_all(1)
+	sb.border_color = border
+	sb.set_content_margin_all(12)
+	return sb
+
+## Chip conmutable (mapa / modificador / estado / dificultad).
+## selected=false → superficie con borde; selected=true → relleno accent + borde superior claro.
+static func chip(selected: bool, accent := PRIMARY, radius := 12) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.set_corner_radius_all(radius)
+	if selected:
+		sb.bg_color = accent
+		sb.border_width_top = 2
+		sb.border_color = accent.lightened(0.35)
+	else:
+		sb.bg_color = PANEL_DEEP
+		sb.set_border_width_all(1)
+		sb.border_color = BORDER
+	sb.set_content_margin_all(11)
+	return sb
+
+## Tarjeta agrupadora estándar (envuelve varias secciones de una pantalla).
+static func group_panel(radius := 18, pad := 14) -> StyleBoxFlat:
+	return panel(PANEL_DEEP, GROUP_BORDER, radius, 1, pad)
+
+## Marco cuadrado (38×38) con un emoji centrado adentro. Sube la calidad de los
+## iconos-emoji sin sustituirlos por texturas (§5 del handoff).
+static func icon_tile_node(emoji: String, accent := PRIMARY, size := 38, glyph := 19) -> PanelContainer:
+	var pc := PanelContainer.new()
+	pc.custom_minimum_size = Vector2(size, size)
+	pc.add_theme_stylebox_override("panel", icon_tile(accent))
+	var l := Label.new()
+	l.text = emoji
+	l.add_theme_font_size_override("font_size", glyph)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	pc.add_child(l)
+	return pc
+
+## Popup de información (ⓘ de modificadores/estados). Reusa panel() para el marco.
+static func info_popup_box() -> StyleBoxFlat:
+	return panel(SURFACE, Color(0.17, 0.22, 0.38), 18, 1, 16)
+
+## Banner de alerta (validación / error). tint = DANGER por defecto.
+static func alert_box(tint := DANGER) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(tint.r, tint.g, tint.b, 0.12)
+	sb.set_corner_radius_all(12)
+	sb.set_border_width_all(1)
+	sb.border_color = Color(tint.r, tint.g, tint.b, 0.42)
+	sb.set_content_margin_all(12)
+	return sb

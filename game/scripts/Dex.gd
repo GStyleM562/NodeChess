@@ -113,11 +113,19 @@ func _build_ui() -> void:
 	_search = LineEdit.new()
 	_search.placeholder_text = "🔎 Buscar…"
 	_search.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_search.custom_minimum_size = Vector2(0, 40)
+	_search.add_theme_stylebox_override("normal", UITheme.input())
+	_search.add_theme_stylebox_override("focus", UITheme.input(UITheme.INPUT_BG, UITheme.PRIMARY))
+	_search.add_theme_color_override("font_color", UITheme.TEXT)
+	_search.add_theme_color_override("font_placeholder_color", UITheme.MUTED)
+	var mf := UITheme.body(500)
+	if mf != null:
+		_search.add_theme_font_override("font", mf)
 	_search.text_changed.connect(func(_t): _rebuild_filter(); _goto_first())
 	frow.add_child(_search)
 	_filter_btn = Button.new()
 	_filter_btn.text = FILTER_NAMES[0]
-	_filter_btn.custom_minimum_size = Vector2(120, 38)
+	_filter_btn.custom_minimum_size = Vector2(120, 40)
 	UITheme.button_font(_filter_btn, 12, UITheme.PRIMARY_EDGE, true, 700)
 	UITheme.style_surface(_filter_btn, UITheme.SURFACE2, UITheme.BORDER, 10)
 	_filter_btn.pressed.connect(func():
@@ -147,7 +155,7 @@ func _build_ui() -> void:
 	panel.offset_bottom = -72
 	panel.offset_left = 10
 	panel.offset_right = -10
-	panel.add_theme_stylebox_override("panel", UITheme.panel(Color(0.08, 0.09, 0.16, 0.97), UITheme.BORDER, 16, 1, 10))
+	panel.add_theme_stylebox_override("panel", UITheme.group_panel(16, 12))
 	layer.add_child(panel)
 	_info_panel = panel
 	# Toggle: hide the big info card so the 3D model can actually be admired.
@@ -218,8 +226,7 @@ func _build_ui() -> void:
 
 func _dex_hdr(text: String) -> Label:
 	var l := Label.new()
-	l.text = text
-	UITheme.label(l, 14, UITheme.MUTED, true, 700)
+	UITheme.section(l, text)   # azul, MAYÚSCULAS, Manrope 700
 	return l
 
 func _spawn(i: int) -> void:
@@ -256,18 +263,29 @@ func _build_attacks(pool: Array) -> void:
 	for s in pool:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
-		var sw := ColorRect.new()
-		sw.custom_minimum_size = Vector2(26, 26)
-		sw.color = Combat.color_of(s)
+		# swatch redondeado del color del segmento (§6.3)
+		var sw := Panel.new()
+		sw.custom_minimum_size = Vector2(22, 22)
+		var ssb := StyleBoxFlat.new()
+		ssb.bg_color = Combat.color_of(s)
+		ssb.set_corner_radius_all(6)
+		ssb.set_border_width_all(1)
+		ssb.border_color = Color(1, 1, 1, 0.22)
+		sw.add_theme_stylebox_override("panel", ssb)
 		row.add_child(sw)
-		var pct := 100.0 * float(s.get("w", 1.0)) / total
-		var txt := "%s   —   %.0f%%" % [Combat.label(s), pct]
+		var seg_name := Combat.label(s)
 		if s.has("fx"):
-			txt += "   [" + String(s["fx"]) + "]"
+			seg_name += "   [" + String(s["fx"]) + "]"
 		var lbl := Label.new()
-		lbl.add_theme_font_size_override("font_size", 18)
-		lbl.text = txt
+		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		UITheme.label(lbl, 17, UITheme.TEXT, false, 600)
+		lbl.text = seg_name
 		row.add_child(lbl)
+		var pct := 100.0 * float(s.get("w", 1.0)) / total
+		var pl := Label.new()
+		UITheme.label(pl, 17, UITheme.GOLD, true, 800)
+		pl.text = "%.0f%%" % pct
+		row.add_child(pl)
 		_attacks_box.add_child(row)
 
 func _build_passives(d: Dictionary) -> void:

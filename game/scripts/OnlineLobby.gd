@@ -68,7 +68,11 @@ func _ready() -> void:
 	_code_in = LineEdit.new()
 	_code_in.placeholder_text = "CÓDIGO"
 	_code_in.max_length = 4
+	_code_in.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_code_in.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_code_in.custom_minimum_size = Vector2(0, 52)
+	_style_le(_code_in)
+	_code_in.text_changed.connect(func(t): _code_in.text = t.to_upper(); _code_in.caret_column = _code_in.text.length())
 	jr.add_child(_code_in)
 	var join := _button("UNIRSE", UITheme.PRIMARY)
 	join.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -250,37 +254,51 @@ func _build_maps(is_host := true) -> void:
 		_map_box.add_child(b)
 
 func _field(parent: VBoxContainer, caption: String, val: String) -> LineEdit:
-	var hb := HBoxContainer.new()
-	hb.add_theme_constant_override("separation", 8)
-	parent.add_child(hb)
+	# Campo con la etiqueta ENCIMA (§6.5), no al lado.
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 3)
+	parent.add_child(box)
 	var l := Label.new()
 	l.text = caption
-	l.custom_minimum_size = Vector2(90, 0)
-	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	UITheme.label(l, 13, UITheme.TEXT2, false, 600)
-	hb.add_child(l)
+	UITheme.label(l, 12, UITheme.TEXT2, false, 600)
+	box.add_child(l)
 	var e := LineEdit.new()
 	e.text = val
 	e.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hb.add_child(e)
+	e.custom_minimum_size = Vector2(0, 44)
+	_style_le(e)
+	box.add_child(e)
 	return e
+
+## Estilo de campo de entrada (input bg, borde, foco azul, fuente Manrope).
+func _style_le(e: LineEdit) -> void:
+	e.add_theme_stylebox_override("normal", UITheme.input())
+	e.add_theme_stylebox_override("focus", UITheme.input(UITheme.INPUT_BG, UITheme.PRIMARY))
+	e.add_theme_color_override("font_color", UITheme.TEXT)
+	e.add_theme_color_override("font_placeholder_color", UITheme.MUTED)
+	e.add_theme_color_override("caret_color", UITheme.PRIMARY_EDGE)
+	var mf := UITheme.body(600)
+	if mf != null:
+		e.add_theme_font_override("font", mf)
 
 func _button(text: String, accent: Color) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.custom_minimum_size = Vector2(0, 52)
-	UITheme.button_font(b, 18, UITheme.TEXT, true, 800)
 	if accent == UITheme.SURFACE:
+		UITheme.button_font(b, 18, UITheme.TEXT, true, 800)
 		UITheme.style_surface(b, UITheme.SURFACE, UITheme.BORDER, 14)
 	else:
+		# Texto oscuro sobre acentos claros (verde/oro) para mejor contraste (§6.5).
+		var fg: Color = Color(0.03, 0.14, 0.06) if accent == UITheme.SUCCESS else (Color(0.16, 0.12, 0.02) if accent == UITheme.GOLD else Color.WHITE)
+		UITheme.button_font(b, 18, fg, true, 800)
 		UITheme.style_primary(b, accent, 14)
 	return b
 
 func _hdr(text: String) -> Label:
 	var l := Label.new()
-	l.text = text
+	UITheme.section(l, text)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UITheme.label(l, 12, UITheme.MUTED, true, 700)
 	return l
 
 func _spacer() -> Control:

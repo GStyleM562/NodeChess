@@ -64,11 +64,17 @@ func _ready() -> void:
 
 	var sec_top := _panel_section(root)
 	sec_top.add_child(_hdr("MAPA"))
+	var map_scroll := ScrollContainer.new()
+	map_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	map_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
+	map_scroll.custom_minimum_size = Vector2(0, 56)
+	map_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sec_top.add_child(map_scroll)
 	_map_box = HBoxContainer.new()
-	_map_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	_map_box.add_theme_constant_override("separation", 8)
-	sec_top.add_child(_map_box)
+	map_scroll.add_child(_map_box)
 	_build_maps()
+	_theme_scrollbar(map_scroll.get_h_scroll_bar())
 	sec_top.add_child(_hdr("MODIFICADORES  ·  elige hasta 3"))
 	_modsel_box = GridContainer.new()
 	_modsel_box.columns = 2
@@ -85,36 +91,41 @@ func _ready() -> void:
 		var cb := Button.new()
 		cb.text = cpu_names[lvl]
 		cb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		cb.custom_minimum_size = Vector2(0, 42)
-		UITheme.button_font(cb, 14, UITheme.TEXT, true, 700)
-		if Settings.cpu_level == lvl:
-			UITheme.style_primary(cb, UITheme.PRIMARY, 10)
-		else:
-			UITheme.style_surface(cb, UITheme.SURFACE2, UITheme.BORDER, 10)
+		cb.custom_minimum_size = Vector2(0, 44)
+		_style_chip(cb, Settings.cpu_level == lvl, UITheme.PRIMARY)
 		cb.pressed.connect(func():
 			Settings.set_cpu_level(lvl)
 			for c in cpu_row.get_children():
-				UITheme.style_surface(c, UITheme.SURFACE2, UITheme.BORDER, 10)
-			UITheme.style_primary(cb, UITheme.PRIMARY, 10))
+				_style_chip(c, false, UITheme.PRIMARY)
+			_style_chip(cb, true, UITheme.PRIMARY))
 		cpu_row.add_child(cb)
 
 	var sec_team := _panel_section(root)
 	sec_team.add_child(_hdr("TU EQUIPO  ·  toca una carta para quitarla"))
+	# Scroll HORIZONTAL con barra visible: 6 cartas no caben de golpe (§9.1).
+	var team_scroll := ScrollContainer.new()
+	team_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	team_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
+	team_scroll.custom_minimum_size = Vector2(0, 84)
+	team_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sec_team.add_child(team_scroll)
 	_team_box = HBoxContainer.new()
-	_team_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	_team_box.add_theme_constant_override("separation", 6)
-	sec_team.add_child(_team_box)
+	_team_box.add_theme_constant_override("separation", 8)
+	team_scroll.add_child(_team_box)
+	_theme_scrollbar(team_scroll.get_h_scroll_bar())
 
 	root.add_child(_hdr("DISPONIBLES  ·  toca para añadir"))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
 	root.add_child(scroll)
 	_avail_box = VBoxContainer.new()
 	_avail_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_avail_box.add_theme_constant_override("separation", 7)
 	scroll.add_child(_avail_box)
 	_build_available()
+	_theme_scrollbar(scroll.get_v_scroll_bar())
 
 	var nav := HBoxContainer.new()
 	nav.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -232,20 +243,45 @@ func _team_owned() -> bool:
 
 func _hdr(text: String) -> Label:
 	var l := Label.new()
-	l.text = text
-	UITheme.label(l, 12, UITheme.PRIMARY_EDGE, true, 700)
+	UITheme.section(l, text)   # azul, MAYÚSCULAS, Manrope 700 (handoff §4.5)
 	return l
 
 ## Panel contenedor de sección (agrupa visualmente en lugar de flotar todo).
 func _panel_section(parent: VBoxContainer) -> VBoxContainer:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.BORDER, 14, 1, 10))
+	p.add_theme_stylebox_override("panel", UITheme.group_panel(18, 13))
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(p)
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 8)
+	vb.add_theme_constant_override("separation", 9)
 	p.add_child(vb)
 	return vb
+
+## Estiliza un botón como CHIP conmutable (handoff §3): mapa/dificultad azul,
+## modificadores naranja. Aplica normal/hover/pressed + fuente.
+func _style_chip(b: Button, selected: bool, accent := UITheme.PRIMARY) -> void:
+	var col: Color = Color(0.14, 0.12, 0.02) if (selected and accent == UITheme.ORANGE) else UITheme.TEXT
+	UITheme.button_font(b, 14, col, true, 700)
+	b.add_theme_stylebox_override("normal", UITheme.chip(selected, accent))
+	b.add_theme_stylebox_override("hover", UITheme.chip(selected, accent.lightened(0.08) if selected else accent))
+	b.add_theme_stylebox_override("pressed", UITheme.chip(selected, accent))
+	b.add_theme_stylebox_override("disabled", UITheme.chip(false, UITheme.BORDER))
+
+## Barra de scroll visible y tematizada (grabber azulado, riel oscuro, 7px).
+func _theme_scrollbar(sb: ScrollBar) -> void:
+	if sb == null:
+		return
+	sb.custom_minimum_size = Vector2(7, 7)
+	var grab := StyleBoxFlat.new()
+	grab.bg_color = Color(0.2, 0.251, 0.42)   # #33406B
+	grab.set_corner_radius_all(99)
+	var rail := StyleBoxFlat.new()
+	rail.bg_color = Color(0.043, 0.063, 0.141)   # #0B1024
+	rail.set_corner_radius_all(99)
+	sb.add_theme_stylebox_override("grabber", grab)
+	sb.add_theme_stylebox_override("grabber_highlight", grab)
+	sb.add_theme_stylebox_override("grabber_pressed", grab)
+	sb.add_theme_stylebox_override("scroll", rail)
 
 func _build_maps() -> void:
 	for c in _map_box.get_children():
@@ -255,12 +291,8 @@ func _build_maps() -> void:
 		b.text = MapData.display_name(i)
 		b.toggle_mode = true
 		b.button_pressed = (i == _map_index)
-		b.custom_minimum_size = Vector2(0, 46)
-		UITheme.button_font(b, 16, UITheme.TEXT, true, 700)
-		if i == _map_index:
-			UITheme.style_primary(b, UITheme.PRIMARY, 12)
-		else:
-			UITheme.style_surface(b, UITheme.SURFACE, UITheme.BORDER, 12)
+		b.custom_minimum_size = Vector2(0, 44)
+		_style_chip(b, i == _map_index, UITheme.PRIMARY)
 		b.pressed.connect(_select_map.bind(i))
 		_map_box.add_child(b)
 
@@ -289,11 +321,7 @@ func _build_modsel() -> void:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size = Vector2(0, 46)
 		b.clip_text = true
-		UITheme.button_font(b, 15, UITheme.TEXT, true, 700)
-		if mid in _mods:
-			UITheme.style_primary(b, UITheme.ORANGE, 12)
-		else:
-			UITheme.style_surface(b, UITheme.SURFACE, UITheme.BORDER, 12)
+		_style_chip(b, mid in _mods, UITheme.ORANGE)   # seleccionado naranja (§4)
 		b.pressed.connect(_toggle_mod.bind(mid))
 		_modsel_box.add_child(b)
 
