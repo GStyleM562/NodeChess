@@ -62,7 +62,19 @@ func _ready() -> void:
 	deck_scroll.add_child(_deck_row)
 	_build_deck_tabs()
 
-	var sec_top := _panel_section(root)
+	# CUERPO scrolleable: todo (mapa/mods/dificultad + equipo + disponibles) se
+	# desliza; el header (título/pestañas) y la barra Menú/Jugar quedan fijos.
+	var body := ScrollContainer.new()
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
+	root.add_child(body)
+	var body_vb := VBoxContainer.new()
+	body_vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body_vb.add_theme_constant_override("separation", 10)
+	body.add_child(body_vb)
+
+	var sec_top := _panel_section(body_vb)
 	sec_top.add_child(_hdr("MAPA"))
 	var map_scroll := ScrollContainer.new()
 	map_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -100,7 +112,7 @@ func _ready() -> void:
 			_style_chip(cb, true, UITheme.PRIMARY))
 		cpu_row.add_child(cb)
 
-	var sec_team := _panel_section(root)
+	var sec_team := _panel_section(body_vb)
 	sec_team.add_child(_hdr("TU EQUIPO  ·  toca una carta para quitarla"))
 	# Scroll HORIZONTAL con barra visible: 6 cartas no caben de golpe (§9.1).
 	var team_scroll := ScrollContainer.new()
@@ -114,18 +126,15 @@ func _ready() -> void:
 	team_scroll.add_child(_team_box)
 	_theme_scrollbar(team_scroll.get_h_scroll_bar())
 
-	root.add_child(_hdr("DISPONIBLES  ·  toca para añadir"))
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
-	root.add_child(scroll)
+	# DISPONIBLES va DENTRO del cuerpo scrolleable (sin scroll anidado propio),
+	# así el deslizamiento vertical llega hasta la última figura y el botón Jugar.
+	body_vb.add_child(_hdr("DISPONIBLES  ·  toca para añadir"))
 	_avail_box = VBoxContainer.new()
 	_avail_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_avail_box.add_theme_constant_override("separation", 7)
-	scroll.add_child(_avail_box)
+	body_vb.add_child(_avail_box)
 	_build_available()
-	_theme_scrollbar(scroll.get_v_scroll_bar())
+	_theme_scrollbar(body.get_v_scroll_bar())
 
 	var nav := HBoxContainer.new()
 	nav.alignment = BoxContainer.ALIGNMENT_CENTER

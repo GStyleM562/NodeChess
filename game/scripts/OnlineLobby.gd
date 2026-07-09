@@ -58,7 +58,12 @@ func _ready() -> void:
 	_panel_connect.add_theme_constant_override("separation", 8)
 	root.add_child(_panel_connect)
 	_name = _field(_panel_connect, "Tu nombre", "Jugador")
-	_url = _field(_panel_connect, "Servidor", _load_url())
+	# Servidor: campo OCULTO (el usuario no debe verlo/tocarlo). Sigue funcional
+	# con la URL guardada o la del relay por defecto.
+	_url = LineEdit.new()
+	_url.text = _load_url()
+	_url.visible = false
+	_panel_connect.add_child(_url)
 	var create := _button("CREAR SALA", UITheme.SUCCESS)
 	create.pressed.connect(_on_create)
 	_panel_connect.add_child(create)

@@ -332,6 +332,7 @@ func _build_passives(form: VBoxContainer) -> void:
 	s.add_child(hint)
 	var grid := GridContainer.new()
 	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_theme_constant_override("h_separation", 6)
 	grid.add_theme_constant_override("v_separation", 6)
 	s.add_child(grid)
@@ -341,6 +342,7 @@ func _build_passives(form: VBoxContainer) -> void:
 		var pname := String(Roster.PASSIVES[pid].get("name", pid))
 		var pdesc := String(Roster.PASSIVES[pid].get("desc", ""))
 		var item := HBoxContainer.new()
+		item.size_flags_horizontal = Control.SIZE_EXPAND_FILL   # la celda llena su columna
 		item.add_theme_constant_override("separation", 4)
 		# A toggle button reads clearly as "selectable" (fills with accent when ON).
 		var tg := Button.new()
@@ -349,7 +351,7 @@ func _build_passives(form: VBoxContainer) -> void:
 		tg.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		tg.clip_text = true
 		tg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		tg.custom_minimum_size = Vector2(0, 38)
+		tg.custom_minimum_size = Vector2(96, 38)   # ancho mínimo para que se lea el nombre
 		tg.tooltip_text = pdesc
 		_style_toggle(tg)
 		tg.toggled.connect(func(_p): _revalidate())
@@ -370,6 +372,7 @@ func _build_resists(form: VBoxContainer) -> void:
 	s.add_child(hint)
 	var grid := GridContainer.new()
 	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_theme_constant_override("h_separation", 6)
 	grid.add_theme_constant_override("v_separation", 6)
 	s.add_child(grid)
@@ -378,6 +381,7 @@ func _build_resists(form: VBoxContainer) -> void:
 		var lbl_txt := String(label)
 		var desc := _fx_desc(lbl_txt)   # descripción REAL del estado (§9.2)
 		var item := HBoxContainer.new()
+		item.size_flags_horizontal = Control.SIZE_EXPAND_FILL   # la celda llena su columna
 		item.add_theme_constant_override("separation", 4)
 		var tg := Button.new()
 		tg.toggle_mode = true
@@ -385,7 +389,7 @@ func _build_resists(form: VBoxContainer) -> void:
 		tg.clip_text = true
 		tg.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		tg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		tg.custom_minimum_size = Vector2(0, 36)
+		tg.custom_minimum_size = Vector2(88, 36)   # ancho mínimo para que se lea el estado
 		tg.tooltip_text = desc
 		_style_toggle(tg)
 		tg.toggled.connect(func(_p): _revalidate())
