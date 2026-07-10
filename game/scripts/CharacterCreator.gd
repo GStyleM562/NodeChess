@@ -171,6 +171,16 @@ func _build_topbar() -> void:
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	UITheme.label(title, 22, UITheme.GOLD, true, 800)
 	hb.add_child(title)
+	# TU inventario de piezas completas (×N) sin salir del Creador: qué puedes
+	# usar ahora mismo y cuánto tienes (crear CONSUME 1 de cada pieza usada).
+	var inv_btn := Button.new()
+	inv_btn.text = "📦"
+	UITheme.button_font(inv_btn, 16, UITheme.GOLD, false, 700)
+	UITheme.style_surface(inv_btn)
+	inv_btn.custom_minimum_size = Vector2(48, 40)
+	inv_btn.tooltip_text = "Tus piezas completas (se consumen al crear)"
+	inv_btn.pressed.connect(_show_my_pieces)
+	hb.add_child(inv_btn)
 	# Import/backup: paste a share code (from "Copiar código" in the Dex) to restore
 	# figures after a reinstall, or copy ONE code that backs up every saved figure.
 	var imp := Button.new()
@@ -1028,6 +1038,113 @@ func _show_import() -> void:
 	close.text = "Cerrar"
 	UITheme.button_font(close, 14, UITheme.TEXT, false, 700)
 	UITheme.style_surface(close)
+	close.pressed.connect(func(): modal.queue_free())
+	row2.add_child(close)
+
+## TU INVENTARIO dentro del Creador: piezas completas que posees (×N), agrupadas.
+## Solo lectura — para convertir fragmentos ve a la pantalla Inventario.
+func _show_my_pieces() -> void:
+	var old := get_node_or_null("MyPiecesModal")
+	if old:
+		old.queue_free()
+	var modal := Control.new()
+	modal.name = "MyPiecesModal"
+	modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(modal)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.66)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed:
+			modal.queue_free())
+	modal.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.add_child(cc)
+	var panel := PanelContainer.new()
+	var pw: float = minf(470.0, get_viewport().get_visible_rect().size.x - 24.0)
+	panel.custom_minimum_size = Vector2(pw, 0)
+	panel.add_theme_stylebox_override("panel", UITheme.info_popup_box())
+	cc.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	panel.add_child(vb)
+	var t := Label.new()
+	t.text = "📦 Tus piezas completas"
+	UITheme.label(t, 18, UITheme.GOLD, true, 800)
+	vb.add_child(t)
+	var hint := Label.new()
+	hint.text = ("Modo ADMIN: todo ilimitado." if _inv().is_admin() else
+		"Crear un personaje CONSUME 1 de cada pieza usada. Editar cobra solo lo nuevo y devuelve lo retirado.")
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(pw - 40.0, 0)
+	UITheme.label(hint, 12, UITheme.TEXT2, false, 600)
+	vb.add_child(hint)
+	# lista scrolleable de piezas POSEÍDAS con su conteo
+	var scr := ScrollContainer.new()
+	scr.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scr.custom_minimum_size = Vector2(pw - 40.0, minf(get_viewport().get_visible_rect().size.y * 0.5, 460.0))
+	vb.add_child(scr)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 4)
+	scr.add_child(list)
+	var groups := [["model:", "FIGURAS"], ["rarity:", "RAREZAS"], ["atype:", "TIPOS DE ATAQUE"],
+		["color:", "ATAQUES (COLORES)"], ["fx:", "ESTADOS"], ["passive:", "PASIVAS"],
+		["stamina:", "ESTAMINA"], ["resist:", "RESISTENCIAS"]]
+	var any := false
+	for g in groups:
+		var rows: Array = []
+		for key in _inv().catalog():
+			if not String(key).begins_with(String(g[0])):
+				continue
+			var n: int = int(_inv().pieces.get(String(key), 0))
+			if _inv().is_admin() or n > 0:
+				rows.append([String(key), n])
+		if rows.is_empty():
+			continue
+		any = true
+		var gh := Label.new()
+		UITheme.section(gh, String(g[1]))
+		list.add_child(gh)
+		for r in rows:
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 8)
+			var nm := Label.new()
+			nm.text = String(_inv().piece_name(String(r[0])))
+			nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			UITheme.label(nm, 13, UITheme.TEXT, false, 600)
+			row.add_child(nm)
+			var ct := Label.new()
+			ct.text = "∞" if _inv().is_admin() else "×%d" % int(r[1])
+			UITheme.label(ct, 13, UITheme.SUCCESS, true, 700)
+			row.add_child(ct)
+			list.add_child(row)
+	if not any:
+		var empty := Label.new()
+		empty.text = "Aún no tienes piezas completas.\nConvierte fragmentos (10 = 1 pieza) en el Inventario, o abre cofres en el menú."
+		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		empty.custom_minimum_size = Vector2(pw - 40.0, 0)
+		UITheme.label(empty, 13, UITheme.MUTED, false, 600)
+		list.add_child(empty)
+	var row2 := HBoxContainer.new()
+	row2.add_theme_constant_override("separation", 8)
+	vb.add_child(row2)
+	var goinv := Button.new()
+	goinv.text = "📦 Ir al Inventario"
+	goinv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	goinv.custom_minimum_size = Vector2(0, 44)
+	UITheme.button_font(goinv, 14, UITheme.TEXT, true, 700)
+	UITheme.style_surface(goinv)
+	goinv.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/inventory.tscn"))
+	row2.add_child(goinv)
+	var close := Button.new()
+	close.text = "Cerrar"
+	close.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	close.custom_minimum_size = Vector2(0, 44)
+	UITheme.button_font(close, 14, UITheme.TEXT, true, 700)
+	UITheme.style_primary(close, UITheme.PRIMARY)
 	close.pressed.connect(func(): modal.queue_free())
 	row2.add_child(close)
 

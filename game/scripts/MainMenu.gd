@@ -481,8 +481,8 @@ func _build_nav(layer: CanvasLayer) -> void:
 	nb.add_theme_constant_override("separation", 26)
 	nav.add_child(nb)
 	nb.add_child(_nav_btn("🏠", "Home", true, func(): pass))
-	nb.add_child(_nav_btn("🛍", "Tienda", false, _soon))
-	nb.add_child(_nav_btn("👤", "Perfil", false, _soon))
+	nb.add_child(_nav_btn("🛍", "Tienda", false, func(): get_tree().change_scene_to_file("res://scenes/shop.tscn")))
+	nb.add_child(_nav_btn("👤", "Perfil", false, func(): get_tree().change_scene_to_file("res://scenes/profile.tscn")))
 
 func _soon() -> void:
 	var box = _toast.get_meta("box") if _toast != null and _toast.has_meta("box") else null

@@ -51,8 +51,13 @@
 - Cofres en el lobby: Gratis (fragmentos) + 5/10/15 min por reloj real
   (rearman al reclamar) + COFRE DE NIVEL 🏅 (al subir de nivel: 3 piezas,
   1 premium garantizada; reclamable con la misma animación).
-- ECONOMÍA REAL: crear GASTA piezas; editar cobra el delta y reembolsa.
+- ECONOMÍA REAL: crear GASTA piezas; editar cobra el delta y reembolsa. El flujo
+  USUARIO completo: cofres → fragmentos → "Convertir" (10=1 pieza completa) →
+  botón 📦 en el CREADOR (modal con TUS piezas ×N sin salir de la creación) →
+  guardar consume 1 de cada pieza usada.
 - XP y NIVELES persistentes: +60 victoria / +25 derrota (+15 online).
+- ESTADÍSTICAS de perfil persistentes: ganadas/perdidas/racha/mejor racha
+  (se actualizan en cada fin de partida).
 - MAZOS MÚLTIPLES (hasta 20) con pestañas en el Deck Builder + código de mazo
   NCDECK1 para compartir/importar. En modo USUARIO el builder exige POSEER las
   figuras (integradas via pieza `model:`; customs propias siempre).
@@ -69,6 +74,9 @@
 - TUTORIAL jugable: primera partida guiada (o 🎓 en Configuración) — panel de
   6 pasos (despliega→mueve→ataca→saltos/candados→buff→gana) contra un muñeco
   de práctica que camina pero JAMÁS ataca; al ganar queda marcado como hecho.
+- TIENDA y PERFIL visitables desde la nav inferior (vista PREVIA, solo ver):
+  Tienda con categorías reales (Modelos/Ataques/Pasivas/Tipos/Partes) y
+  precios de muestra; Perfil con identidad, estadísticas REALES y favoritos.
 - Banca con RETRATOS 3D + ⏳ de K.O.; victoria/derrota animadas con XP real.
 - Música por estado + 11 slots SFX; volúmenes y toggles en Configuración ⚙.
 
@@ -81,7 +89,8 @@
 - Probar build nueva en dos teléfonos (online) y reportar.
 
 **Vuelta 02 (decidido posponer)**
-- Tienda + monedas/gemas reales, anuncios/monetización.
+- Tienda + monedas/gemas reales, anuncios/monetización (la Tienda ya se VE como
+  vista previa; falta activar compras). Perfil: editar nombre/avatar.
 - Misiones diarias / pity (GDD las marca "MVP disabled").
 - Guardado en la nube / cuentas (hoy: local + backup Google + códigos).
 - Cobertura de pruebas de UI táctil (drag&drop de banca es manual).
@@ -96,6 +105,11 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- Tienda y Perfil visitables (vista previa) + flujo USUARIO de crafteo visible:
+  📦 en el Creador (tus piezas ×N), stats de perfil persistentes.
+- Rediseño de menús Part 6 (handoff): helpers UITheme, Home hipnótico, chips,
+  scroll visible, banner de validación + fixes de teléfono (servidor oculto,
+  nombres visibles, Deck Builder scrolleable).
 - **Vuelta01 completa (F0–F6)**: zoom táctil, mazo de 6, resistencias,
   hover/fast-recovery, dash/retirada/teleport, buff nodes con carga,
   10 modificadores (trampas/revive/escudo…), gating de mazos por posesión,

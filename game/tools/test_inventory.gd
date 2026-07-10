@@ -99,6 +99,10 @@ func _initialize() -> void:
 	inv.xp = 0
 	inv.level = 1
 	inv.level_chests = 0
+	inv.wins = 0
+	inv.losses = 0
+	inv.streak = 0
+	inv.best_streak = 0
 	var r1: Dictionary = inv.add_match_xp(true, false)
 	ok = _expect("victoria da 60 XP", int(r1["gained"]), 60) and ok
 	ok = _expect("aún nivel 1", inv.level, 1) and ok
@@ -113,6 +117,11 @@ func _initialize() -> void:
 	ok = _expect("sin cofres no abre", inv.open_level_chest().size(), 0) and ok
 	var r3: Dictionary = inv.add_match_xp(false, false)   # derrota: +25
 	ok = _expect("derrota da 25 XP", int(r3["gained"]), 25) and ok
+	# --- estadísticas de PERFIL (2 victorias + 1 derrota arriba) ---
+	ok = _expect("perfil: 2 ganadas", inv.wins, 2) and ok
+	ok = _expect("perfil: 1 perdida", inv.losses, 1) and ok
+	ok = _expect("perfil: mejor racha 2", inv.best_streak, 2) and ok
+	ok = _expect("perfil: racha actual 0", inv.streak, 0) and ok
 
 	# --- persistencia ---
 	var f := FileAccess.open(INV_PATH, FileAccess.READ)

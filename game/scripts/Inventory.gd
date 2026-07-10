@@ -36,6 +36,10 @@ var next_chest := {}   # chest_id -> unix ts en que estará listo
 var xp := 0            # experiencia dentro del nivel actual
 var level := 1         # nivel del jugador (sube jugando; da COFRES de nivel)
 var level_chests := 0  # cofres de nivel pendientes de reclamar en el lobby
+var wins := 0          # estadísticas de PERFIL (persisten)
+var losses := 0
+var streak := 0        # racha actual de victorias
+var best_streak := 0   # mejor racha histórica
 var _loaded := false
 var _starter := false  # kit inicial ya entregado
 
@@ -145,6 +149,14 @@ func xp_needed() -> int:
 ## reclama en el lobby (con su animación). -> {gained, leveled, level, chests}
 func add_match_xp(won: bool, online: bool) -> Dictionary:
 	_ensure_loaded()
+	# estadísticas de PERFIL
+	if won:
+		wins += 1
+		streak += 1
+		best_streak = maxi(best_streak, streak)
+	else:
+		losses += 1
+		streak = 0
 	var gained := (XP_WIN if won else XP_LOSS) + (XP_ONLINE_BONUS if online else 0)
 	xp += gained
 	var leveled := 0
@@ -384,6 +396,10 @@ func _ensure_loaded() -> void:
 		xp = int(data.get("xp", 0))
 		level = maxi(1, int(data.get("level", 1)))
 		level_chests = int(data.get("lvl_chests", 0))
+		wins = int(data.get("wins", 0))
+		losses = int(data.get("losses", 0))
+		streak = int(data.get("streak", 0))
+		best_streak = int(data.get("best_streak", 0))
 		_starter = bool(data.get("starter", false))
 
 func _save() -> void:
@@ -393,5 +409,6 @@ func _save() -> void:
 			"mode": mode, "pieces": pieces, "fragments": fragments,
 			"next_chest": next_chest, "xp": xp, "level": level,
 			"lvl_chests": level_chests, "starter": _starter,
+			"wins": wins, "losses": losses, "streak": streak, "best_streak": best_streak,
 		}))
 		f.close()
