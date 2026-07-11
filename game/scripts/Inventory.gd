@@ -180,6 +180,18 @@ func open_level_chest() -> Array:
 	_save()
 	return got
 
+## BORRA piezas y fragmentos — SOLO eso (los personajes creados, XP, nivel,
+## cofres y estadísticas se conservan). Estado de cuenta nueva: en modo usuario
+## el kit inicial se vuelve a entregar para que siempre puedas jugar.
+func wipe_pieces() -> void:
+	_ensure_loaded()
+	pieces = {}
+	fragments = {}
+	_starter = false
+	if mode == "user":
+		_grant_starter()
+	_save()
+
 ## ADMIN (prueba): regala n piezas completas de CADA pieza del catálogo.
 func gift_all(n := 3) -> int:
 	_ensure_loaded()

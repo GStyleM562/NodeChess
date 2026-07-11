@@ -38,17 +38,34 @@ static func stash_active() -> void:
 		"team": _ids_of(player_team), "mods": player_modifiers.duplicate(), "map": map_index,
 	}
 
-## Activa la ranura i (cargando su equipo/mods/mapa a las vars vivas).
-static func switch_deck(i: int) -> void:
-	stash_active()
-	active_deck = clampi(i, 0, decks.size() - 1)
+## Activa la ranura i (cargando su equipo/mods/mapa a las vars vivas). El mazo
+## activo es EL MAZO EN USO: el que juega ONLINE y vs CPU. `stash=false` permite
+## activar sin volcar antes el estado actual (p. ej. tras BORRAR un mazo, para
+## no pisar la ranura destino con el contenido del mazo muerto).
+static func switch_deck(i: int, stash := true) -> void:
+	if stash:
+		stash_active()
+	active_deck = clampi(i, 0, maxi(0, decks.size() - 1))
+	if decks.is_empty():
+		save()
+		return
 	var d: Dictionary = decks[active_deck]
-	var team := _indices_of(d.get("team", []))
-	if not team.is_empty():
-		player_team = team
+	# Cargar el equipo REAL del mazo (aunque esté incompleto): lo que ves es lo
+	# que hay; jugar se bloquea en el builder y en el lobby si no está 6/6.
+	player_team = _indices_of(d.get("team", []))
 	player_modifiers = (d.get("mods", player_modifiers) as Array).duplicate()
 	map_index = clampi(int(d.get("map", 0)), 0, MapData.count() - 1)
 	save()
+
+## ¿El mazo EN USO está listo para jugar? (exactamente DECK_SIZE figuras)
+static func active_ready() -> bool:
+	return valid(player_team)
+
+## Nombre del mazo EN USO (para mostrarlo en el lobby online).
+static func active_name() -> String:
+	if not decks.is_empty() and active_deck < decks.size():
+		return String((decks[active_deck] as Dictionary).get("name", "Mazo %d" % (active_deck + 1)))
+	return "Mazo 1"
 
 ## Código NCDECK1 para compartir el mazo activo.
 static func deck_code() -> String:

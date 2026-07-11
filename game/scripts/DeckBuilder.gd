@@ -52,15 +52,34 @@ func _ready() -> void:
 	UITheme.label(hint, 11, UITheme.MUTED, false, 600)
 	root.add_child(hint)
 
-	# --- pestañas de MAZOS (hasta 20) + código NCDECK ---
+	# --- TUS MAZOS: tarjetas (el activo lleva ✓ EN USO y es el que JUEGA) ---
+	var dh := _hdr("TUS MAZOS  ·  el ✓ EN USO juega online y vs CPU")
+	root.add_child(dh)
 	var deck_scroll := ScrollContainer.new()
 	deck_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	deck_scroll.custom_minimum_size = Vector2(0, 46)
+	deck_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
+	deck_scroll.custom_minimum_size = Vector2(0, 84)
 	root.add_child(deck_scroll)
 	_deck_row = HBoxContainer.new()
-	_deck_row.add_theme_constant_override("separation", 6)
+	_deck_row.add_theme_constant_override("separation", 8)
 	deck_scroll.add_child(_deck_row)
+	_theme_scrollbar(deck_scroll.get_h_scroll_bar())
 	_build_deck_tabs()
+	# acciones sobre el mazo EN USO
+	var act_row := HBoxContainer.new()
+	act_row.add_theme_constant_override("separation", 8)
+	root.add_child(act_row)
+	act_row.add_child(_action_btn("✎ Nombre", UITheme.TEXT2, _rename_deck))
+	act_row.add_child(_action_btn("⧉ Código", UITheme.GOLD, func():
+		DisplayServer.clipboard_set(Loadout.deck_code())
+		_counter.text = "⧉ copiado"))
+	act_row.add_child(_action_btn("⇪ Importar", UITheme.PRIMARY_EDGE, func():
+		var r: Dictionary = Loadout.import_deck_code(DisplayServer.clipboard_get())
+		if bool(r["ok"]):
+			_switch_deck(Loadout.decks.size() - 1)
+		else:
+			_counter.text = "✗ código inválido"))
+	act_row.add_child(_action_btn("🗑 Borrar", UITheme.DANGER, _confirm_delete_deck))
 
 	# CUERPO scrolleable: todo (mapa/mods/dificultad + equipo + disponibles) se
 	# desliza; el header (título/pestañas) y la barra Menú/Jugar quedan fijos.
@@ -74,8 +93,32 @@ func _ready() -> void:
 	body_vb.add_theme_constant_override("separation", 10)
 	body.add_child(body_vb)
 
+	# 1) TU EQUIPO primero: armar el mazo es LO principal de esta pantalla.
+	var sec_team := _panel_section(body_vb)
+	sec_team.add_child(_hdr("TU EQUIPO  ·  toca una carta para quitarla"))
+	# Scroll HORIZONTAL con barra visible: 6 cartas no caben de golpe (§9.1).
+	var team_scroll := ScrollContainer.new()
+	team_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	team_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
+	team_scroll.custom_minimum_size = Vector2(0, 84)
+	team_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sec_team.add_child(team_scroll)
+	_team_box = HBoxContainer.new()
+	_team_box.add_theme_constant_override("separation", 8)
+	team_scroll.add_child(_team_box)
+	_theme_scrollbar(team_scroll.get_h_scroll_bar())
+
+	# 2) DISPONIBLES enseguida (sin scroll anidado: se desliza con el cuerpo).
+	body_vb.add_child(_hdr("DISPONIBLES  ·  toca para añadir"))
+	_avail_box = VBoxContainer.new()
+	_avail_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_avail_box.add_theme_constant_override("separation", 7)
+	body_vb.add_child(_avail_box)
+	_build_available()
+
+	# 3) AJUSTES DE PARTIDA al final (mapa, modificadores, dificultad CPU).
 	var sec_top := _panel_section(body_vb)
-	sec_top.add_child(_hdr("MAPA"))
+	sec_top.add_child(_hdr("AJUSTES DE PARTIDA  ·  MAPA"))
 	var map_scroll := ScrollContainer.new()
 	map_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	map_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
@@ -111,29 +154,6 @@ func _ready() -> void:
 				_style_chip(c, false, UITheme.PRIMARY)
 			_style_chip(cb, true, UITheme.PRIMARY))
 		cpu_row.add_child(cb)
-
-	var sec_team := _panel_section(body_vb)
-	sec_team.add_child(_hdr("TU EQUIPO  ·  toca una carta para quitarla"))
-	# Scroll HORIZONTAL con barra visible: 6 cartas no caben de golpe (§9.1).
-	var team_scroll := ScrollContainer.new()
-	team_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	team_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
-	team_scroll.custom_minimum_size = Vector2(0, 84)
-	team_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sec_team.add_child(team_scroll)
-	_team_box = HBoxContainer.new()
-	_team_box.add_theme_constant_override("separation", 8)
-	team_scroll.add_child(_team_box)
-	_theme_scrollbar(team_scroll.get_h_scroll_bar())
-
-	# DISPONIBLES va DENTRO del cuerpo scrolleable (sin scroll anidado propio),
-	# así el deslizamiento vertical llega hasta la última figura y el botón Jugar.
-	body_vb.add_child(_hdr("DISPONIBLES  ·  toca para añadir"))
-	_avail_box = VBoxContainer.new()
-	_avail_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_avail_box.add_theme_constant_override("separation", 7)
-	body_vb.add_child(_avail_box)
-	_build_available()
 	_theme_scrollbar(body.get_v_scroll_bar())
 
 	var nav := HBoxContainer.new()
@@ -157,32 +177,37 @@ func _ready() -> void:
 
 	_refresh()
 
-# ---------------------------------------------------------------- mazos (tabs)
+# ---------------------------------------------------------------- mazos (tarjetas)
+## Tira de TARJETAS de mazo: nombre + conteo N/6; la activa lleva ✓ EN USO
+## (es el mazo que juega ONLINE y vs CPU). Tocar otra tarjeta la pone EN USO.
 func _build_deck_tabs() -> void:
 	for c in _deck_row.get_children():
 		c.queue_free()
 	Loadout.stash_active()
 	for i in maxi(1, Loadout.decks.size()):
 		var d: Dictionary = Loadout.decks[i] if i < Loadout.decks.size() else {}
-		var b := Button.new()
-		b.text = String(d.get("name", "Mazo %d" % (i + 1)))
-		b.custom_minimum_size = Vector2(0, 40)
-		b.toggle_mode = true
-		b.button_pressed = i == Loadout.active_deck
-		UITheme.button_font(b, 13, UITheme.TEXT, true, 700)
-		if i == Loadout.active_deck:
-			UITheme.style_primary(b, UITheme.PRIMARY, 10)
-		else:
-			UITheme.style_surface(b, UITheme.SURFACE2, UITheme.BORDER, 10)
-		b.pressed.connect(_switch_deck.bind(i))
-		_deck_row.add_child(b)
+		_deck_row.add_child(_deck_card(i, d))
 	if Loadout.decks.size() < Loadout.MAX_DECKS:
 		var add := Button.new()
-		add.text = "＋"
-		add.custom_minimum_size = Vector2(44, 40)
-		UITheme.button_font(add, 16, UITheme.SUCCESS, true, 800)
-		UITheme.style_surface(add, UITheme.SURFACE2, UITheme.BORDER, 10)
-		add.tooltip_text = "Duplicar el mazo actual"
+		add.custom_minimum_size = Vector2(72, 64)
+		UITheme.style_surface(add, Color(0.06, 0.08, 0.15), UITheme.SUCCESS.darkened(0.35), 14)
+		var av := VBoxContainer.new()
+		av.alignment = BoxContainer.ALIGNMENT_CENTER
+		av.set_anchors_preset(Control.PRESET_FULL_RECT)
+		av.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		av.add_theme_constant_override("separation", 0)
+		add.add_child(av)
+		var ap := Label.new()
+		ap.text = "＋"
+		ap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		UITheme.label(ap, 20, UITheme.SUCCESS, true, 800)
+		av.add_child(ap)
+		var al := Label.new()
+		al.text = "Nuevo"
+		al.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		UITheme.label(al, 10, UITheme.SUCCESS, true, 700)
+		av.add_child(al)
+		add.tooltip_text = "Nuevo mazo (copia del actual)"
 		add.pressed.connect(func():
 			Loadout.stash_active()
 			Loadout.decks.append({"name": "Mazo %d" % (Loadout.decks.size() + 1),
@@ -190,44 +215,159 @@ func _build_deck_tabs() -> void:
 				"mods": Loadout.player_modifiers.duplicate(), "map": Loadout.map_index})
 			_switch_deck(Loadout.decks.size() - 1))
 		_deck_row.add_child(add)
-	if Loadout.decks.size() > 1:
-		var del := Button.new()
-		del.text = "🗑"
-		del.custom_minimum_size = Vector2(44, 40)
-		UITheme.button_font(del, 14, UITheme.DANGER, true, 700)
-		UITheme.style_surface(del, UITheme.SURFACE2, UITheme.BORDER, 10)
-		del.tooltip_text = "Borrar este mazo"
-		del.pressed.connect(func():
-			Loadout.decks.remove_at(Loadout.active_deck)
-			Loadout.active_deck = 0
-			_switch_deck(0))
-		_deck_row.add_child(del)
-	var share := Button.new()
-	share.text = "⧉"
-	share.custom_minimum_size = Vector2(44, 40)
-	UITheme.button_font(share, 14, UITheme.GOLD, true, 700)
-	UITheme.style_surface(share, UITheme.SURFACE2, UITheme.BORDER, 10)
-	share.tooltip_text = "Copiar código del mazo"
-	share.pressed.connect(func():
-		DisplayServer.clipboard_set(Loadout.deck_code())
-		_counter.text = "⧉ código copiado")
-	_deck_row.add_child(share)
-	var imp := Button.new()
-	imp.text = "⇪"
-	imp.custom_minimum_size = Vector2(44, 40)
-	UITheme.button_font(imp, 14, UITheme.PRIMARY_EDGE, true, 700)
-	UITheme.style_surface(imp, UITheme.SURFACE2, UITheme.BORDER, 10)
-	imp.tooltip_text = "Importar mazo desde el portapapeles (código NCDECK1)"
-	imp.pressed.connect(func():
-		var r: Dictionary = Loadout.import_deck_code(DisplayServer.clipboard_get())
-		if bool(r["ok"]):
-			_switch_deck(Loadout.decks.size() - 1)
-		else:
-			_counter.text = "✗ código inválido")
-	_deck_row.add_child(imp)
+
+## Tarjeta de un mazo: nombre + N/6 + chip "✓ EN USO" si es el activo.
+func _deck_card(i: int, d: Dictionary) -> Button:
+	var active := i == Loadout.active_deck
+	var n: int = (d.get("team", []) as Array).size() if not d.is_empty() else _team.size()
+	var full := n >= Loadout.DECK_SIZE
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(118, 64)
+	if active:
+		UITheme.style_primary(b, UITheme.PRIMARY, 14)
+	else:
+		UITheme.style_surface(b, UITheme.SURFACE2, UITheme.BORDER, 14)
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_theme_constant_override("separation", 0)
+	b.add_child(v)
+	var nm := Label.new()
+	nm.text = String(d.get("name", "Mazo %d" % (i + 1)))
+	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nm.clip_text = true
+	UITheme.label(nm, 13, UITheme.TEXT, true, 700)
+	v.add_child(nm)
+	var st := Label.new()
+	st.text = ("✓ EN USO · %d/%d" % [n, Loadout.DECK_SIZE]) if active else ("%d/%d" % [n, Loadout.DECK_SIZE])
+	st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(st, 10, (Color(1, 1, 1, 0.9) if active else (UITheme.SUCCESS if full else UITheme.GOLD)), true, 700)
+	v.add_child(st)
+	b.pressed.connect(_switch_deck.bind(i))
+	return b
+
+## Botón de la fila de acciones del mazo EN USO.
+func _action_btn(text: String, col: Color, cb: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.custom_minimum_size = Vector2(0, 40)
+	UITheme.button_font(b, 12, col, true, 700)
+	UITheme.style_surface(b, UITheme.SURFACE2, UITheme.BORDER, 10)
+	b.pressed.connect(cb)
+	return b
+
+## Renombrar el mazo EN USO (modal con campo de texto).
+func _rename_deck() -> void:
+	var modal := Control.new()
+	modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(modal)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.62)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed:
+			modal.queue_free())
+	modal.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.add_child(cc)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(minf(380.0, get_viewport().get_visible_rect().size.x - 32.0), 0)
+	panel.add_theme_stylebox_override("panel", UITheme.info_popup_box())
+	cc.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	panel.add_child(vb)
+	var t := Label.new()
+	t.text = "✎ Nombre del mazo"
+	UITheme.label(t, 16, UITheme.GOLD, true, 800)
+	vb.add_child(t)
+	var le := LineEdit.new()
+	le.text = Loadout.active_name()
+	le.max_length = 14
+	le.custom_minimum_size = Vector2(0, 44)
+	le.add_theme_stylebox_override("normal", UITheme.input())
+	le.add_theme_stylebox_override("focus", UITheme.input(UITheme.INPUT_BG, UITheme.PRIMARY))
+	le.add_theme_color_override("font_color", UITheme.TEXT)
+	vb.add_child(le)
+	var okb := Button.new()
+	okb.text = "Guardar"
+	okb.custom_minimum_size = Vector2(0, 44)
+	UITheme.button_font(okb, 14, Color.WHITE, true, 800)
+	UITheme.style_primary(okb, UITheme.PRIMARY, 12)
+	okb.pressed.connect(func():
+		var nm := le.text.strip_edges()
+		if nm != "" and not Loadout.decks.is_empty():
+			(Loadout.decks[Loadout.active_deck] as Dictionary)["name"] = nm
+			Loadout.save()
+			_build_deck_tabs()
+		modal.queue_free())
+	vb.add_child(okb)
+
+## Borrar el mazo EN USO — con confirmación (y SIN pisar el mazo destino: el
+## cambio de ranura tras borrar no vuelca el estado del mazo muerto).
+func _confirm_delete_deck() -> void:
+	if Loadout.decks.size() <= 1:
+		_counter.text = "es tu único mazo"
+		return
+	var modal := Control.new()
+	modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(modal)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.62)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed:
+			modal.queue_free())
+	modal.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.add_child(cc)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(minf(380.0, get_viewport().get_visible_rect().size.x - 32.0), 0)
+	panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.DANGER.darkened(0.2), 18, 2, 16))
+	cc.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	panel.add_child(vb)
+	var t := Label.new()
+	t.text = "🗑 ¿Borrar «%s»?" % Loadout.active_name()
+	UITheme.label(t, 16, UITheme.DANGER, true, 800)
+	vb.add_child(t)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 8)
+	vb.add_child(hb)
+	var no := Button.new()
+	no.text = "Cancelar"
+	no.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	no.custom_minimum_size = Vector2(0, 44)
+	UITheme.button_font(no, 14, UITheme.TEXT, true, 700)
+	UITheme.style_surface(no)
+	no.pressed.connect(func(): modal.queue_free())
+	hb.add_child(no)
+	var yes := Button.new()
+	yes.text = "Borrar"
+	yes.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	yes.custom_minimum_size = Vector2(0, 44)
+	UITheme.button_font(yes, 14, Color.WHITE, true, 800)
+	UITheme.style_primary(yes, UITheme.DANGER, 12)
+	yes.pressed.connect(func():
+		Loadout.decks.remove_at(Loadout.active_deck)
+		Loadout.switch_deck(0, false)   # sin stash: no revivir el mazo borrado
+		_after_switch()
+		modal.queue_free())
+	hb.add_child(yes)
 
 func _switch_deck(i: int) -> void:
 	Loadout.switch_deck(i)
+	_after_switch()
+
+## Refresca todo el builder tras cambiar/borrar/importar un mazo.
+func _after_switch() -> void:
 	_team = Loadout.player_team.duplicate()
 	_map_index = Loadout.map_index
 	_mods = Loadout.player_modifiers.duplicate()
@@ -396,6 +536,7 @@ func _refresh() -> void:
 		_team_box.add_child(b)
 	_play_btn.disabled = not (Loadout.valid(_team) and _team_owned())
 	_commit()
+	_build_deck_tabs()   # el conteo N/6 de la tarjeta EN USO cambia en vivo
 
 func _on_play() -> void:
 	if not (Loadout.valid(_team) and _team_owned()):

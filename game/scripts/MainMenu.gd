@@ -719,6 +719,21 @@ func _show_settings() -> void:
 	UITheme.label(mhint, 11, UITheme.TEXT2, false, 600)
 	vb.add_child(mhint)
 
+	# --- reiniciar inventario (piezas + fragmentos; NADA más) ---
+	var wipe := Button.new()
+	wipe.text = "🗑 Borrar inventario (piezas y fragmentos)"
+	wipe.custom_minimum_size = Vector2(0, 42)
+	UITheme.button_font(wipe, 13, UITheme.DANGER, true, 700)
+	UITheme.style_surface(wipe, UITheme.SURFACE2, UITheme.DANGER.darkened(0.35), 10)
+	wipe.pressed.connect(func(): _confirm_wipe(modal))
+	vb.add_child(wipe)
+	var whint := Label.new()
+	whint.text = "Borra TODAS tus piezas y fragmentos. Tus personajes creados, nivel, XP y cofres NO se tocan. En modo usuario recibes de nuevo el kit inicial."
+	whint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	whint.custom_minimum_size = Vector2(430, 0)
+	UITheme.label(whint, 11, UITheme.MUTED, false, 600)
+	vb.add_child(whint)
+
 	# Dónde van los archivos de audio (chuleta para no buscar en el README).
 	var hdr := Label.new()
 	UITheme.section(hdr, "¿Dónde pongo la música? (.mp3/.ogg/.wav, 1 por carpeta)")
@@ -745,6 +760,65 @@ func _show_settings() -> void:
 	UITheme.style_primary(close, UITheme.PRIMARY)
 	close.pressed.connect(func(): modal.queue_free())
 	vb.add_child(close)
+
+## Confirmación del borrado de inventario (piezas + fragmentos, nada más).
+func _confirm_wipe(settings_modal: Control) -> void:
+	var modal := Control.new()
+	modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	var layer := CanvasLayer.new()
+	layer.layer = 35
+	modal.add_child(layer)
+	add_child(modal)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.66)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed:
+			modal.queue_free())
+	layer.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(cc)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(minf(400.0, get_viewport().get_visible_rect().size.x - 32.0), 0)
+	panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.DANGER.darkened(0.2), 18, 2, 16))
+	cc.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	panel.add_child(vb)
+	var t := _lbl("🗑 ¿Borrar tu inventario?", 17, UITheme.DANGER, true, 800)
+	vb.add_child(t)
+	var b := Label.new()
+	b.text = "Se borran TODAS las piezas y fragmentos. Personajes creados, nivel, XP y cofres se conservan."
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	b.custom_minimum_size = Vector2(360, 0)
+	UITheme.label(b, 13, UITheme.TEXT2, false, 600)
+	vb.add_child(b)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 8)
+	vb.add_child(hb)
+	var no := Button.new()
+	no.text = "Cancelar"
+	no.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	no.custom_minimum_size = Vector2(0, 46)
+	UITheme.button_font(no, 14, UITheme.TEXT, true, 700)
+	UITheme.style_surface(no)
+	no.pressed.connect(func(): modal.queue_free())
+	hb.add_child(no)
+	var yes := Button.new()
+	yes.text = "Borrar"
+	yes.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	yes.custom_minimum_size = Vector2(0, 46)
+	UITheme.button_font(yes, 14, Color.WHITE, true, 800)
+	UITheme.style_primary(yes, UITheme.DANGER, 12)
+	yes.pressed.connect(func():
+		Inventory.wipe_pieces()
+		modal.queue_free()
+		if is_instance_valid(settings_modal):
+			settings_modal.queue_free()
+		_toast_msg("🗑 Inventario borrado (kit inicial re-entregado en modo usuario)"))
+	hb.add_child(yes)
 
 ## Fila de volumen: etiqueta + slider 0–100 + porcentaje en vivo.
 func _volume_row(caption: String, val: float, on_change: Callable) -> Control:

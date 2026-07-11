@@ -124,10 +124,23 @@ func _ready() -> void:
 	_build_environment()
 	if NetSession.online:
 		_setup_online_state()
+		# RED DE SEGURIDAD (la PEOR regla es empezar sin banca): si algún mazo
+		# llegó vacío/roto, abortamos y regresamos al menú en vez de jugar así.
+		if (_gs.bench["player"] as Array).is_empty() or (_gs.bench["enemy"] as Array).is_empty():
+			push_warning("Online sin banca: mazo vacío — partida abortada")
+			Roster.FIGURES = _saved_roster
+			NetSession.end_online()
+			get_tree().change_scene_to_file.call_deferred("res://scenes/main_menu.tscn")
+			return
 	else:
 		_gs = GameState.new(MapData.new(0 if Loadout.tutorial else Loadout.map_index))
-		# Teams come from the Deck Builder (player) + a preset enemy deck.
-		for ri in Loadout.player_team:
+		# Teams come from the Deck Builder (player) + a preset enemy deck. Si el
+		# mazo en uso quedó vacío (a medio armar), cae al equipo por defecto:
+		# NUNCA se empieza una partida sin banca.
+		var pteam: Array = Loadout.player_team
+		if pteam.is_empty():
+			pteam = [0, 1, 2, 3, 4, 6]
+		for ri in pteam:
 			_gs.add_to_bench("player", int(ri))
 		# Tutorial: la CPU usa UNA figura pasiva (muñeco de práctica).
 		for ri in ([0] if Loadout.tutorial else Loadout.enemy_team):

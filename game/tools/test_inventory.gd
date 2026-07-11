@@ -123,6 +123,16 @@ func _initialize() -> void:
 	ok = _expect("perfil: mejor racha 2", inv.best_streak, 2) and ok
 	ok = _expect("perfil: racha actual 0", inv.streak, 0) and ok
 
+	# --- BORRAR inventario: solo piezas+fragmentos; kit inicial re-entregado ---
+	inv.add_frags("color:gold", 8)
+	var lvl_before: int = inv.level
+	inv.wipe_pieces()
+	ok = _expect("wipe: fragmentos borrados", inv.frags("color:gold"), 0) and ok
+	ok = _expect("wipe: piezas extra borradas", inv.has_piece("fx:Miedo"), false) and ok
+	ok = _expect("wipe: kit inicial de vuelta", inv.has_piece("color:white"), true) and ok
+	ok = _expect("wipe: nivel intacto", inv.level, lvl_before) and ok
+	ok = _expect("wipe: stats intactas", inv.wins, 2) and ok
+
 	# --- persistencia ---
 	var f := FileAccess.open(INV_PATH, FileAccess.READ)
 	var data = JSON.parse_string(f.get_as_text()) if f != null else null

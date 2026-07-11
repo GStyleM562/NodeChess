@@ -105,6 +105,14 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- FIX crítico online: JAMÁS empezar sin banca. El lobby muestra el MAZO EN USO
+  (nombre + 6/6) y bloquea crear/unirse si está incompleto o con figuras no
+  poseídas; Board3D aborta al menú si algún mazo llega vacío; offline cae al
+  equipo por defecto. Deck Builder: tarjetas de mazo con ✓ EN USO (el que juega
+  online y vs CPU), renombrar ✎, borrar con confirmación (y sin pisar el Mazo 1
+  — bug corregido), ＋ Nuevo; reorden: equipo → disponibles → ajustes de
+  partida. Configuración: 🗑 borrar inventario (piezas+fragmentos; personajes,
+  XP y cofres intactos; re-entrega el kit inicial en modo usuario).
 - Tienda y Perfil visitables (vista previa) + flujo USUARIO de crafteo visible:
   📦 en el Creador (tus piezas ×N), stats de perfil persistentes.
 - Rediseño de menús Part 6 (handoff): helpers UITheme, Home hipnótico, chips,

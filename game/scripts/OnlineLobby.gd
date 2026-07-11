@@ -64,6 +64,7 @@ func _ready() -> void:
 	_url.text = _load_url()
 	_url.visible = false
 	_panel_connect.add_child(_url)
+	_panel_connect.add_child(_deck_card())
 	var create := _button("CREAR SALA", UITheme.SUCCESS)
 	create.pressed.connect(_on_create)
 	_panel_connect.add_child(create)
@@ -125,8 +126,62 @@ func _wire(c) -> void:
 	c.match_start.connect(_on_match_start)
 	c.player_left.connect(func(_id): _players_lbl.text = "El rival salió…"; _start_btn.disabled = true)
 
+# ---------------------------------------------------------------- mazo en uso
+## LA regla de oro: JAMÁS ir online sin un mazo completo. Devuelve el problema
+## del mazo EN USO ("" = listo para jugar).
+func _deck_problem() -> String:
+	if not Loadout.active_ready():
+		return "Tu mazo «%s» tiene %d/%d figuras. Complétalo en 🃏 Mazos." % [
+			Loadout.active_name(), Loadout.player_team.size(), Loadout.DECK_SIZE]
+	for ri in Loadout.player_team:
+		if ri < 0 or ri >= Roster.FIGURES.size():
+			return "Tu mazo «%s» tiene figuras inválidas. Revísalo en 🃏 Mazos." % Loadout.active_name()
+		var d: Dictionary = Roster.FIGURES[ri]
+		if not (Inventory.is_admin() or bool(d.get("custom", false)) or Inventory.has_piece("model:" + String(d.get("id", "")))):
+			return "Tu mazo «%s» usa figuras que no posees. Revísalo en 🃏 Mazos." % Loadout.active_name()
+	return ""
+
+## Tarjeta "MAZO EN USO": nombre + 6/6 + estado, con acceso directo a Mazos.
+func _deck_card() -> Control:
+	var ok := _deck_problem() == ""
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.PANEL_DEEP,
+		(UITheme.SUCCESS if ok else UITheme.DANGER).darkened(0.2), 14, 1, 10))
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 10)
+	p.add_child(hb)
+	var tile := UITheme.icon_tile_node("🃏", UITheme.SUCCESS if ok else UITheme.DANGER, 38, 19)
+	hb.add_child(tile)
+	var vb := VBoxContainer.new()
+	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	vb.add_theme_constant_override("separation", 0)
+	hb.add_child(vb)
+	var nm := Label.new()
+	nm.text = "Mazo en uso: %s" % Loadout.active_name()
+	UITheme.label(nm, 14, UITheme.TEXT, true, 700)
+	vb.add_child(nm)
+	var st := Label.new()
+	st.text = ("%d/%d ✓ listo para jugar" % [Loadout.player_team.size(), Loadout.DECK_SIZE]) if ok \
+		else ("%d/%d — incompleto" % [Loadout.player_team.size(), Loadout.DECK_SIZE])
+	UITheme.label(st, 12, UITheme.SUCCESS if ok else UITheme.DANGER, false, 700)
+	vb.add_child(st)
+	var ch := Button.new()
+	ch.text = "Cambiar"
+	ch.custom_minimum_size = Vector2(96, 44)
+	ch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	UITheme.button_font(ch, 13, UITheme.TEXT, true, 700)
+	UITheme.style_surface(ch, UITheme.SURFACE2, UITheme.BORDER, 10)
+	ch.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/deck_builder.tscn"))
+	hb.add_child(ch)
+	return p
+
 # ---------------------------------------------------------------- actions
 func _on_create() -> void:
+	var prob := _deck_problem()
+	if prob != "":
+		_status.text = "⚠ " + prob
+		return
 	_pending = "create"
 	_save_url(_url.text)
 	if NetSession.client.is_open():
@@ -138,6 +193,10 @@ func _on_create() -> void:
 		NetSession.client.connect_to(_url.text.strip_edges())
 
 func _on_join() -> void:
+	var prob := _deck_problem()
+	if prob != "":
+		_status.text = "⚠ " + prob
+		return
 	if _code_in.text.strip_edges().length() < 4:
 		_status.text = "Escribe el código de 4 letras."
 		return
