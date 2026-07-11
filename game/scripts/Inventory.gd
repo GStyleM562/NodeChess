@@ -337,6 +337,17 @@ func piece_rarity(key: String) -> String:
 		return "rare"
 	if k.begins_with("rarity:"):
 		return k.trim_prefix("rarity:")
+	if k.begins_with("pow:"):
+		var d := int(k.trim_prefix("pow:"))
+		return "legend" if d >= 90 else ("epic" if d >= 65 else ("rare" if d >= 35 else "common"))
+	if k.begins_with("stars:"):
+		var s := int(k.trim_prefix("stars:"))
+		return "legend" if s >= 3 else ("epic" if s == 2 else "rare")
+	if k.begins_with("prob:"):
+		var w := int(k.trim_prefix("prob:"))
+		return "legend" if w >= 65 else ("epic" if w >= 45 else ("rare" if w >= 25 else "common"))
+	if k.begins_with("class:"):
+		return "common" if k.trim_prefix("class:") == "Balanced" else "rare"
 	return "common"
 
 const PRICE_BY_RARITY := {
@@ -528,15 +539,34 @@ func catalog() -> Array:
 		if not seen_r.has(sid):
 			seen_r[sid] = true
 			out.append("resist:" + sid)
+	# DAÑOS de 5 en 5 (solo los consumen ataques Blanco/Oro)
+	for d in range(5, 105, 5):
+		out.append("pow:%d" % d)
+	# ESTRELLAS 1–3 (solo las consumen ataques Púrpura)
+	for st in range(1, 4):
+		out.append("stars:%d" % st)
+	# PROBABILIDADES de 5 en 5 hasta 70% (cada segmento consume la suya)
+	for w in range(5, 75, 5):
+		out.append("prob:%d" % w)
+	# CLASES (de momento sin pasivas ocultas; ya inventariadas para el futuro)
+	for c in CharacterCreator.CLASSES:
+		out.append("class:" + String(c))
 	return out
 
 ## Piezas que una figura NECESITA (para bloquear el guardado en modo usuario).
+## REGLAS DE CONSUMO POR COLOR (GDD "construye tus piezas"):
+##  · DAÑO (pow:N): solo lo consumen Blanco y Oro — Púrpura/Azul/Rojo van sin daño.
+##  · ESTRELLAS (stars:N): solo las consume Púrpura — el resto va con 0 estrellas.
+##  · PROBABILIDAD (prob:N): la consume TODO segmento (su % de la ruleta),
+##    solo en pasos de 5 dentro de 5–70 (los pesos legados tipo w=1 no cobran).
 func required_pieces(fig: Dictionary) -> Array:
 	var req := {}
 	if String(fig.get("model_ref", "")) != "":
 		req["model:" + String(fig["model_ref"])] = true
 	if fig.has("rarity"):
 		req["rarity:" + String(fig["rarity"])] = true
+	if fig.has("class"):
+		req["class:" + String(fig["class"])] = true
 	req["atype:" + String(fig.get("type", "Ruleta"))] = true
 	req["stamina:%d" % int(fig.get("stamina", 2))] = true
 	for pid in fig.get("passives", []):
@@ -544,9 +574,22 @@ func required_pieces(fig: Dictionary) -> Array:
 	for sid in fig.get("resists", []):
 		req["resist:" + String(sid)] = true
 	for seg in fig.get("attack", []):
-		req["color:" + String(seg.get("col", "white"))] = true
+		var col := String(seg.get("col", "white"))
+		req["color:" + col] = true
 		if String(seg.get("fx", "")) != "":
 			req["fx:" + String(seg["fx"])] = true
+		# DAÑO: solo Blanco/Oro (y solo valores del catálogo: múltiplos de 5, 5–100)
+		if col in ["white", "gold"]:
+			var pw := int(seg.get("pow", 0))
+			if pw >= 5 and pw <= 100 and pw % 5 == 0:
+				req["pow:%d" % pw] = true
+		# ESTRELLAS: solo Púrpura (1–3)
+		if col == "purple":
+			req["stars:%d" % clampi(int(seg.get("stars", 1)), 1, 3)] = true
+		# PROBABILIDAD: todo segmento con peso del catálogo (5–70, paso 5)
+		var w := int(seg.get("w", 0))
+		if w >= 5 and w <= 70 and w % 5 == 0:
+			req["prob:%d" % w] = true
 	for st in fig.get("ranks", []):
 		var eid := String(st.get("evolves_id", ""))
 		# Solo exigir la figura destino si es INTEGRADA (las custom no salen en cajas).
@@ -588,6 +631,14 @@ func piece_icon(key: String) -> String:
 		return "✨"
 	if k.begins_with("resist:"):
 		return "🛡"
+	if k.begins_with("pow:"):
+		return "💥"
+	if k.begins_with("stars:"):
+		return "✴"
+	if k.begins_with("prob:"):
+		return "📊"
+	if k.begins_with("class:"):
+		return "🎖"
 	return "👟"   # stamina
 
 ## Nombre legible de una pieza para la UI.
@@ -620,14 +671,24 @@ func piece_name(key: String) -> String:
 				if String(GameState.FX_STATUS[label]) == p[1]:
 					return "Resistencia " + String(label)
 			return "Resistencia " + p[1]
+		"pow":
+			return "Daño " + p[1]
+		"stars":
+			return "★" + p[1] + (" Estrella" if p[1] == "1" else " Estrellas")
+		"prob":
+			return "Probabilidad " + p[1] + "%"
+		"class":
+			return "Clase " + p[1]
 	return key
 
 # ---------------------------------------------------------------- kit inicial
-## Lo mínimo para que el pool por defecto del Creador sea construible.
+## Lo mínimo para que el pool por defecto del Creador sea construible
+## (Golpe blanco 60 al 50% + Guardia azul 30% + Fallo 20%, clase Balanced).
 func _grant_starter() -> void:
 	_starter = true
 	for key in ["color:white", "color:blue", "color:red", "stamina:2",
-			"atype:Ruleta", "model:ironclad_knight", "rarity:epic"]:
+			"atype:Ruleta", "model:ironclad_knight", "rarity:epic",
+			"class:Balanced", "pow:60", "prob:50", "prob:30", "prob:20"]:
 		pieces[key] = maxi(int(pieces.get(key, 0)), 1)
 
 # ---------------------------------------------------------------- persistencia

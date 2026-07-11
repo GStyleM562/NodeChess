@@ -267,6 +267,11 @@ func _build_identity(form: VBoxContainer) -> void:
 	_style_le(_desc)
 	_field(s, "Descripción", _desc)
 	_class = _opt(CLASSES)
+	var clkeys: Array = []
+	for c in CLASSES:
+		clkeys.append("class:" + String(c))
+	_lock_items(_class, clkeys)   # las clases también son piezas del inventario
+	_class.item_selected.connect(func(_i): _revalidate())
 	_field(s, "Clase", _class)
 	_rarity = _opt(RARITY_ES)
 	_rarity.select(2)   # Épica by default
@@ -467,7 +472,9 @@ func _add_row(seg: Dictionary) -> void:
 	var line2 := HBoxContainer.new()
 	line2.add_theme_constant_override("separation", 6)
 	vb.add_child(line2)
-	var pw := _spin(0, 200, 5, int(seg.get("pow", 0)), "Daño")
+	# DAÑO 0–100 de 5 en 5 (pieza pow:N, solo la consumen Blanco/Oro) y
+	# PROBABILIDAD 5–70% de 5 en 5 (pieza prob:N, la consume todo segmento).
+	var pw := _spin(0, 100, 5, int(seg.get("pow", 0)), "Daño")
 	var st := _spin(1, 3, 1, int(seg.get("stars", 1)), "★")
 	var fx := _opt(_fx_labels())
 	fx.select(_fx_index(seg))
@@ -476,8 +483,8 @@ func _add_row(seg: Dictionary) -> void:
 	for o in FX_OPTS:
 		var f := String(o.get("fx", ""))
 		fkeys.append(("fx:" + f) if f != "" else "")   # "Ninguno" siempre permitido
+	var prob := _spin(5, 70, 5, int(seg.get("w", 10)), "%")
 	_lock_items(fx, fkeys)
-	var prob := _spin(0, 100, 5, int(seg.get("w", 10)), "%")
 	prob.get_line_edit().add_theme_color_override("font_color", UITheme.GOLD)
 	prob.value_changed.connect(func(_v): _revalidate())
 	pw.value_changed.connect(func(_v): _revalidate())
@@ -1090,8 +1097,10 @@ func _show_my_pieces() -> void:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list.add_theme_constant_override("separation", 4)
 	scr.add_child(list)
-	var groups := [["model:", "FIGURAS"], ["rarity:", "RAREZAS"], ["atype:", "TIPOS DE ATAQUE"],
-		["color:", "ATAQUES (COLORES)"], ["fx:", "ESTADOS"], ["passive:", "PASIVAS"],
+	var groups := [["model:", "FIGURAS"], ["rarity:", "RAREZAS"], ["class:", "CLASES"],
+		["atype:", "TIPOS DE ATAQUE"], ["color:", "ATAQUES (COLORES)"],
+		["pow:", "DAÑOS (blanco/oro)"], ["stars:", "ESTRELLAS (púrpura)"],
+		["prob:", "PROBABILIDADES"], ["fx:", "ESTADOS"], ["passive:", "PASIVAS"],
 		["stamina:", "ESTAMINA"], ["resist:", "RESISTENCIAS"]]
 	var any := false
 	for g in groups:

@@ -117,6 +117,12 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- STATS INVENTARIADAS: daños (5–100 de 5 en 5), estrellas (1–3), probabilidades
+  (5–70%) y clases ahora son PIEZAS coleccionables con reglas de consumo por
+  color (blanco/oro consumen daño; púrpura consume estrellas; azul/rojo ni uno
+  ni otro; todo segmento consume su %). Tienda con categoría 💥 Potencia; kit
+  inicial ampliado; doc de diseño `docs/Balance_PiecePoints.md` (fórmulas y
+  roadmap del sistema Piece Points).
 - CONSUMIBLES BLINDADOS: precio CANÓNICO en el motor (la UI jamás lo decide —
   anti-trampa), compra/crafteo/cofres atómicos y validados con RECIBO,
   🧾 log persistente de movimientos (evidencia para soporte) con visor en el

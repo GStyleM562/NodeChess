@@ -3,8 +3,8 @@ extends Control
 ## Pasivas/Tipos de ataque/Partes). Comprar descuenta 🪙/💎 de tu cuenta y
 ## añade la pieza a tu inventario (Inventory.buy). Saldos reales en el header.
 
-const CATS := ["Modelos", "Ataques", "Pasivas", "Tipos de ataque", "Partes"]
-const CAT_ICON := {"Modelos": "🧍", "Ataques": "🎯", "Pasivas": "✨", "Tipos de ataque": "🎲", "Partes": "🧩"}
+const CATS := ["Modelos", "Ataques", "Potencia", "Pasivas", "Tipos de ataque", "Partes"]
+const CAT_ICON := {"Modelos": "🧍", "Ataques": "🎯", "Potencia": "💥", "Pasivas": "✨", "Tipos de ataque": "🎲", "Partes": "🧩"}
 
 var _cat := 0
 var _grid: GridContainer
@@ -140,6 +140,14 @@ func _items_for(cat: String) -> Array:
 					var hard := fxn in ["Miedo", "Paralizado", "Congelado", "Sueño"]
 					out.append({"key": ks, "name": String(inv.piece_name(ks)),
 						"rarity": "epic" if hard else "rare", "icon": "🌀"})
+		"Potencia":
+			# daños (blanco/oro), estrellas (púrpura) y probabilidades por segmento
+			for key in inv.catalog():
+				var ks := String(key)
+				if ks.begins_with("pow:") or ks.begins_with("stars:") or ks.begins_with("prob:"):
+					var ic := "💥" if ks.begins_with("pow:") else ("✴" if ks.begins_with("stars:") else "📊")
+					out.append({"key": ks, "name": String(inv.piece_name(ks)),
+						"rarity": inv.piece_rarity(ks), "icon": ic})
 		"Pasivas":
 			for key in inv.catalog():
 				var ks := String(key)
@@ -162,16 +170,10 @@ func _items_for(cat: String) -> Array:
 		"Partes":
 			for key in inv.catalog():
 				var ks := String(key)
-				var r := ""
-				if ks.begins_with("stamina:"):
-					var n := int(ks.trim_prefix("stamina:"))
-					r = "legend" if n >= 5 else ("epic" if n == 4 else ("rare" if n == 3 else "common"))
-				elif ks.begins_with("resist:"):
-					r = "rare"
-				elif ks.begins_with("rarity:"):
-					r = ks.trim_prefix("rarity:")
-				if r != "":
-					out.append({"key": ks, "name": String(inv.piece_name(ks)), "rarity": r, "icon": "🧩"})
+				if ks.begins_with("stamina:") or ks.begins_with("resist:") or ks.begins_with("rarity:") or ks.begins_with("class:"):
+					var ic2 := "🎖" if ks.begins_with("class:") else "🧩"
+					out.append({"key": ks, "name": String(inv.piece_name(ks)),
+						"rarity": inv.piece_rarity(ks), "icon": ic2})
 	return out
 
 func _rarity_col(r: String) -> Color:

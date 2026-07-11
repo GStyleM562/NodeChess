@@ -277,8 +277,10 @@ func _rebuild_inventory() -> void:
 	if not Inventory.is_admin() and _inventory_empty():
 		_inv_box.add_child(_empty_state())
 		return
-	var groups := [["model:", "FIGURAS"], ["rarity:", "RAREZAS"], ["atype:", "TIPOS DE ATAQUE"],
-		["color:", "ATAQUES (COLORES)"], ["fx:", "ESTADOS"], ["passive:", "PASIVAS"],
+	var groups := [["model:", "FIGURAS"], ["rarity:", "RAREZAS"], ["class:", "CLASES"],
+		["atype:", "TIPOS DE ATAQUE"], ["color:", "ATAQUES (COLORES)"],
+		["pow:", "DAÑOS (blanco/oro)"], ["stars:", "ESTRELLAS (púrpura)"],
+		["prob:", "PROBABILIDADES"], ["fx:", "ESTADOS"], ["passive:", "PASIVAS"],
 		["stamina:", "ESTAMINA"], ["resist:", "RESISTENCIAS"]]
 	for g in groups:
 		var hdr := Label.new()

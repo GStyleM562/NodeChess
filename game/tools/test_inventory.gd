@@ -102,6 +102,41 @@ func _initialize() -> void:
 	ok = _expect("edit: pieza invertida no falta", "color:gold" in inv.missing_pieces_for(figB, figB), false) and ok
 	ok = _expect("crear nuevo SÍ la exige", "color:gold" in inv.missing_pieces_for(figB, {}), true) and ok
 
+	# --- PIEZAS DE STATS: reglas de consumo por color (construye-tus-piezas) ---
+	var mixta := {"id": "mx", "name": "Mixta", "stamina": 2, "type": "Ruleta", "rarity": "epic",
+		"class": "Agile", "passives": [], "model_ref": "ironclad_knight",
+		"attack": [
+			{"col": "white", "pow": 60, "w": 40},
+			{"col": "purple", "stars": 2, "fx": "Miedo", "w": 30},
+			{"col": "blue", "w": 20},
+			{"col": "red", "w": 10},
+		]}
+	var reqs: Array = inv.required_pieces(mixta)
+	ok = _expect("blanco consume su DAÑO", "pow:60" in reqs, true) and ok
+	ok = _expect("púrpura consume ESTRELLAS", "stars:2" in reqs, true) and ok
+	ok = _expect("la CLASE se consume", "class:Agile" in reqs, true) and ok
+	ok = _expect("cada segmento consume su %", ("prob:40" in reqs) and ("prob:30" in reqs)
+		and ("prob:20" in reqs) and ("prob:10" in reqs), true) and ok
+	var pow_n := 0
+	var star_n := 0
+	for kx in reqs:
+		if String(kx).begins_with("pow:"):
+			pow_n += 1
+		if String(kx).begins_with("stars:"):
+			star_n += 1
+	ok = _expect("púrpura/azul/rojo NO consumen daño", pow_n, 1) and ok
+	ok = _expect("blanco/azul/rojo NO consumen estrellas", star_n, 1) and ok
+	# catálogo: rangos exactos pedidos (daños 5–100, prob 5–70, ★1–3, 8 clases)
+	var cat2: Array = inv.catalog()
+	ok = _expect("catálogo: daños 5..100 de 5 en 5", ("pow:5" in cat2) and ("pow:100" in cat2) and not ("pow:105" in cat2), true) and ok
+	ok = _expect("catálogo: prob 5..70", ("prob:5" in cat2) and ("prob:70" in cat2) and not ("prob:75" in cat2), true) and ok
+	ok = _expect("catálogo: estrellas 1..3", ("stars:1" in cat2) and ("stars:3" in cat2) and not ("stars:4" in cat2), true) and ok
+	ok = _expect("catálogo: clases", ("class:Balanced" in cat2) and ("class:Controller" in cat2), true) and ok
+	# sin la pieza de stat: BLOQUEA en modo usuario
+	inv.pieces["stars:2"] = 0
+	ok = _expect("sin ★2: bloquea la figura", "stars:2" in inv.missing_pieces(mixta), true) and ok
+	inv.pieces["stars:2"] = 3
+
 	# --- XP y NIVELES: sube jugando y otorga COFRES de nivel ---
 	inv.xp = 0
 	inv.level = 1
