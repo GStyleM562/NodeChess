@@ -189,15 +189,6 @@ func _rarity_es(r: String) -> String:
 		"rare": return "RARA"
 		_: return "COMÚN"
 
-## Precio de muestra por rareza (oro para bajas, gemas para altas).
-func _price_of(r: String) -> Array:
-	match r:
-		"mythic": return ["💎", "150"]
-		"legend": return ["💎", "80"]
-		"epic": return ["💎", "30"]
-		"rare": return ["🪙", "500"]
-		_: return ["🪙", "200"]
-
 func _build_items() -> void:
 	for c in _grid.get_children():
 		c.queue_free()
@@ -231,22 +222,31 @@ func _item_card(it: Dictionary) -> Control:
 	rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	UITheme.label(rl, 10, rar, true, 700)
 	v.add_child(rl)
-	var price := _price_of(String(it["rarity"]))
-	var cur: String = "gems" if String(price[0]) == "💎" else "coins"
-	var cost := int(String(price[1]).replace(",", ""))
+	# Precio CANÓNICO del motor (la UI jamás lo decide — anti-trampa).
+	var pd: Dictionary = inv.price_of(key)
+	var cur := String(pd.get("currency", "coins"))
+	var cost := int(pd.get("price", 0))
 	var buy := Button.new()
-	buy.text = "%s %s" % [String(price[0]), String(price[1])]
+	buy.text = "%s %d" % ["💎" if cur == "gems" else "🪙", cost]
 	buy.custom_minimum_size = Vector2(0, 38)
 	UITheme.button_font(buy, 13, UITheme.TEXT, true, 800)
 	UITheme.style_surface(buy, UITheme.SURFACE2, UITheme.BORDER, 10)
-	# COMPRA REAL: descuenta el saldo y añade la pieza al inventario.
+	# COMPRA REAL y validada: el recibo VISTOSO sale de lo que el motor
+	# realmente entregó (jamás de lo que la UI supone).
 	buy.pressed.connect(func():
-		if inv.buy(key, cost, cur):
+		var r: Dictionary = inv.buy(key)
+		if bool(r.get("ok", false)):
 			_refresh_balances()
-			_toast_msg("✓ +1 %s — ya está en tu inventario" % String(it["name"]))
 			_build_items()
+			RewardPopup.show(self, "🛍 ¡Compra realizada!", UITheme.SUCCESS,
+				[{"icon": String(it["icon"]), "text": String(r["name"]),
+					"sub": "×1 añadido a tu inventario — ahora tienes ×%d" % int(r["owned"]),
+					"col": rar}],
+				"Pagaste %s %d   ·   Saldo: 🪙 %d · 💎 %d" % [
+					"💎" if String(r["currency"]) == "gems" else "🪙",
+					int(r["price"]), int(r["coins"]), int(r["gems"])])
 		else:
-			_toast_msg("No te alcanza: faltan %s" % ("💎 diamantes" if cur == "gems" else "🪙 monedas")))
+			_toast_msg(String(r.get("error", "No se pudo comprar"))))
 	v.add_child(buy)
 	return p
 

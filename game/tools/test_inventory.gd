@@ -50,13 +50,16 @@ func _initialize() -> void:
 		"attack": [{"col": "white", "pow": 60, "w": 50}, {"col": "blue", "w": 30}, {"col": "red", "w": 20}]}
 	ok = _expect("figura básica permitida", inv.missing_pieces(basica).size(), 0) and ok
 
-	# --- fragmentos: 10 = 1 pieza ---
+	# --- CRAFTEO: 10 frag = 1 pieza, validado y con recibo ---
 	inv.add_frags("stamina:3", 9)
-	ok = _expect("9 frag: no convierte", inv.convert("stamina:3"), false) and ok
+	ok = _expect("9 frag: no convierte", bool(inv.convert("stamina:3").get("ok", false)), false) and ok
 	inv.add_frags("stamina:3", 1)
-	ok = _expect("10 frag: convierte", inv.convert("stamina:3"), true) and ok
+	var cr: Dictionary = inv.convert("stamina:3")
+	ok = _expect("10 frag: convierte", bool(cr.get("ok", false)), true) and ok
+	ok = _expect("recibo de crafteo (nombre)", String(cr.get("name", "")) != "", true) and ok
 	ok = _expect("pieza obtenida", inv.has_piece("stamina:3"), true) and ok
 	ok = _expect("frag consumidos", inv.frags("stamina:3"), 0) and ok
+	ok = _expect("craftear pieza inexistente falla", bool(inv.convert("model:hackx").get("ok", false)), false) and ok
 
 	# --- caja gratis: fragmentos (+% de 💎) ---
 	var got: Dictionary = inv.open_free()
@@ -139,36 +142,54 @@ func _initialize() -> void:
 	ok = _expect("nivel 5 da 10 diamantes", int(r5["gems"]), 10) and ok
 	ok = _expect("diamantes acreditados", inv.gems, 10) and ok
 
-	# --- COFRES GANADOS: descifrar (uno a la vez) y abrir ---
+	# --- COFRES GANADOS: descifra LOS QUE QUIERAS (libre) y abre validado ---
 	ok = _expect("3 cofres ganados", inv.chest_inv.size(), 3) and ok
 	ok = _expect("estado inicial: cerrado", String(inv.chest_info(0)["state"]), "locked") and ok
 	ok = _expect("descifrar arranca", inv.start_unlock(0), true) and ok
-	ok = _expect("solo UNO a la vez", inv.start_unlock(1), false) and ok
-	ok = _expect("aún no está listo", inv.open_won_chest(0).is_empty(), true) and ok
+	ok = _expect("descifrado LIBRE (otro a la vez)", inv.start_unlock(1), true) and ok
+	ok = _expect("no re-descifrar el mismo", inv.start_unlock(0), false) and ok
+	ok = _expect("índice inválido: falla", inv.start_unlock(99), false) and ok
+	ok = _expect("aún no está listo: NO abre", inv.open_won_chest(0).is_empty(), true) and ok
 	(inv.chest_inv[0] as Dictionary)["ready_at"] = 0   # simular tiempo cumplido
 	ok = _expect("descifrado: listo", String(inv.chest_info(0)["state"]), "ready") and ok
 	var wr: Dictionary = inv.open_won_chest(0)
 	ok = _expect("cofre ganado da piezas", (wr.get("pieces", []) as Array).size() >= 2, true) and ok
 	ok = _expect("cofre sale del inventario", inv.chest_inv.size(), 2) and ok
-	ok = _expect("tras abrir puedo descifrar otro", inv.start_unlock(0), true) and ok
+	ok = _expect("el resto sigue descifrables", inv.start_unlock(1), true) and ok
 
-	# --- TIENDA: comprar añade la pieza y descuenta; sin fondos falla ---
+	# --- RANURAS LLENAS: la victoria AVISA y no se pierde en silencio ---
+	while inv.chest_inv.size() < inv.CHEST_SLOTS:
+		inv.grant_won_chest()
+	ok = _expect("ranuras al tope (4/4)", inv.chest_inv.size(), inv.CHEST_SLOTS) and ok
+	ok = _expect("lleno: no entrega otro", inv.grant_won_chest(), "") and ok
+	var rfull: Dictionary = inv.add_match_xp(true, false)
+	ok = _expect("victoria con ranuras llenas: sin cofre", String(rfull["chest"]), "") and ok
+	ok = _expect("victoria avisa chest_full", bool(rfull["chest_full"]), true) and ok
+
+	# --- TIENDA validada: precio CANÓNICO, compra atómica con recibo ---
 	inv.coins = 700
 	inv.gems = 5
-	var g_shop: int = int(inv.pieces.get("color:gold", 0))
-	ok = _expect("compra con monedas", inv.buy("color:gold", 500, "coins"), true) and ok
-	ok = _expect("pieza añadida al inventario", int(inv.pieces.get("color:gold", 0)), g_shop + 1) and ok
-	ok = _expect("monedas descontadas", inv.coins, 200) and ok
-	ok = _expect("sin monedas: falla", inv.buy("color:gold", 500, "coins"), false) and ok
-	ok = _expect("sin diamantes: falla", inv.buy("model:nightblade", 30, "gems"), false) and ok
+	var pw: Dictionary = inv.price_of("color:white")
+	ok = _expect("precio canónico blanco 200🪙", int(pw.get("price", 0)) == 200 and String(pw.get("currency", "")) == "coins", true) and ok
+	ok = _expect("precio de pieza inexistente: {}", inv.price_of("model:hackx").is_empty(), true) and ok
+	var w_shop: int = int(inv.pieces.get("color:white", 0))
+	var br: Dictionary = inv.buy("color:white")
+	ok = _expect("compra con monedas", bool(br.get("ok", false)), true) and ok
+	ok = _expect("pieza añadida al inventario", int(inv.pieces.get("color:white", 0)), w_shop + 1) and ok
+	ok = _expect("monedas descontadas", inv.coins, 500) and ok
+	ok = _expect("recibo trae saldo real", int(br.get("coins", -1)), 500) and ok
+	var bg: Dictionary = inv.buy("passive:lunge")   # épica → 💎30, solo hay 5
+	ok = _expect("sin diamantes: falla y explica", bool(bg.get("ok", false)) == false and String(bg.get("error", "")) != "", true) and ok
+	ok = _expect("pieza inexistente: falla", bool(inv.buy("model:hackx").get("ok", false)), false) and ok
+	ok = _expect("🧾 log registra movimientos", inv.tx_log.size() > 3, true) and ok
 	# fondos ADMIN: añadir/quitar (clavado en ≥0)
-	inv.adjust_funds(300, 25)
-	ok = _expect("fondos añadidos", inv.coins == 500 and inv.gems == 30, true) and ok
-	inv.adjust_funds(-9999, -9999)
+	inv.adjust_funds(-99999, -99999)
 	ok = _expect("fondos nunca negativos", inv.coins == 0 and inv.gems == 0, true) and ok
+	inv.adjust_funds(300, 25)
+	ok = _expect("fondos añadidos", inv.coins == 300 and inv.gems == 25, true) and ok
 
-	# --- estadísticas de PERFIL (3 victorias + 1 derrota arriba) ---
-	ok = _expect("perfil: 3 ganadas", inv.wins, 3) and ok
+	# --- estadísticas de PERFIL (4 victorias + 1 derrota arriba) ---
+	ok = _expect("perfil: 4 ganadas", inv.wins, 4) and ok
 	ok = _expect("perfil: 1 perdida", inv.losses, 1) and ok
 	ok = _expect("perfil: mejor racha 2", inv.best_streak, 2) and ok
 
@@ -180,7 +201,7 @@ func _initialize() -> void:
 	ok = _expect("wipe: piezas extra borradas", inv.has_piece("fx:Miedo"), false) and ok
 	ok = _expect("wipe: kit inicial de vuelta", inv.has_piece("color:white"), true) and ok
 	ok = _expect("wipe: nivel intacto", inv.level, lvl_before) and ok
-	ok = _expect("wipe: stats intactas", inv.wins, 3) and ok
+	ok = _expect("wipe: stats intactas", inv.wins, 4) and ok
 
 	# --- persistencia ---
 	var f := FileAccess.open(INV_PATH, FileAccess.READ)

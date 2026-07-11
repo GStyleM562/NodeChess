@@ -2555,7 +2555,10 @@ func _show_winner(team: String) -> void:
 	if String(res.get("chest", "")) != "":
 		var cname: String = String((Inventory.CHESTS.get(String(res["chest"]), {}) as Dictionary).get("name", "Cofre"))
 		v.add_child(_vic_chip("📦 ¡%s ganado! Descífralo en el Inventario" % cname, UITheme.SUCCESS))
-	if int(res["leveled"]) == 0 and String(res.get("chest", "")) == "":
+	elif bool(res.get("chest_full", false)):
+		# ranuras llenas = esta victoria NO dio cofre; que el jugador lo SEPA
+		v.add_child(_vic_chip("📦 Ranuras de cofres LLENAS — abre alguno para ganar más", UITheme.DANGER))
+	if int(res["leveled"]) == 0 and String(res.get("chest", "")) == "" and not bool(res.get("chest_full", false)):
 		v.add_child(_vic_chip("🎁 Tus cofres te esperan en el menú", UITheme.PRIMARY_EDGE))
 
 	# buttons

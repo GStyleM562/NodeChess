@@ -7,6 +7,7 @@ var _result: Label
 var _mode_lbl: Label
 var _inv_box: VBoxContainer
 var _chest_box: VBoxContainer   # TUS COFRES (descifrar / abrir)
+var _chest_hdr: Label           # "Tus cofres (N/4)"
 var _chest_tick := 0.0
 
 func _ready() -> void:
@@ -43,6 +44,15 @@ func _ready() -> void:
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	UITheme.label(title, 24, UITheme.GOLD, true, 800)
 	top.add_child(title)
+	# 🧾 últimos movimientos (evidencia para soporte: gastos y entregas)
+	var txb := Button.new()
+	txb.text = "🧾"
+	txb.custom_minimum_size = Vector2(44, 42)
+	txb.tooltip_text = "Últimos movimientos (compras, crafteos, cofres)"
+	UITheme.button_font(txb, 16, UITheme.TEXT2, false, 600)
+	UITheme.style_surface(txb, UITheme.SURFACE2, UITheme.BORDER, 11)
+	txb.pressed.connect(_show_tx_log)
+	top.add_child(txb)
 	# píldora de modo (👤 USUARIO / 👑 ADMIN) — §6.4
 	var mode_pill := PanelContainer.new()
 	mode_pill.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -64,9 +74,9 @@ func _ready() -> void:
 	root.add_child(_result)
 
 	# --- TUS COFRES: los GANAS venciendo partidas; aquí los DESCIFRAS y abres ---
-	var chdr := Label.new()
-	UITheme.section(chdr, "Tus cofres  ·  gana partidas para conseguirlos")
-	root.add_child(chdr)
+	_chest_hdr = Label.new()
+	UITheme.section(_chest_hdr, "Tus cofres (0/%d)" % Inventory.CHEST_SLOTS)
+	root.add_child(_chest_hdr)
 	_chest_box = VBoxContainer.new()
 	_chest_box.add_theme_constant_override("separation", 6)
 	root.add_child(_chest_box)
@@ -118,6 +128,14 @@ func _process(delta: float) -> void:
 func _rebuild_chests() -> void:
 	if _chest_box == null:
 		return
+	# contador de RANURAS siempre visible (llenas = las victorias no dan cofre)
+	if _chest_hdr != null:
+		var n: int = Inventory.chest_inv.size()
+		var full := n >= Inventory.CHEST_SLOTS
+		UITheme.section(_chest_hdr, "Tus cofres (%d/%d)%s" % [n, Inventory.CHEST_SLOTS,
+			"  ·  ¡LLENAS! abre para ganar más" if full else ""])
+		if full:
+			_chest_hdr.add_theme_color_override("font_color", UITheme.DANGER)
 	for c in _chest_box.get_children():
 		c.queue_free()
 	if Inventory.chest_inv.is_empty():
@@ -167,9 +185,8 @@ func _chest_row(i: int) -> Control:
 	act.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	match state:
 		"locked":
-			var busy: bool = Inventory.any_unlocking()
-			act.text = "En espera" if busy else "Descifrar"
-			act.disabled = busy
+			# Descifrado LIBRE: arranca el cofre QUE TÚ QUIERAS (varios a la vez).
+			act.text = "Descifrar"
 			UITheme.button_font(act, 13, UITheme.TEXT, true, 700)
 			UITheme.style_surface(act, UITheme.SURFACE2, UITheme.BORDER, 10)
 			act.pressed.connect(func():
@@ -188,17 +205,65 @@ func _chest_row(i: int) -> Control:
 				var r: Dictionary = Inventory.open_won_chest(i)
 				if r.is_empty():
 					return
-				var names: Array = []
+				# RECIBO vistoso: exactamente lo ENTREGADO por el motor.
+				var items: Array = []
 				for key in r.get("pieces", []):
-					names.append(String(Inventory.piece_name(String(key))))
-				var msg := "✓ Cofre abierto: " + ", ".join(names)
+					items.append({"icon": Inventory.piece_icon(String(key)),
+						"text": String(Inventory.piece_name(String(key))),
+						"sub": "×1 añadido a tu inventario"})
 				if int(r.get("gems", 0)) > 0:
-					msg += "   💎 +%d ¡DIAMANTES!" % int(r["gems"])
-				_result.text = msg
+					items.append({"icon": "💎", "text": "+%d DIAMANTES" % int(r["gems"]),
+						"sub": "acreditados a tu cuenta", "col": Color(0.5, 0.85, 1.0)})
+				RewardPopup.show(self, "📦 ¡Cofre %s abierto!" % String(ui["name"]), col,
+					items, "Saldo: 🪙 %d · 💎 %d" % [Inventory.coins, Inventory.gems])
 				_rebuild_chests()
 				_rebuild_inventory())
 	hb.add_child(act)
 	return p
+
+# ---------------------------------------------------------------- 🧾 movimientos
+## Visor de los últimos movimientos del 🧾 log persistente (soporte técnico:
+## demuestra qué se gastó y qué se entregó en cada transacción).
+func _show_tx_log() -> void:
+	var labels := {"compra": "🛍 Compra", "crafteo": "🔨 Crafteo", "cofre_ganado": "📦 Cofre ganado",
+		"abrir_cofre": "📦 Cofre abierto", "descifrar": "⏳ Descifrado iniciado",
+		"nivel": "⬆ Subida de nivel", "caja_gratis": "🎁 Caja gratis",
+		"fondos_admin": "💰 Ajuste de fondos", "crear_figura": "🛠 Figura creada",
+		"borrar_inventario": "🗑 Inventario borrado"}
+	var items: Array = []
+	var log: Array = Inventory.tx_log.duplicate()
+	log.reverse()
+	for e in log.slice(0, 10):
+		var d: Dictionary = e
+		var k := String(d.get("k", "?"))
+		var mins := maxi(0, (int(Time.get_unix_time_from_system()) - int(d.get("t", 0))) / 60)
+		var sub := "hace %d min" % mins if mins < 120 else "hace %d h" % (mins / 60)
+		var detail := ""
+		match k:
+			"compra":
+				detail = "%s · %s %d" % [Inventory.piece_name(String(d.get("key", ""))),
+					"💎" if String(d.get("cur", "")) == "gems" else "🪙", int(d.get("price", 0))]
+			"crafteo":
+				detail = "%s (10 frag → 1 pieza)" % Inventory.piece_name(String(d.get("key", "")))
+			"cofre_ganado", "descifrar":
+				detail = String((Inventory.CHESTS.get(String(d.get("tier", "")), {}) as Dictionary).get("name", d.get("tier", "")))
+			"abrir_cofre":
+				detail = "%d piezas%s" % [(d.get("piezas", []) as Array).size(),
+					("  +%d💎" % int(d.get("gems", 0))) if int(d.get("gems", 0)) > 0 else ""]
+			"nivel":
+				detail = "nivel %d · +%d🪙%s" % [int(d.get("lvl", 0)), int(d.get("coins", 0)),
+					("  +%d💎" % int(d.get("gems", 0))) if int(d.get("gems", 0)) > 0 else ""]
+			"fondos_admin":
+				detail = "%+d🪙 · %+d💎" % [int(d.get("coins", 0)), int(d.get("gems", 0))]
+			"crear_figura":
+				detail = "%s (%d piezas)" % [String(d.get("fig", "?")), int(d.get("piezas", 0))]
+		items.append({"icon": "🧾", "text": String(labels.get(k, k)) + ((" — " + detail) if detail != "" else ""),
+			"sub": sub, "col": UITheme.PRIMARY_EDGE})
+	if items.is_empty():
+		items.append({"icon": "🧾", "text": "Sin movimientos todavía",
+			"sub": "Aquí quedan tus compras, crafteos y cofres", "col": UITheme.MUTED})
+	RewardPopup.show(self, "🧾 Últimos movimientos", UITheme.PRIMARY_EDGE, items,
+		"Saldo actual: 🪙 %d · 💎 %d" % [Inventory.coins, Inventory.gems])
 
 # ---------------------------------------------------------------- inventario
 func _refresh_mode() -> void:
@@ -294,8 +359,15 @@ func _inv_row(key: String) -> Control:
 	UITheme.button_font(cv, 12, UITheme.TEXT, false, 700)
 	UITheme.style_surface(cv, UITheme.SURFACE2, UITheme.BORDER, 9)
 	cv.pressed.connect(func():
-		if Inventory.convert(key):
-			_result.text = "✓ %s convertida (+1 pieza)." % Inventory.piece_name(key)
-			_rebuild_inventory())
+		var r: Dictionary = Inventory.convert(key)
+		if bool(r.get("ok", false)):
+			# RECIBO del crafteo: lo que entregó el motor, con saldo de frags.
+			RewardPopup.show(self, "🔨 ¡Crafteo completado!", UITheme.GOLD,
+				[{"icon": Inventory.piece_icon(key), "text": String(r["name"]),
+					"sub": "%d fragmentos → 1 pieza completa · ahora tienes ×%d" % [Inventory.FRAG_COST, int(r["owned"])]}],
+				"Fragmentos restantes de esta pieza: %d/%d" % [int(r["frags"]), Inventory.FRAG_COST])
+			_rebuild_inventory()
+		else:
+			_result.text = "✗ " + String(r.get("error", "No se pudo convertir")))
 	row.add_child(cv)
 	return row

@@ -93,15 +93,21 @@ func add_frags(key: String, n: int) -> void:
 	fragments[key] = int(fragments.get(key, 0)) + n
 	_save()
 
-## 10 fragmentos -> 1 pieza completa.
-func convert(key: String) -> bool:
+## CRAFTEO: 10 fragmentos -> 1 pieza completa. ATÓMICO (descuenta y acredita en
+## la misma operación) + validado (pieza del catálogo, fragmentos suficientes)
+## + queda en el 🧾 log. -> {"ok", "error"?, "key", "name", "owned", "frags"}
+func convert(key: String) -> Dictionary:
 	_ensure_loaded()
+	if not key in catalog():
+		return {"ok": false, "error": "Esa pieza no existe en el catálogo."}
 	if frags(key) < FRAG_COST:
-		return false
+		return {"ok": false, "error": "Te faltan fragmentos (%d/%d)." % [frags(key), FRAG_COST]}
 	fragments[key] = frags(key) - FRAG_COST
 	pieces[key] = int(pieces.get(key, 0)) + 1
+	_log_tx({"k": "crafteo", "key": key, "frags": FRAG_COST})
 	_save()
-	return true
+	return {"ok": true, "key": key, "name": piece_name(key),
+		"owned": int(pieces[key]), "frags": frags(key)}
 
 # ---------------------------------------------------------------- economía
 ## GASTA las piezas de una figura recién creada (modo usuario; admin no gasta).
@@ -112,6 +118,8 @@ func consume_for(fig: Dictionary) -> void:
 		return
 	for key in required_pieces(fig):
 		pieces[key] = maxi(0, int(pieces.get(key, 0)) - 1)
+	_log_tx({"k": "crear_figura", "fig": String(fig.get("name", "?")),
+		"piezas": required_pieces(fig).size()})
 	_save()
 
 ## EDICIÓN: cobra solo las piezas NUEVAS y devuelve las que se retiraron
@@ -185,13 +193,19 @@ func add_match_xp(won: bool, online: bool) -> Dictionary:
 	level_chests += leveled
 	coins += coin_gain
 	gems += gem_gain
-	# COFRE GANADO por victoria (modo usuario, si hay ranura libre)
+	if leveled > 0:
+		_log_tx({"k": "nivel", "lvl": level, "coins": coin_gain, "gems": gem_gain})
+	# COFRE GANADO por victoria (modo usuario, si hay ranura libre). Si las
+	# ranuras están LLENAS se reporta para avisarle al jugador (cofre perdido).
 	var chest_tier := ""
+	var chest_full := false
 	if won and mode == "user":
-		chest_tier = grant_won_chest()
+		chest_full = chest_inv.size() >= CHEST_SLOTS
+		if not chest_full:
+			chest_tier = grant_won_chest()
 	_save()
 	return {"gained": gained, "leveled": leveled, "level": level, "chests": leveled,
-		"coins": coin_gain, "gems": gem_gain, "chest": chest_tier}
+		"coins": coin_gain, "gems": gem_gain, "chest": chest_tier, "chest_full": chest_full}
 
 ## Cofre de NIVEL: 3 piezas (1 premium garantizada) + % de 💎. Consume un cofre
 ## pendiente. -> {"pieces": [...], "gems": N} (vacío si no hay cofres).
@@ -205,6 +219,7 @@ func open_level_chest() -> Dictionary:
 		pieces[key] = int(pieces.get(key, 0)) + 1
 	var g := _roll_gems("level")
 	gems += g
+	_log_tx({"k": "abrir_cofre", "tier": "nivel", "piezas": got.duplicate(), "gems": g})
 	_save()
 	return {"pieces": got, "gems": g}
 
@@ -218,6 +233,7 @@ func grant_won_chest() -> String:
 	var r := randf()
 	var tier := "t5" if r < 0.6 else ("t10" if r < 0.9 else "t15")
 	chest_inv.append({"tier": tier, "state": "locked", "ready_at": 0})
+	_log_tx({"k": "cofre_ganado", "tier": tier})
 	_save()
 	return tier
 
@@ -234,16 +250,18 @@ func chest_info(i: int) -> Dictionary:
 		"left": maxi(0, int(c.get("ready_at", 0)) - _now()),
 		"secs": int((CHESTS[String(c["tier"])] as Dictionary)["interval"])}
 
-## "DESCIFRAR": arranca el progreso de apertura (solo UNO a la vez).
+## "DESCIFRAR": arranca el progreso de apertura del cofre QUE TÚ ELIJAS
+## (sin orden forzado ni límite: puedes descifrar varios a la vez).
 func start_unlock(i: int) -> bool:
 	_ensure_loaded()
-	if i < 0 or i >= chest_inv.size() or any_unlocking():
+	if i < 0 or i >= chest_inv.size():
 		return false
 	var c: Dictionary = chest_inv[i]
 	if String(c.get("state", "locked")) != "locked":
 		return false
 	c["state"] = "unlocking"
 	c["ready_at"] = _now() + int((CHESTS[String(c["tier"])] as Dictionary)["interval"])
+	_log_tx({"k": "descifrar", "tier": String(c["tier"])})
 	_save()
 	return true
 
@@ -275,6 +293,7 @@ func open_won_chest(i: int) -> Dictionary:
 	var g := _roll_gems(tier_id)
 	gems += g
 	chest_inv.remove_at(i)
+	_log_tx({"k": "abrir_cofre", "tier": tier_id, "piezas": got.duplicate(), "gems": g})
 	_save()
 	return {"pieces": got, "gems": g}
 
@@ -286,27 +305,101 @@ func _roll_gems(kind: String) -> int:
 	return int(d[1]) + randi() % maxi(1, int(d[2]) - int(d[1]) + 1)
 
 # ------------------------------------------------------- tienda 🛍
-## Compra REAL: descuenta 🪙/💎 y añade la pieza al inventario. false si no alcanza.
-func buy(key: String, price: int, currency: String) -> bool:
+## RAREZA canónica de una pieza (única fuente de verdad para precios/UI).
+func piece_rarity(key: String) -> String:
+	var k := String(key)
+	if k.begins_with("model:"):
+		var id := k.trim_prefix("model:")
+		for f in Roster.FIGURES:
+			if String(f.get("id", "")) == id:
+				return String(f.get("rarity", FigureCard.RARITY.get(id, "common")))
+		return String(FigureCard.RARITY.get(id, "common"))
+	if k.begins_with("color:"):
+		var c := k.trim_prefix("color:")
+		return "epic" if c == "gold" else ("rare" if (c == "blue" or c == "purple") else "common")
+	if k.begins_with("fx:"):
+		return "epic" if k.trim_prefix("fx:") in ["Miedo", "Paralizado", "Congelado", "Sueño"] else "rare"
+	if k.begins_with("passive:"):
+		return "epic"
+	if k.begins_with("atype:"):
+		var t := k.trim_prefix("atype:")
+		if t.contains("D8") or t.contains("D10") or t.contains("D12") or t.contains("Doble"):
+			return "epic"
+		if t.contains("D4") or t.contains("D6"):
+			return "rare"
+		if t.contains("2d6"):
+			return "legend"
+		return "common"
+	if k.begins_with("stamina:"):
+		var n := int(k.trim_prefix("stamina:"))
+		return "legend" if n >= 5 else ("epic" if n == 4 else ("rare" if n == 3 else "common"))
+	if k.begins_with("resist:"):
+		return "rare"
+	if k.begins_with("rarity:"):
+		return k.trim_prefix("rarity:")
+	return "common"
+
+const PRICE_BY_RARITY := {
+	"common": {"price": 200, "currency": "coins"},
+	"rare": {"price": 500, "currency": "coins"},
+	"epic": {"price": 30, "currency": "gems"},
+	"legend": {"price": 80, "currency": "gems"},
+	"mythic": {"price": 150, "currency": "gems"},
+}
+
+## Precio CANÓNICO de una pieza. La UI solo lo MUESTRA — jamás lo decide
+## (anti-trampa: un cliente alterado no puede comprar a otro precio).
+## -> {"price": int, "currency": "coins"/"gems"} · {} si la pieza no existe.
+func price_of(key: String) -> Dictionary:
 	_ensure_loaded()
-	if currency == "gems":
+	if not key in catalog():
+		return {}
+	return (PRICE_BY_RARITY.get(piece_rarity(key), PRICE_BY_RARITY["common"]) as Dictionary).duplicate()
+
+## Compra REAL y ATÓMICA con recibo. Valida que la pieza EXISTA en el catálogo
+## y calcula el precio internamente. La pieza se acredita en la misma operación
+## que el cobro (o todo o nada) y queda en el 🧾 log de movimientos.
+## -> {"ok", "error"?, "key", "name", "price", "currency", "coins", "gems", "owned"}
+func buy(key: String) -> Dictionary:
+	_ensure_loaded()
+	var p := price_of(key)
+	if p.is_empty():
+		return {"ok": false, "error": "Esa pieza no existe en el catálogo."}
+	var price := int(p["price"])
+	var cur := String(p["currency"])
+	if cur == "gems":
 		if gems < price:
-			return false
+			return {"ok": false, "error": "Te faltan 💎 diamantes (%d/%d)." % [gems, price]}
 		gems -= price
 	else:
 		if coins < price:
-			return false
+			return {"ok": false, "error": "Te faltan 🪙 monedas (%d/%d)." % [coins, price]}
 		coins -= price
 	pieces[key] = int(pieces.get(key, 0)) + 1
+	_log_tx({"k": "compra", "key": key, "price": price, "cur": cur})
 	_save()
-	return true
+	return {"ok": true, "key": key, "name": piece_name(key), "price": price,
+		"currency": cur, "coins": coins, "gems": gems, "owned": int(pieces[key])}
 
 ## ADMIN: añade/quita fondos a la cuenta (clavado en ≥ 0).
 func adjust_funds(d_coins: int, d_gems: int) -> void:
 	_ensure_loaded()
 	coins = maxi(0, coins + d_coins)
 	gems = maxi(0, gems + d_gems)
+	_log_tx({"k": "fondos_admin", "coins": d_coins, "gems": d_gems})
 	_save()
+
+# ------------------------------------------------------- 🧾 log de movimientos
+## Recibo persistente de CADA transacción de consumibles (compras, crafteos,
+## cofres, recompensas). Evidencia para Soporte: qué se gastó y qué se entregó.
+const TX_MAX := 50
+var tx_log: Array = []
+
+func _log_tx(entry: Dictionary) -> void:
+	entry["t"] = _now()
+	tx_log.append(entry)
+	if tx_log.size() > TX_MAX:
+		tx_log = tx_log.slice(tx_log.size() - TX_MAX)
 
 ## BORRA piezas y fragmentos — SOLO eso (los personajes creados, XP, nivel,
 ## cofres y estadísticas se conservan). Estado de cuenta nueva: en modo usuario
@@ -318,6 +411,7 @@ func wipe_pieces() -> void:
 	_starter = false
 	if mode == "user":
 		_grant_starter()
+	_log_tx({"k": "borrar_inventario"})
 	_save()
 
 ## ADMIN (prueba): regala n piezas completas de CADA pieza del catálogo.
@@ -343,6 +437,7 @@ func open_free() -> Dictionary:
 		got[key] = int(got.get(key, 0)) + n
 	var g := _roll_gems("free")
 	gems += g
+	_log_tx({"k": "caja_gratis", "gems": g})
 	_save()
 	return {"frags": got, "gems": g}
 
@@ -476,6 +571,25 @@ func missing_pieces(fig: Dictionary) -> Array:
 			out.append(key)
 	return out
 
+## Icono del TIPO de pieza (recibos, listas, cofres).
+func piece_icon(key: String) -> String:
+	var k := String(key)
+	if k.begins_with("model:"):
+		return "🧍"
+	if k.begins_with("rarity:"):
+		return "⭐"
+	if k.begins_with("atype:"):
+		return "🎲"
+	if k.begins_with("color:"):
+		return "🎯"
+	if k.begins_with("fx:"):
+		return "🌀"
+	if k.begins_with("passive:"):
+		return "✨"
+	if k.begins_with("resist:"):
+		return "🛡"
+	return "👟"   # stamina
+
 ## Nombre legible de una pieza para la UI.
 func piece_name(key: String) -> String:
 	var p := key.split(":", true, 1)
@@ -546,6 +660,7 @@ func _ensure_loaded() -> void:
 		coins = int(data.get("coins", 0))
 		gems = int(data.get("gems", 0))
 		chest_inv = data.get("chest_inv", [])
+		tx_log = data.get("tx", [])
 		_starter = bool(data.get("starter", false))
 
 func _save() -> void:
@@ -556,6 +671,6 @@ func _save() -> void:
 			"next_chest": next_chest, "xp": xp, "level": level,
 			"lvl_chests": level_chests, "starter": _starter,
 			"wins": wins, "losses": losses, "streak": streak, "best_streak": best_streak,
-			"coins": coins, "gems": gems, "chest_inv": chest_inv,
+			"coins": coins, "gems": gems, "chest_inv": chest_inv, "tx": tx_log,
 		}))
 		f.close()

@@ -117,6 +117,12 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- CONSUMIBLES BLINDADOS: precio CANÓNICO en el motor (la UI jamás lo decide —
+  anti-trampa), compra/crafteo/cofres atómicos y validados con RECIBO,
+  🧾 log persistente de movimientos (evidencia para soporte) con visor en el
+  Inventario, ventana vistosa RewardPopup en compras/crafteos/cofres,
+  descifrado LIBRE (el cofre que quieras, varios a la vez), ranuras (N/4)
+  visibles y aviso de "ranuras llenas" en la victoria.
 - ECONOMÍA VIVA: 🪙 por nivel + 💎 cada 5 niveles y en cajas (%), Tienda que
   compra DE VERDAD al inventario, cofres GANADOS por victoria con descifrado
   manual (Inventario), chips de recompensa en la victoria, fondos admin.
