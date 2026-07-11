@@ -1,6 +1,6 @@
 extends SceneTree
-## Menú principal: construye la escena, verifica los 5 cofres del lobby con su
-## estado en vivo (gratis + t5/t10/t15 + nivel 🏅), y abre la caja GRATIS
+## Menú principal: construye la escena, verifica los 3 cofres del lobby con su
+## estado en vivo (gratis + 📦 cofres ganados + nivel 🏅), y abre la caja GRATIS
 ## (animación completa) sin crashear. Respalda user://inventory.json.
 
 const INV_PATH := "user://inventory.json"
@@ -20,21 +20,21 @@ func _initialize() -> void:
 func _run(mm) -> void:
 	var ok := true
 	await create_timer(0.7).timeout   # _ready + primer refresh de estados
-	ok = _expect("5 cofres en el lobby", mm._chest_states.size(), 5) and ok
+	ok = _expect("3 cofres en el lobby", mm._chest_states.size(), 3) and ok
 	var free_lbl: Label = mm._chest_states["free"]
 	ok = _expect("gratis siempre lista", free_lbl.text, "¡Gratis!") and ok
-	ok = _expect("t5 con estado", String(mm._chest_states["t5"].text) != "…", true) and ok
+	ok = _expect("cofres ganados con estado", String(mm._chest_states["won"].text) != "…", true) and ok
 
 	# abrir la caja gratis: dispara la animación (cofre + destello + pastillas)
 	mm._tap_chest("free")
 	await create_timer(2.6).timeout
 	ok = _expect("animación sin crash", is_instance_valid(mm), true) and ok
 
-	# cofre temporal NO listo -> toast, no animación (tras reclamar t5 una vez)
-	get_root().get_node("Inventory").open_chest("t5")
-	mm._tap_chest("t5")
+	# 📦 sin cofres ganados -> toast (no animación, no crash)
+	get_root().get_node("Inventory").chest_inv = []
+	mm._tap_chest("won")
 	await create_timer(0.3).timeout
-	ok = _expect("t5 en espera no crashea", is_instance_valid(mm), true) and ok
+	ok = _expect("📦 vacío no crashea", is_instance_valid(mm), true) and ok
 
 	if _had:
 		var f := FileAccess.open(INV_PATH, FileAccess.WRITE)

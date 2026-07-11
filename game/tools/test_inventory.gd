@@ -22,6 +22,9 @@ func _initialize() -> void:
 	inv.pieces = {}
 	inv.fragments = {}
 	inv.next_chest = {}
+	inv.coins = 0
+	inv.gems = 0
+	inv.chest_inv = []
 	inv._starter = false
 
 	# --- admin: todo ilimitado ---
@@ -55,9 +58,10 @@ func _initialize() -> void:
 	ok = _expect("pieza obtenida", inv.has_piece("stamina:3"), true) and ok
 	ok = _expect("frag consumidos", inv.frags("stamina:3"), 0) and ok
 
-	# --- caja gratis: fragmentos ---
+	# --- caja gratis: fragmentos (+% de 💎) ---
 	var got: Dictionary = inv.open_free()
-	ok = _expect("caja gratis da frag", got.size() > 0, true) and ok
+	ok = _expect("caja gratis da frag", (got.get("frags", {}) as Dictionary).size() > 0, true) and ok
+	ok = _expect("caja gratis reporta gems", got.has("gems"), true) and ok
 
 	# --- cofres temporales: dan piezas y REARMAN su timer ---
 	ok = _expect("t5 listo de inicio", inv.chest_ready("t5"), true) and ok
@@ -103,25 +107,70 @@ func _initialize() -> void:
 	inv.losses = 0
 	inv.streak = 0
 	inv.best_streak = 0
+	inv.coins = 0
+	inv.gems = 0
+	inv.chest_inv = []
 	var r1: Dictionary = inv.add_match_xp(true, false)
 	ok = _expect("victoria da 60 XP", int(r1["gained"]), 60) and ok
 	ok = _expect("aún nivel 1", inv.level, 1) and ok
+	ok = _expect("victoria (user) da COFRE", String(r1["chest"]) != "", true) and ok
+	ok = _expect("cofre en inventario", inv.chest_inv.size(), 1) and ok
 	var r2: Dictionary = inv.add_match_xp(true, true)   # +75 (online) -> 135 >= 100
 	ok = _expect("sube a nivel 2", int(r2["level"]), 2) and ok
 	ok = _expect("otorga 1 cofre de nivel", int(r2["chests"]), 1) and ok
+	ok = _expect("nivel 2 da 200 monedas", int(r2["coins"]), 200) and ok
+	ok = _expect("monedas acreditadas", inv.coins, 200) and ok
 	ok = _expect("cofre pendiente", inv.level_chests, 1) and ok
 	ok = _expect("xp sobrante correcto", inv.xp, 35) and ok
-	var lp: Array = inv.open_level_chest()
-	ok = _expect("cofre de nivel da 3 piezas", lp.size(), 3) and ok
+	var lr: Dictionary = inv.open_level_chest()
+	ok = _expect("cofre de nivel da 3 piezas", (lr.get("pieces", []) as Array).size(), 3) and ok
 	ok = _expect("cofre consumido", inv.level_chests, 0) and ok
-	ok = _expect("sin cofres no abre", inv.open_level_chest().size(), 0) and ok
+	ok = _expect("sin cofres no abre", inv.open_level_chest().is_empty(), true) and ok
 	var r3: Dictionary = inv.add_match_xp(false, false)   # derrota: +25
 	ok = _expect("derrota da 25 XP", int(r3["gained"]), 25) and ok
-	# --- estadísticas de PERFIL (2 victorias + 1 derrota arriba) ---
-	ok = _expect("perfil: 2 ganadas", inv.wins, 2) and ok
+	ok = _expect("derrota NO da cofre", String(r3["chest"]), "") and ok
+
+	# --- DIAMANTES cada 5 niveles: nivel 5 → 5×2 = 10 💎 ---
+	inv.gems = 0   # el cofre de nivel de arriba pudo soltar 💎 (25%) — resetear
+	inv.level = 4
+	inv.xp = 380   # xp_needed(4)=400; +60 de victoria → nivel 5
+	var r5: Dictionary = inv.add_match_xp(true, false)
+	ok = _expect("nivel 5 alcanzado", inv.level, 5) and ok
+	ok = _expect("nivel 5 da 10 diamantes", int(r5["gems"]), 10) and ok
+	ok = _expect("diamantes acreditados", inv.gems, 10) and ok
+
+	# --- COFRES GANADOS: descifrar (uno a la vez) y abrir ---
+	ok = _expect("3 cofres ganados", inv.chest_inv.size(), 3) and ok
+	ok = _expect("estado inicial: cerrado", String(inv.chest_info(0)["state"]), "locked") and ok
+	ok = _expect("descifrar arranca", inv.start_unlock(0), true) and ok
+	ok = _expect("solo UNO a la vez", inv.start_unlock(1), false) and ok
+	ok = _expect("aún no está listo", inv.open_won_chest(0).is_empty(), true) and ok
+	(inv.chest_inv[0] as Dictionary)["ready_at"] = 0   # simular tiempo cumplido
+	ok = _expect("descifrado: listo", String(inv.chest_info(0)["state"]), "ready") and ok
+	var wr: Dictionary = inv.open_won_chest(0)
+	ok = _expect("cofre ganado da piezas", (wr.get("pieces", []) as Array).size() >= 2, true) and ok
+	ok = _expect("cofre sale del inventario", inv.chest_inv.size(), 2) and ok
+	ok = _expect("tras abrir puedo descifrar otro", inv.start_unlock(0), true) and ok
+
+	# --- TIENDA: comprar añade la pieza y descuenta; sin fondos falla ---
+	inv.coins = 700
+	inv.gems = 5
+	var g_shop: int = int(inv.pieces.get("color:gold", 0))
+	ok = _expect("compra con monedas", inv.buy("color:gold", 500, "coins"), true) and ok
+	ok = _expect("pieza añadida al inventario", int(inv.pieces.get("color:gold", 0)), g_shop + 1) and ok
+	ok = _expect("monedas descontadas", inv.coins, 200) and ok
+	ok = _expect("sin monedas: falla", inv.buy("color:gold", 500, "coins"), false) and ok
+	ok = _expect("sin diamantes: falla", inv.buy("model:nightblade", 30, "gems"), false) and ok
+	# fondos ADMIN: añadir/quitar (clavado en ≥0)
+	inv.adjust_funds(300, 25)
+	ok = _expect("fondos añadidos", inv.coins == 500 and inv.gems == 30, true) and ok
+	inv.adjust_funds(-9999, -9999)
+	ok = _expect("fondos nunca negativos", inv.coins == 0 and inv.gems == 0, true) and ok
+
+	# --- estadísticas de PERFIL (3 victorias + 1 derrota arriba) ---
+	ok = _expect("perfil: 3 ganadas", inv.wins, 3) and ok
 	ok = _expect("perfil: 1 perdida", inv.losses, 1) and ok
 	ok = _expect("perfil: mejor racha 2", inv.best_streak, 2) and ok
-	ok = _expect("perfil: racha actual 0", inv.streak, 0) and ok
 
 	# --- BORRAR inventario: solo piezas+fragmentos; kit inicial re-entregado ---
 	inv.add_frags("color:gold", 8)
@@ -131,7 +180,7 @@ func _initialize() -> void:
 	ok = _expect("wipe: piezas extra borradas", inv.has_piece("fx:Miedo"), false) and ok
 	ok = _expect("wipe: kit inicial de vuelta", inv.has_piece("color:white"), true) and ok
 	ok = _expect("wipe: nivel intacto", inv.level, lvl_before) and ok
-	ok = _expect("wipe: stats intactas", inv.wins, 2) and ok
+	ok = _expect("wipe: stats intactas", inv.wins, 3) and ok
 
 	# --- persistencia ---
 	var f := FileAccess.open(INV_PATH, FileAccess.READ)

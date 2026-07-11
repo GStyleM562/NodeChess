@@ -55,6 +55,18 @@
   USUARIO completo: cofres → fragmentos → "Convertir" (10=1 pieza completa) →
   botón 📦 en el CREADOR (modal con TUS piezas ×N sin salir de la creación) →
   guardar consume 1 de cada pieza usada.
+- MONEDAS 🪙 y DIAMANTES 💎: subir de nivel da 🪙 (nivel × 100) y cada 5 niveles
+  💎 (nivel × 2); TODAS las cajas tienen % de soltar 💎 (mejor cofre, más %).
+  Saldos reales en Home y Tienda; panel ADMIN en Configuración para
+  añadir/quitar fondos.
+- TIENDA REAL: cada tarjeta es una pieza del inventario (modelos, colores,
+  estados, pasivas, tipos, estamina/resist/rareza); comprar descuenta 🪙/💎 y
+  AÑADE la pieza a tu inventario (usable en Creador y mazos).
+- COFRES GANADOS 📦: al VENCER (modo usuario) cae un cofre (60% común / 30%
+  épico / 10% legendario) a tus 4 ranuras; en el Inventario lo DESCIFRAS (uno a
+  la vez, 5/10/15 min) y al abrirlo da piezas + % de 💎. El slot 📦 del lobby
+  abre el que esté listo con la animación. (Los cofres de reloj t5/t10/t15 del
+  lobby se retiraron: ahora los cofres SE GANAN.)
 - XP y NIVELES persistentes: +60 victoria / +25 derrota (+15 online).
 - ESTADÍSTICAS de perfil persistentes: ganadas/perdidas/racha/mejor racha
   (se actualizan en cada fin de partida).
@@ -105,6 +117,9 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- ECONOMÍA VIVA: 🪙 por nivel + 💎 cada 5 niveles y en cajas (%), Tienda que
+  compra DE VERDAD al inventario, cofres GANADOS por victoria con descifrado
+  manual (Inventario), chips de recompensa en la victoria, fondos admin.
 - FIX crítico online: JAMÁS empezar sin banca. El lobby muestra el MAZO EN USO
   (nombre + 6/6) y bloquea crear/unirse si está incompleto o con figuras no
   poseídas; Board3D aborta al menú si algún mazo llega vacío; offline cae al

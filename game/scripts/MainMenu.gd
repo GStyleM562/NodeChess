@@ -4,12 +4,12 @@ extends Node3D
 ## reward/gift slots, a juicy PLAY button, secondary buttons and a bottom nav.
 ## Style only — scene routes and the 3D model are unchanged.
 
-## Cofres REALES del lobby (los "regalos" del diseño): gratis + 5/10/15 min.
+## Cofres REALES del lobby: caja gratis + TUS COFRES ganados (se descifran en
+## el Inventario) + cofre de nivel. Los t5/t10/t15 ya NO son de reloj: se GANAN
+## venciendo partidas (modo usuario) y viven en el inventario de cofres.
 const CHEST_LOBBY := {
 	"free": {"icon": "🎁", "col": Color(0.35, 0.6, 1.0), "name": "Gratis"},
-	"t5": {"icon": "🧰", "col": Color(0.212, 0.82, 0.498), "name": "Común"},
-	"t10": {"icon": "💎", "col": Color(0.722, 0.451, 1.0), "name": "Épico"},
-	"t15": {"icon": "👑", "col": Color(1.0, 0.773, 0.239), "name": "Legendario"},
+	"won": {"icon": "📦", "col": Color(0.212, 0.82, 0.498), "name": "Cofres"},
 	"level": {"icon": "🏅", "col": Color(0.95, 0.5, 0.2), "name": "Nivel"},
 }
 
@@ -48,13 +48,26 @@ func _refresh_chest_states() -> void:
 			lbl.text = "×%d" % Inventory.level_chests
 			lbl.add_theme_color_override("font_color", UITheme.SUCCESS)
 			continue
-		var left: int = Inventory.chest_left(id)
-		if left <= 0:
-			lbl.text = "¡LISTO!"
-			lbl.add_theme_color_override("font_color", UITheme.SUCCESS)
-		else:
-			lbl.text = "%d:%02d" % [left / 60, left % 60]
-			lbl.add_theme_color_override("font_color", UITheme.TEXT2)
+		if id == "won":
+			# ¿algún cofre listo? → ¡ABRIR! · ¿descifrando? → cuenta atrás · si no → ×N
+			var ready := false
+			var left := -1
+			for i in Inventory.chest_inv.size():
+				var info: Dictionary = Inventory.chest_info(i)
+				if String(info.get("state", "")) == "ready":
+					ready = true
+				elif String(info.get("state", "")) == "unlocking":
+					left = int(info["left"])
+			if ready:
+				lbl.text = "¡ABRIR!"
+				lbl.add_theme_color_override("font_color", UITheme.SUCCESS)
+			elif left >= 0:
+				lbl.text = "%d:%02d" % [left / 60, left % 60]
+				lbl.add_theme_color_override("font_color", UITheme.TEXT2)
+			else:
+				lbl.text = "×%d" % Inventory.chest_inv.size()
+				lbl.add_theme_color_override("font_color",
+					UITheme.SUCCESS if Inventory.chest_inv.size() > 0 else UITheme.MUTED)
 
 # ----------------------------------------------------------------- 3D centerpiece
 func _build_env() -> void:
@@ -180,9 +193,9 @@ func _build_topbar(layer: CanvasLayer) -> void:
 	lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	who.add_child(lv)
 	tb.add_child(who)
-	tb.add_child(_chip("🪙", "1,250", UITheme.GOLD))
-	tb.add_child(_chip("💎", "30", Color(0.5, 0.85, 1.0)))
-	tb.add_child(_chip("⚡", "8", UITheme.ENERGY))
+	# saldos REALES (🪙 por subir de nivel · 💎 cada 5 niveles y en cofres)
+	tb.add_child(_chip("🪙", str(Inventory.coins), UITheme.GOLD))
+	tb.add_child(_chip("💎", str(Inventory.gems), Color(0.5, 0.85, 1.0)))
 	var gear := _icon_btn("⚙")
 	gear.pressed.disconnect(_soon)
 	gear.pressed.connect(_toggle_settings)
@@ -225,7 +238,7 @@ func _build_gifts(layer: CanvasLayer) -> void:
 	gifts.alignment = BoxContainer.ALIGNMENT_CENTER
 	gifts.add_theme_constant_override("separation", 10)
 	layer.add_child(gifts)
-	for id in ["free", "t5", "t10", "t15", "level"]:
+	for id in ["free", "won", "level"]:
 		var slot := _chest_slot(id)
 		gifts.add_child(slot)
 		if id == "level":
@@ -261,29 +274,43 @@ func _tap_chest(id: String) -> void:
 	if id == "free":
 		var got: Dictionary = Inventory.open_free()
 		var lines: Array = []
-		for key in got:
-			lines.append("%s %s  +%d fragmentos" % [_piece_icon(String(key)), Inventory.piece_name(String(key)), int(got[key])])
+		var frags: Dictionary = got.get("frags", {})
+		for key in frags:
+			lines.append("%s %s  +%d fragmentos" % [_piece_icon(String(key)), Inventory.piece_name(String(key)), int(frags[key])])
+		if int(got.get("gems", 0)) > 0:
+			lines.append("💎 +%d ¡DIAMANTES!" % int(got["gems"]))
 		_open_chest_anim(id, lines)
 		return
 	if id == "level":
-		var lp: Array = Inventory.open_level_chest()
-		if lp.is_empty():
+		var lr: Dictionary = Inventory.open_level_chest()
+		if lr.is_empty():
 			return
 		var llines: Array = []
-		for key in lp:
+		for key in lr.get("pieces", []):
 			llines.append("%s %s" % [_piece_icon(String(key)), Inventory.piece_name(String(key))])
+		if int(lr.get("gems", 0)) > 0:
+			llines.append("💎 +%d ¡DIAMANTES!" % int(lr["gems"]))
 		_open_chest_anim(id, llines)
 		_refresh_chest_states()
 		return
-	if not Inventory.chest_ready(id):
-		var left: int = Inventory.chest_left(id)
-		_toast_msg("⏳ %s disponible en %d:%02d" % [String(Inventory.CHESTS[id]["name"]), left / 60, left % 60])
-		return
-	var pieces: Array = Inventory.open_chest(id)
-	var lines2: Array = []
-	for key in pieces:
-		lines2.append("%s %s" % [_piece_icon(String(key)), Inventory.piece_name(String(key))])
-	_open_chest_anim(id, lines2)
+	if id == "won":
+		# ¿hay un cofre LISTO? ábrelo aquí con la animación; si no, ve al
+		# Inventario a DESCIFRAR (ahí arrancas el progreso de cada cofre).
+		for i in Inventory.chest_inv.size():
+			if String(Inventory.chest_info(i).get("state", "")) == "ready":
+				var wr: Dictionary = Inventory.open_won_chest(i)
+				var wl: Array = []
+				for key in wr.get("pieces", []):
+					wl.append("%s %s" % [_piece_icon(String(key)), Inventory.piece_name(String(key))])
+				if int(wr.get("gems", 0)) > 0:
+					wl.append("💎 +%d ¡DIAMANTES!" % int(wr["gems"]))
+				_open_chest_anim(id, wl)
+				_refresh_chest_states()
+				return
+		if Inventory.chest_inv.is_empty():
+			_toast_msg("📦 Gana partidas para conseguir cofres")
+		else:
+			get_tree().change_scene_to_file("res://scenes/inventory.tscn")
 
 func _piece_icon(key: String) -> String:
 	if key.begins_with("model:"): return "🧍"
@@ -718,6 +745,32 @@ func _show_settings() -> void:
 	mhint.custom_minimum_size = Vector2(430, 0)
 	UITheme.label(mhint, 11, UITheme.TEXT2, false, 600)
 	vb.add_child(mhint)
+
+	# --- ADMIN: quitar/añadir FONDOS (🪙/💎) a la cuenta del usuario ---
+	if Inventory.is_admin():
+		var fh := Label.new()
+		UITheme.section(fh, "Fondos del usuario (admin)")
+		fh.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		vb.add_child(fh)
+		var fbal := _lbl("🪙 %d   ·   💎 %d" % [Inventory.coins, Inventory.gems], 15, UITheme.GOLD, true, 800)
+		vb.add_child(fbal)
+		var frow := HBoxContainer.new()
+		frow.add_theme_constant_override("separation", 6)
+		vb.add_child(frow)
+		var fund := func(dc: int, dg: int):
+			Inventory.adjust_funds(dc, dg)
+			fbal.text = "🪙 %d   ·   💎 %d" % [Inventory.coins, Inventory.gems]
+		for spec in [["−500 🪙", -500, 0], ["+500 🪙", 500, 0], ["−25 💎", 0, -25], ["+25 💎", 0, 25]]:
+			var fb := Button.new()
+			fb.text = String(spec[0])
+			fb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			fb.custom_minimum_size = Vector2(0, 42)
+			UITheme.button_font(fb, 13, UITheme.TEXT, true, 700)
+			UITheme.style_surface(fb, UITheme.SURFACE2, UITheme.BORDER, 10)
+			var dc: int = int(spec[1])
+			var dg: int = int(spec[2])
+			fb.pressed.connect(func(): fund.call(dc, dg))
+			frow.add_child(fb)
 
 	# --- reiniciar inventario (piezas + fragmentos; NADA más) ---
 	var wipe := Button.new()

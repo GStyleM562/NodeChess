@@ -2544,11 +2544,18 @@ func _show_winner(team: String) -> void:
 	create_tween().tween_property(xp, "value", float(Inventory.xp), 0.9).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	v.add_child(_vic_lbl("+%d XP  (%d/%d)" % [int(res["gained"]), Inventory.xp, Inventory.xp_needed()], 13, UITheme.GOLD, true, 700))
 
-	# --- recompensas REALES por subir de nivel: COFRES reclamables en el lobby ---
+	# --- recompensas REALES: nivel, monedas, diamantes y cofre ganado ---
 	if int(res["leveled"]) > 0:
 		v.add_child(_vic_chip("⬆ ¡SUBISTE A NIVEL %d!" % int(res["level"]), UITheme.SUCCESS))
 		v.add_child(_vic_chip("🏅 +%d Cofre de Nivel — recógelo en el menú" % int(res["chests"]), UITheme.GOLD))
-	else:
+	if int(res.get("coins", 0)) > 0:
+		v.add_child(_vic_chip("🪙 +%d monedas" % int(res["coins"]), UITheme.GOLD))
+	if int(res.get("gems", 0)) > 0:
+		v.add_child(_vic_chip("💎 +%d DIAMANTES" % int(res["gems"]), Color(0.5, 0.85, 1.0)))
+	if String(res.get("chest", "")) != "":
+		var cname: String = String((Inventory.CHESTS.get(String(res["chest"]), {}) as Dictionary).get("name", "Cofre"))
+		v.add_child(_vic_chip("📦 ¡%s ganado! Descífralo en el Inventario" % cname, UITheme.SUCCESS))
+	if int(res["leveled"]) == 0 and String(res.get("chest", "")) == "":
 		v.add_child(_vic_chip("🎁 Tus cofres te esperan en el menú", UITheme.PRIMARY_EDGE))
 
 	# buttons

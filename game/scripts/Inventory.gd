@@ -40,6 +40,9 @@ var wins := 0          # estadísticas de PERFIL (persisten)
 var losses := 0
 var streak := 0        # racha actual de victorias
 var best_streak := 0   # mejor racha histórica
+var coins := 0         # 🪙 monedas de juego (suben de nivel → compras en Tienda)
+var gems := 0          # 💎 diamantes (cada 5 niveles + % en cofres)
+var chest_inv: Array = []   # cofres GANADOS: [{tier, state, ready_at}] máx 4
 var _loaded := false
 var _starter := false  # kit inicial ya entregado
 
@@ -47,6 +50,14 @@ const XP_WIN := 60
 const XP_LOSS := 25
 const XP_ONLINE_BONUS := 15
 const LEVEL_REWARD_PIECES := 2   # piezas completas al azar por cada nivel
+const LEVEL_COINS := 100         # 🪙 por subir de nivel: nivel nuevo × 100
+const GEM_LEVEL_EVERY := 5       # cada 5 niveles: 💎 = nivel × 2
+const CHEST_SLOTS := 4           # ranuras de cofres ganados (estilo móvil)
+# % de DIAMANTES al abrir cada caja: [probabilidad, mín, máx] — mejor cofre, más %.
+const GEM_DROP := {
+	"free": [0.05, 1, 1], "t5": [0.10, 1, 2], "t10": [0.20, 2, 4],
+	"t15": [0.35, 4, 8], "level": [0.25, 2, 5],
+}
 
 # ---------------------------------------------------------------- modo
 func is_admin() -> bool:
@@ -145,8 +156,10 @@ func missing_pieces_for(fig: Dictionary, old_fig: Dictionary) -> Array:
 func xp_needed() -> int:
 	return level * 100   # curva simple: 100, 200, 300…
 
-## XP al terminar una partida. Cada nivel otorga un COFRE DE NIVEL, que se
-## reclama en el lobby (con su animación). -> {gained, leveled, level, chests}
+## XP al terminar una partida. Cada nivel otorga un COFRE DE NIVEL + 🪙 monedas
+## (nivel nuevo × 100); cada 5 niveles cae un puñado de 💎 (nivel × 2). GANAR
+## como USUARIO además otorga un cofre al inventario de cofres (descifrable).
+## -> {gained, leveled, level, chests, coins, gems, chest}
 func add_match_xp(won: bool, online: bool) -> Dictionary:
 	_ensure_loaded()
 	# estadísticas de PERFIL
@@ -160,25 +173,140 @@ func add_match_xp(won: bool, online: bool) -> Dictionary:
 	var gained := (XP_WIN if won else XP_LOSS) + (XP_ONLINE_BONUS if online else 0)
 	xp += gained
 	var leveled := 0
+	var coin_gain := 0
+	var gem_gain := 0
 	while xp >= xp_needed():
 		xp -= xp_needed()
 		level += 1
 		leveled += 1
+		coin_gain += level * LEVEL_COINS               # 🪙 monedas por nivel
+		if level % GEM_LEVEL_EVERY == 0:
+			gem_gain += level * 2                       # 💎 cada 5 niveles: nivel × 2
 	level_chests += leveled
+	coins += coin_gain
+	gems += gem_gain
+	# COFRE GANADO por victoria (modo usuario, si hay ranura libre)
+	var chest_tier := ""
+	if won and mode == "user":
+		chest_tier = grant_won_chest()
 	_save()
-	return {"gained": gained, "leveled": leveled, "level": level, "chests": leveled}
+	return {"gained": gained, "leveled": leveled, "level": level, "chests": leveled,
+		"coins": coin_gain, "gems": gem_gain, "chest": chest_tier}
 
-## Cofre de NIVEL: 3 piezas (1 premium garantizada). Consume un cofre pendiente.
-func open_level_chest() -> Array:
+## Cofre de NIVEL: 3 piezas (1 premium garantizada) + % de 💎. Consume un cofre
+## pendiente. -> {"pieces": [...], "gems": N} (vacío si no hay cofres).
+func open_level_chest() -> Dictionary:
 	_ensure_loaded()
 	if level_chests <= 0:
-		return []
+		return {}
 	level_chests -= 1
 	var got: Array = [_random_piece(true), _random_piece(false), _random_piece(false)]
 	for key in got:
 		pieces[key] = int(pieces.get(key, 0)) + 1
+	var g := _roll_gems("level")
+	gems += g
 	_save()
-	return got
+	return {"pieces": got, "gems": g}
+
+# ------------------------------------------------------- cofres GANADOS 📦
+## Cofre ganado al VENCER (modo usuario): entra al inventario de cofres cerrado.
+## Peor→mejor: 60% común · 30% épico · 10% legendario. "" si no hay ranura.
+func grant_won_chest() -> String:
+	_ensure_loaded()
+	if chest_inv.size() >= CHEST_SLOTS:
+		return ""
+	var r := randf()
+	var tier := "t5" if r < 0.6 else ("t10" if r < 0.9 else "t15")
+	chest_inv.append({"tier": tier, "state": "locked", "ready_at": 0})
+	_save()
+	return tier
+
+## Estado calculado de un cofre ganado: "locked" | "unlocking" | "ready".
+func chest_info(i: int) -> Dictionary:
+	_ensure_loaded()
+	if i < 0 or i >= chest_inv.size():
+		return {}
+	var c: Dictionary = chest_inv[i]
+	var state := String(c.get("state", "locked"))
+	if state == "unlocking" and _now() >= int(c.get("ready_at", 0)):
+		state = "ready"
+	return {"tier": String(c["tier"]), "state": state,
+		"left": maxi(0, int(c.get("ready_at", 0)) - _now()),
+		"secs": int((CHESTS[String(c["tier"])] as Dictionary)["interval"])}
+
+## "DESCIFRAR": arranca el progreso de apertura (solo UNO a la vez).
+func start_unlock(i: int) -> bool:
+	_ensure_loaded()
+	if i < 0 or i >= chest_inv.size() or any_unlocking():
+		return false
+	var c: Dictionary = chest_inv[i]
+	if String(c.get("state", "locked")) != "locked":
+		return false
+	c["state"] = "unlocking"
+	c["ready_at"] = _now() + int((CHESTS[String(c["tier"])] as Dictionary)["interval"])
+	_save()
+	return true
+
+func any_unlocking() -> bool:
+	_ensure_loaded()
+	for i in chest_inv.size():
+		if String(chest_info(i).get("state", "")) == "unlocking":
+			return true
+	return false
+
+## Abre un cofre ganado YA descifrado: piezas por su nivel + % de 💎.
+## -> {"pieces": [...], "gems": N} (vacío si aún no está listo).
+func open_won_chest(i: int) -> Dictionary:
+	_ensure_loaded()
+	var info := chest_info(i)
+	if info.is_empty() or String(info["state"]) != "ready":
+		return {}
+	var tier_id := String(info["tier"])
+	var c: Dictionary = CHESTS[tier_id]
+	var tier := int(c["tier"])
+	var got: Array = []
+	for k in int(c["pieces"]):
+		var premium := tier == 2 or (tier == 1 and randi() % 2 == 0)
+		got.append(_random_piece(premium))
+	if tier == 2:
+		got[0] = _random_from_prefix("model:")   # legendario: figura garantizada
+	for key in got:
+		pieces[key] = int(pieces.get(key, 0)) + 1
+	var g := _roll_gems(tier_id)
+	gems += g
+	chest_inv.remove_at(i)
+	_save()
+	return {"pieces": got, "gems": g}
+
+## Tirada de DIAMANTES al abrir una caja (más % y cantidad en cofres mejores).
+func _roll_gems(kind: String) -> int:
+	var d: Array = GEM_DROP.get(kind, [0.0, 0, 0])
+	if randf() >= float(d[0]):
+		return 0
+	return int(d[1]) + randi() % maxi(1, int(d[2]) - int(d[1]) + 1)
+
+# ------------------------------------------------------- tienda 🛍
+## Compra REAL: descuenta 🪙/💎 y añade la pieza al inventario. false si no alcanza.
+func buy(key: String, price: int, currency: String) -> bool:
+	_ensure_loaded()
+	if currency == "gems":
+		if gems < price:
+			return false
+		gems -= price
+	else:
+		if coins < price:
+			return false
+		coins -= price
+	pieces[key] = int(pieces.get(key, 0)) + 1
+	_save()
+	return true
+
+## ADMIN: añade/quita fondos a la cuenta (clavado en ≥ 0).
+func adjust_funds(d_coins: int, d_gems: int) -> void:
+	_ensure_loaded()
+	coins = maxi(0, coins + d_coins)
+	gems = maxi(0, gems + d_gems)
+	_save()
 
 ## BORRA piezas y fragmentos — SOLO eso (los personajes creados, XP, nivel,
 ## cofres y estadísticas se conservan). Estado de cuenta nueva: en modo usuario
@@ -202,7 +330,8 @@ func gift_all(n := 3) -> int:
 	return cat.size()
 
 # ---------------------------------------------------------------- cajas
-## Caja GRATIS: fragmentos aleatorios (3 piezas distintas, 2–4 frag c/u).
+## Caja GRATIS: fragmentos aleatorios (3 piezas distintas, 2–4 frag c/u) + % 💎.
+## -> {"frags": {key: n}, "gems": N}
 func open_free() -> Dictionary:
 	_ensure_loaded()
 	var cat := catalog()
@@ -212,8 +341,10 @@ func open_free() -> Dictionary:
 		var n := 2 + randi() % 3
 		fragments[key] = int(fragments.get(key, 0)) + n
 		got[key] = int(got.get(key, 0)) + n
+	var g := _roll_gems("free")
+	gems += g
 	_save()
-	return got
+	return {"frags": got, "gems": g}
 
 func chest_ready(id: String) -> bool:
 	_ensure_loaded()
@@ -412,6 +543,9 @@ func _ensure_loaded() -> void:
 		losses = int(data.get("losses", 0))
 		streak = int(data.get("streak", 0))
 		best_streak = int(data.get("best_streak", 0))
+		coins = int(data.get("coins", 0))
+		gems = int(data.get("gems", 0))
+		chest_inv = data.get("chest_inv", [])
 		_starter = bool(data.get("starter", false))
 
 func _save() -> void:
@@ -422,5 +556,6 @@ func _save() -> void:
 			"next_chest": next_chest, "xp": xp, "level": level,
 			"lvl_chests": level_chests, "starter": _starter,
 			"wins": wins, "losses": losses, "streak": streak, "best_streak": best_streak,
+			"coins": coins, "gems": gems, "chest_inv": chest_inv,
 		}))
 		f.close()

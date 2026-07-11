@@ -1,7 +1,7 @@
 extends Control
-## TIENDA (esquema del handoff §10) — SOLO VER por ahora: categorías reales
-## (Modelos/Ataques/Pasivas/Tipos de ataque/Partes) con tarjetas y precios de
-## muestra. Comprar muestra un aviso; la monetización real llega en Vuelta 02.
+## TIENDA REAL: cada tarjeta es una PIEZA del inventario (Modelos/Ataques/
+## Pasivas/Tipos de ataque/Partes). Comprar descuenta 🪙/💎 de tu cuenta y
+## añade la pieza a tu inventario (Inventory.buy). Saldos reales en el header.
 
 const CATS := ["Modelos", "Ataques", "Pasivas", "Tipos de ataque", "Partes"]
 const CAT_ICON := {"Modelos": "🧍", "Ataques": "🎯", "Pasivas": "✨", "Tipos de ataque": "🎲", "Partes": "🧩"}
@@ -10,6 +10,8 @@ var _cat := 0
 var _grid: GridContainer
 var _chip_row: HBoxContainer
 var _toast: Label
+var _coin_lbl: Label
+var _gem_lbl: Label
 
 func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
@@ -37,11 +39,15 @@ func _ready() -> void:
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UITheme.label(title, 24, UITheme.TEXT, true, 800)
 	top.add_child(title)
-	top.add_child(_coin("🪙", "1,250", UITheme.GOLD))
-	top.add_child(_coin("💎", "30", Color(0.5, 0.85, 1.0)))
+	var cp := _coin("🪙", str(Inventory.coins), UITheme.GOLD)
+	_coin_lbl = cp.get_meta("value")
+	top.add_child(cp)
+	var gp := _coin("💎", str(Inventory.gems), Color(0.5, 0.85, 1.0))
+	_gem_lbl = gp.get_meta("value")
+	top.add_child(gp)
 
 	var note := Label.new()
-	note.text = "Vista PREVIA de la tienda — las compras se activan en la siguiente vuelta."
+	note.text = "Compra piezas para el Creador: 🪙 subes de nivel jugando · 💎 cada 5 niveles y en cofres."
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	UITheme.label(note, 11, UITheme.MUTED, false, 600)
 	root.add_child(note)
@@ -108,55 +114,64 @@ func _build_chips() -> void:
 		_chip_row.add_child(b)
 
 # ---------------------------------------------------------------- items reales
-## Cada ítem: {name, rarity ("common".."mythic"), icon}. Datos del juego real.
+## Cada ítem es una PIEZA real del inventario: {key, name, rarity, icon}.
+## Comprarla la añade a Inventory.pieces (usable en el Creador y en mazos).
 func _items_for(cat: String) -> Array:
 	var out: Array = []
+	var inv := get_node("/root/Inventory")
 	match cat:
 		"Modelos":
 			for f in Roster.FIGURES:
 				if bool(f.get("custom", false)):
 					continue
-				out.append({"name": String(f.get("name", "?")),
+				out.append({"key": "model:" + String(f.get("id", "")),
+					"name": String(f.get("name", "?")),
 					"rarity": FigureCard._rarity_key(f), "icon": "🧍"})
 		"Ataques":
-			var seen := {}
-			for f in Roster.FIGURES:
-				for s in f.get("attack", []):
-					var nm := String(s.get("name", ""))
-					if nm == "" or seen.has(nm):
-						continue
-					seen[nm] = true
-					var p := int(s.get("pow", 0))
-					out.append({"name": nm,
-						"rarity": ("epic" if p >= 80 else ("rare" if p >= 50 else "common")), "icon": "🎯"})
-		"Pasivas":
-			for pid in Roster.PASSIVES.keys():
-				if pid in CharacterCreator.HIDDEN_PASSIVES:
-					continue
-				out.append({"name": String(Roster.PASSIVES[pid].get("name", pid)),
-					"rarity": "epic", "icon": "✨"})
-		"Tipos de ataque":
-			for t in CharacterCreator.TYPES:
-				var r := "common"
-				if String(t).contains("D8") or String(t).contains("D10") or String(t).contains("D12") or String(t).contains("Doble"):
-					r = "epic"
-				elif String(t).contains("D4") or String(t).contains("D6"):
-					r = "rare"
-				elif String(t).contains("2d6"):
-					r = "legend"
-				out.append({"name": String(t), "rarity": r, "icon": "🎲"})
-		"Partes":
-			var inv := get_node("/root/Inventory")
-			var shown := 0
+			# colores de ataque + estados (las piezas que arman tu pool)
 			for key in inv.catalog():
 				var ks := String(key)
-				if not (ks.begins_with("stamina:") or ks.begins_with("color:") or ks.begins_with("resist:")):
+				if ks.begins_with("color:"):
+					var col := ks.trim_prefix("color:")
+					var r := "epic" if col == "gold" else ("rare" if (col == "blue" or col == "purple") else "common")
+					out.append({"key": ks, "name": String(inv.piece_name(ks)), "rarity": r, "icon": "🎯"})
+				elif ks.begins_with("fx:"):
+					var fxn := ks.trim_prefix("fx:")
+					var hard := fxn in ["Miedo", "Paralizado", "Congelado", "Sueño"]
+					out.append({"key": ks, "name": String(inv.piece_name(ks)),
+						"rarity": "epic" if hard else "rare", "icon": "🌀"})
+		"Pasivas":
+			for key in inv.catalog():
+				var ks := String(key)
+				if ks.begins_with("passive:"):
+					out.append({"key": ks, "name": String(inv.piece_name(ks)), "rarity": "epic", "icon": "✨"})
+		"Tipos de ataque":
+			for key in inv.catalog():
+				var ks := String(key)
+				if not ks.begins_with("atype:"):
 					continue
-				out.append({"name": String(inv.piece_name(ks)),
-					"rarity": ("rare" if ks.begins_with("resist:") else "common"), "icon": "🧩"})
-				shown += 1
-				if shown >= 12:
-					break
+				var t := ks.trim_prefix("atype:")
+				var r := "common"
+				if t.contains("D8") or t.contains("D10") or t.contains("D12") or t.contains("Doble"):
+					r = "epic"
+				elif t.contains("D4") or t.contains("D6"):
+					r = "rare"
+				elif t.contains("2d6"):
+					r = "legend"
+				out.append({"key": ks, "name": String(inv.piece_name(ks)), "rarity": r, "icon": "🎲"})
+		"Partes":
+			for key in inv.catalog():
+				var ks := String(key)
+				var r := ""
+				if ks.begins_with("stamina:"):
+					var n := int(ks.trim_prefix("stamina:"))
+					r = "legend" if n >= 5 else ("epic" if n == 4 else ("rare" if n == 3 else "common"))
+				elif ks.begins_with("resist:"):
+					r = "rare"
+				elif ks.begins_with("rarity:"):
+					r = ks.trim_prefix("rarity:")
+				if r != "":
+					out.append({"key": ks, "name": String(inv.piece_name(ks)), "rarity": r, "icon": "🧩"})
 	return out
 
 func _rarity_col(r: String) -> Color:
@@ -190,7 +205,9 @@ func _build_items() -> void:
 		_grid.add_child(_item_card(it))
 
 func _item_card(it: Dictionary) -> Control:
+	var inv := get_node("/root/Inventory")
 	var rar := _rarity_col(String(it["rarity"]))
+	var key := String(it.get("key", ""))
 	var p := PanelContainer.new()
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	p.add_theme_stylebox_override("panel", UITheme.panel(Color(0.071, 0.09, 0.18), Color(rar.r, rar.g, rar.b, 0.5), 14, 1, 10))
@@ -208,20 +225,36 @@ func _item_card(it: Dictionary) -> Control:
 	nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	UITheme.label(nm, 13, UITheme.TEXT, true, 700)
 	v.add_child(nm)
+	var have := int(inv.pieces.get(key, 0))
 	var rl := Label.new()
-	rl.text = _rarity_es(String(it["rarity"]))
+	rl.text = _rarity_es(String(it["rarity"])) + ("   ·   tienes ×%d" % have if have > 0 else "")
 	rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	UITheme.label(rl, 10, rar, true, 700)
 	v.add_child(rl)
 	var price := _price_of(String(it["rarity"]))
+	var cur: String = "gems" if String(price[0]) == "💎" else "coins"
+	var cost := int(String(price[1]).replace(",", ""))
 	var buy := Button.new()
 	buy.text = "%s %s" % [String(price[0]), String(price[1])]
 	buy.custom_minimum_size = Vector2(0, 38)
 	UITheme.button_font(buy, 13, UITheme.TEXT, true, 800)
 	UITheme.style_surface(buy, UITheme.SURFACE2, UITheme.BORDER, 10)
-	buy.pressed.connect(func(): _toast_msg("🛍 Tienda de PRUEBA — compras en la próxima vuelta"))
+	# COMPRA REAL: descuenta el saldo y añade la pieza al inventario.
+	buy.pressed.connect(func():
+		if inv.buy(key, cost, cur):
+			_refresh_balances()
+			_toast_msg("✓ +1 %s — ya está en tu inventario" % String(it["name"]))
+			_build_items()
+		else:
+			_toast_msg("No te alcanza: faltan %s" % ("💎 diamantes" if cur == "gems" else "🪙 monedas")))
 	v.add_child(buy)
 	return p
+
+func _refresh_balances() -> void:
+	if _coin_lbl != null and is_instance_valid(_coin_lbl):
+		_coin_lbl.text = str(Inventory.coins)
+	if _gem_lbl != null and is_instance_valid(_gem_lbl):
+		_gem_lbl.text = str(Inventory.gems)
 
 func _toast_msg(text: String) -> void:
 	var box = _toast.get_meta("box") if _toast != null and _toast.has_meta("box") else null
@@ -248,6 +281,7 @@ func _coin(icon: String, value: String, col: Color) -> Control:
 	vl.text = value
 	UITheme.label(vl, 13, UITheme.TEXT, true, 700)
 	h.add_child(vl)
+	p.set_meta("value", vl)
 	return p
 
 ## Nav inferior Home / Tienda (activa) / Perfil.
