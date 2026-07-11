@@ -2,6 +2,8 @@ extends SceneTree
 ## Headless engine test: combat resolver unit checks + a full bot-vs-bot game.
 ## Run: Godot --headless --path game --script res://tools/test_engine.gd
 
+var _fails := 0   # marcador global: cualquier FAIL individual tumba el test
+
 func _initialize() -> void:
 	_test_resolver()
 	_test_outcome()
@@ -9,6 +11,7 @@ func _initialize() -> void:
 	_test_map()
 	_test_surround()
 	_test_game()
+	print("ENGINE_OK" if _fails == 0 else "ENGINE_FAIL (%d)" % _fails)
 	quit()
 
 func _test_map() -> void:
@@ -71,9 +74,13 @@ func _test_effects() -> void:
 	_expect_b("status expires over time", gs.has_status(u, "fear"), false)
 
 func _expect(name: String, got: int, want: int) -> void:
+	if got != want:
+		_fails += 1
 	print(("  OK   " if got == want else "  FAIL ") + name + "  got=%d want=%d" % [got, want])
 
 func _expect_b(name: String, got: bool, want: bool) -> void:
+	if got != want:
+		_fails += 1
 	print(("  OK   " if got == want else "  FAIL ") + name + "  got=%s want=%s" % [got, want])
 
 func _test_outcome() -> void:

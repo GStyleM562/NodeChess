@@ -93,6 +93,9 @@
 - Música por estado + 11 slots SFX; volúmenes y toggles en Configuración ⚙.
 
 ## 🕐 PENDIENTES
+> Lista completa y priorizada: `docs/PENDIENTES_Vuelta02.md` · Plan de
+> pruebas (suite + 🤖 robot + checklist humana): `docs/PLAN_Testing.md`.
+
 **Del lado de GOJAN (assets, no bloquean código)**
 - SFX reales (11 carpetas en `game/assets/audio/sfx/`).
 - Meshy: Storm Valkyrie nueva (sigue excluida de la CPU), isla real,
