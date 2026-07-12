@@ -83,9 +83,15 @@
 - Velocidad de combate ×2 (Configuración) + botón ⏭ para saltar la animación.
 - MODO DALTÓNICO: paleta Okabe-Ito + símbolo por color (■◆✦⬟✖) en ruletas.
 - Portal visual (toro violeta girando) en los teleporters de Túneles.
-- TUTORIAL jugable: primera partida guiada (o 🎓 en Configuración) — panel de
-  6 pasos (despliega→mueve→ataca→saltos/candados→buff→gana) contra un muñeco
-  de práctica que camina pero JAMÁS ataca; al ganar queda marcado como hecho.
+- FULL TUTORIAL — aula "🎓 Cómo jugar" (botón en Home, rejilla 4×2): 11
+  capítulos por categoría con ✓/XP. 🎲 Tablero (9): primera partida + 8
+  LECCIONES GUIONADAS estilo NODEHACK — combates con resultado YA marcado
+  (índices forzados al motor real), acciones OBLIGATORIAS (gate: lo que no
+  corresponde al paso se ignora), rival ESTATUA, marcador 👉 pulsante sobre el
+  objetivo (desplegar/mover, combatir, Cleanse, saltar, rodear, tapar entrada,
+  buff node, tomar portería). 📱 Menú (2): guías "pícale aquí" reales para
+  craftear y descifrar cofres. Cada capítulo da XP la PRIMERA vez (repetibles);
+  BIENVENIDA al abrir el juego con pendientes por categoría y XP por reclamar.
 - TIENDA y PERFIL visitables desde la nav inferior (vista PREVIA, solo ver):
   Tienda con categorías reales (Modelos/Ataques/Pasivas/Tipos/Partes) y
   precios de muestra; Perfil con identidad, estadísticas REALES y favoritos.
@@ -120,6 +126,9 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- FULL TUTORIAL: aula "Cómo jugar" con 11 capítulos (8 lecciones guionadas con
+  resultados marcados + gate de acciones + 👉, 2 guías de menú, XP por capítulo,
+  bienvenida con pendientes). 🤖 Modo Robot en standby (docs/STANDBY_ModoRobot.md).
 - STATS INVENTARIADAS: daños (5–100 de 5 en 5), estrellas (1–3), probabilidades
   (5–70%) y clases ahora son PIEZAS coleccionables con reglas de consumo por
   color (blanco/oro consumen daño; púrpura consume estrellas; azul/rojo ni uno

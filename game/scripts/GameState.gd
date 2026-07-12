@@ -910,7 +910,11 @@ func _pw(k: String) -> float:
 
 ## CPU por lista de prioridades (ver docs/AI_CPU.md). 0 = fácil (legacy);
 ## 1+ = lista completa; 2 = además gasta modificadores en ataques ganadores.
+## -1 = muñeco de práctica (camina, jamás ataca) · -2 = ESTATUA (lecciones
+## guionadas del FULL tutorial: el rival no actúa en absoluto).
 func bot_action(team: String) -> Dictionary:
+	if bot_difficulty <= -2:
+		return {"type": "pass"}
 	if bot_difficulty < 0:
 		return _bot_tutorial(team)
 	if bot_difficulty == 0:

@@ -164,6 +164,37 @@ func missing_pieces_for(fig: Dictionary, old_fig: Dictionary) -> Array:
 func xp_needed() -> int:
 	return level * 100   # curva simple: 100, 200, 300…
 
+## Bucle de niveles COMPARTIDO: aplica xp ganada, sube niveles y acredita las
+## recompensas (🪙 nivel×100 por nivel · 💎 nivel×2 cada 5 · cofre de nivel).
+func _apply_xp(gained: int) -> Dictionary:
+	xp += gained
+	var leveled := 0
+	var coin_gain := 0
+	var gem_gain := 0
+	while xp >= xp_needed():
+		xp -= xp_needed()
+		level += 1
+		leveled += 1
+		coin_gain += level * LEVEL_COINS
+		if level % GEM_LEVEL_EVERY == 0:
+			gem_gain += level * 2
+	level_chests += leveled
+	coins += coin_gain
+	gems += gem_gain
+	if leveled > 0:
+		_log_tx({"k": "nivel", "lvl": level, "coins": coin_gain, "gems": gem_gain})
+	return {"leveled": leveled, "coins": coin_gain, "gems": gem_gain}
+
+## XP directa (tutoriales/recompensas) SIN tocar estadísticas de partidas.
+## -> {gained, leveled, level, coins, gems}
+func grant_xp(gained: int, why := "recompensa") -> Dictionary:
+	_ensure_loaded()
+	var lv := _apply_xp(gained)
+	_log_tx({"k": "xp", "why": why, "xp": gained})
+	_save()
+	return {"gained": gained, "leveled": int(lv["leveled"]), "level": level,
+		"coins": int(lv["coins"]), "gems": int(lv["gems"])}
+
 ## XP al terminar una partida. Cada nivel otorga un COFRE DE NIVEL + 🪙 monedas
 ## (nivel nuevo × 100); cada 5 niveles cae un puñado de 💎 (nivel × 2). GANAR
 ## como USUARIO además otorga un cofre al inventario de cofres (descifrable).
@@ -179,22 +210,10 @@ func add_match_xp(won: bool, online: bool) -> Dictionary:
 		losses += 1
 		streak = 0
 	var gained := (XP_WIN if won else XP_LOSS) + (XP_ONLINE_BONUS if online else 0)
-	xp += gained
-	var leveled := 0
-	var coin_gain := 0
-	var gem_gain := 0
-	while xp >= xp_needed():
-		xp -= xp_needed()
-		level += 1
-		leveled += 1
-		coin_gain += level * LEVEL_COINS               # 🪙 monedas por nivel
-		if level % GEM_LEVEL_EVERY == 0:
-			gem_gain += level * 2                       # 💎 cada 5 niveles: nivel × 2
-	level_chests += leveled
-	coins += coin_gain
-	gems += gem_gain
-	if leveled > 0:
-		_log_tx({"k": "nivel", "lvl": level, "coins": coin_gain, "gems": gem_gain})
+	var lv := _apply_xp(gained)
+	var leveled := int(lv["leveled"])
+	var coin_gain := int(lv["coins"])
+	var gem_gain := int(lv["gems"])
 	# COFRE GANADO por victoria (modo usuario, si hay ranura libre). Si las
 	# ranuras están LLENAS se reporta para avisarle al jugador (cofre perdido).
 	var chest_tier := ""

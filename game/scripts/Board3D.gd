@@ -70,6 +70,12 @@ var _tut_step := -1          # -1 = sin tutorial
 var _tut_panel: PanelContainer
 var _tut_lbl: Label
 var _tut_ok: Button
+var _steps_src: Array = []   # pasos activos (TUT_STEPS legado o lección guionada)
+# --- LECCIÓN guionada del FULL tutorial (TutorialLib) ---
+var _lesson_id := ""             # "" = sin lección
+var _lesson_saved_mods: Array = []
+var _lesson_mark: Node3D         # marcador 👉 del nodo objetivo del paso
+var _lesson_done := false
 
 const TURN_LIMIT := 75.0     # online: segundos por turno (al agotarse, pasa solo)
 var _turn_left := 0.0
@@ -132,6 +138,8 @@ func _ready() -> void:
 			NetSession.end_online()
 			get_tree().change_scene_to_file.call_deferred("res://scenes/main_menu.tscn")
 			return
+	elif Loadout.lesson != "":
+		_lesson_setup()   # LECCIÓN guionada: tablero, figuras y estado prescritos
 	else:
 		_gs = GameState.new(MapData.new(0 if Loadout.tutorial else Loadout.map_index))
 		# Teams come from the Deck Builder (player) + a preset enemy deck. Si el
@@ -159,6 +167,8 @@ func _ready() -> void:
 		NetSession.client.match_start.connect(_on_rematch_start)
 		NetSession.net_paused.connect(_on_net_paused)
 		_turn_left = TURN_LIMIT
+	elif Loadout.lesson != "":
+		_lesson_begin_ui()             # panel de pasos + marcador del objetivo
 	elif Loadout.tutorial:
 		_gs.bot_difficulty = -1        # bot pasivo de tutorial
 		_tut_start()
@@ -217,6 +227,13 @@ func _net_send(action: Dictionary) -> void:
 func _leave_to_menu() -> void:
 	Engine.time_scale = 1.0
 	Loadout.tutorial = false
+	if _lesson_id != "":
+		# abandonar una lección: restaurar mods reales y volver al AULA
+		Loadout.player_modifiers = _lesson_saved_mods
+		Loadout.lesson = ""
+		Music.play_menu()
+		get_tree().change_scene_to_file("res://scenes/tutorials.tscn")
+		return
 	if _online:
 		Roster.FIGURES = _saved_roster                 # un-swap the roster
 		NetSession.end_online()
@@ -370,7 +387,9 @@ func _build_board() -> void:
 		_entrance_owner[e] = "enemy"
 
 # ---------------------------------------------------------------- tutorial
-func _tut_start() -> void:
+## Panel de pasos COMPARTIDO: lo usa el tutorial de primera partida (TUT_STEPS)
+## y las LECCIONES guionadas del FULL tutorial (TutorialLib.lesson).
+func _tut_build_panel() -> void:
 	_tut_panel = PanelContainer.new()
 	_tut_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_tut_panel.offset_left = 12
@@ -392,31 +411,211 @@ func _tut_start() -> void:
 	UITheme.style_primary(_tut_ok, UITheme.SUCCESS, 10)
 	_tut_ok.pressed.connect(func(): _tut_advance())
 	vb.add_child(_tut_ok)
+
+func _tut_start() -> void:
+	_steps_src = TUT_STEPS.duplicate()
+	_tut_build_panel()
 	_tut_step = 0
 	_tut_show()
 
 func _tut_show() -> void:
-	if _tut_step < 0 or _tut_step >= TUT_STEPS.size() or _tut_panel == null:
+	if _tut_step < 0 or _tut_step >= _steps_src.size() or _tut_panel == null:
 		return
-	var st: Dictionary = TUT_STEPS[_tut_step]
+	var st: Dictionary = _steps_src[_tut_step]
 	_tut_lbl.text = String(st["text"])
 	_tut_ok.visible = String(st["kind"]) == "info"
+	# lección: marca el nodo objetivo del paso con el 👉 pulsante
+	if _lesson_id != "":
+		_lesson_place_mark(int(st.get("node", -1)))
 
-## Avanza el tutorial cuando el jugador HIZO la acción del paso actual.
-func _tut_action(kind: String) -> void:
-	if _tut_step < 0 or _tut_step >= TUT_STEPS.size():
+## Avanza cuando el jugador HIZO la acción del paso actual. En lección, además
+## debe coincidir el objetivo (nodo / modificador) del guion.
+func _tut_action(kind: String, target := -1, mid := "") -> void:
+	if _tut_step < 0 or _tut_step >= _steps_src.size():
 		return
-	if String(TUT_STEPS[_tut_step]["kind"]) == kind:
-		_tut_advance()
+	var st: Dictionary = _steps_src[_tut_step]
+	if String(st["kind"]) != kind:
+		return
+	if _lesson_id != "":
+		if st.has("node") and int(st["node"]) != target:
+			return
+		if st.has("mod") and String(st["mod"]) != mid:
+			return
+	_tut_advance()
 
 func _tut_advance() -> void:
 	_tut_step += 1
-	if _tut_step >= TUT_STEPS.size():
+	if _tut_step >= _steps_src.size():
 		if _tut_panel != null:
 			_tut_panel.visible = false
+		_lesson_clear_mark()
+		if _lesson_id != "":
+			_lesson_complete()
 		return
 	_tut_show()
 	Sfx.play("ui_click")
+
+# ---------------------------------------------------------------- lecciones 🎓
+## Construye el tablero PRESCRITO de la lección (figuras ya colocadas, estados,
+## energía y modificadores del guion; el rival es una ESTATUA que nunca actúa).
+func _lesson_setup() -> void:
+	_lesson_id = Loadout.lesson
+	var spec: Dictionary = TutorialLib.lesson(_lesson_id)
+	_gs = GameState.new(MapData.new(int(spec.get("map", 0))))
+	_gs.turn_no = int(spec.get("turn_no", 0))
+	_gs.bot_difficulty = -2
+	var placed := {"player": [], "enemy": []}
+	for side in ["player", "enemy"]:
+		for p in spec.get(side, []):
+			var d: Dictionary = p
+			var uid := _gs.add_to_bench(side, int(d["ri"]))
+			var n := int(d.get("node", -1))
+			if n >= 0:
+				_gs.bench[side].erase(uid)
+				_gs.units[uid]["node"] = n
+				_gs.board[n] = uid
+			(placed[side] as Array).append(uid)
+	for st in spec.get("statuses", []):
+		var sd: Dictionary = st
+		_gs.apply_status(int((placed[String(sd["team"])] as Array)[int(sd["i"])]), String(sd["id"]))
+	if spec.has("energy"):
+		_gs.energy["player"] = int(spec["energy"])
+	# modificadores del guion (los reales del jugador se restauran al salir)
+	_lesson_saved_mods = Loadout.player_modifiers
+	Loadout.player_modifiers = (spec.get("mods", []) as Array).duplicate()
+
+func _lesson_begin_ui() -> void:
+	var spec: Dictionary = TutorialLib.lesson(_lesson_id)
+	_steps_src = []
+	for s in spec.get("steps", []):
+		var d: Dictionary = (s as Dictionary).duplicate()
+		d["kind"] = String(d.get("do", "info"))
+		_steps_src.append(d)
+	_tut_build_panel()
+	_tut_step = 0
+	_tut_show()
+
+## GATE de lección (modelo NODEHACK): las acciones que no corresponden al paso
+## actual se IGNORAN — la mesa obliga a jugar lo que se enseña.
+func _lesson_gate(kind: String, target := -1, mid := "") -> bool:
+	if _lesson_id == "" or _lesson_done:
+		return true
+	if _tut_step < 0 or _tut_step >= _steps_src.size():
+		return true
+	var st: Dictionary = _steps_src[_tut_step]
+	var k := String(st.get("kind", "info"))
+	if k == "info":
+		_show_banner("Lee la instrucción y toca «Entendido ✓»", UITheme.GOLD)
+		return false
+	if k != kind or (st.has("node") and int(st["node"]) != target) \
+			or (st.has("mod") and String(st["mod"]) != mid):
+		_show_banner("Sigue la instrucción del tutorial 👉", UITheme.GOLD)
+		return false
+	return true
+
+## Índices FORZADOS del combate guionado del paso actual ([-1,-1] = tirada libre).
+func _lesson_forced() -> Array:
+	if _lesson_id != "" and _tut_step >= 0 and _tut_step < _steps_src.size():
+		var st: Dictionary = _steps_src[_tut_step]
+		return [int(st.get("ia", -1)), int(st.get("ib", -1))]
+	return [-1, -1]
+
+## Marcador 👉 pulsante sobre el nodo objetivo del paso.
+func _lesson_place_mark(nid: int) -> void:
+	_lesson_clear_mark()
+	if nid < 0:
+		return
+	_lesson_mark = Node3D.new()
+	add_child(_lesson_mark)
+	_lesson_mark.position = _gs.map.pos_of(nid) + Vector3(0, 0.06, 0)
+	var ring := MeshInstance3D.new()
+	var tor := TorusMesh.new()
+	tor.inner_radius = 0.4
+	tor.outer_radius = 0.52
+	ring.mesh = tor
+	var m := StandardMaterial3D.new()
+	m.albedo_color = UITheme.GOLD
+	m.emission_enabled = true
+	m.emission = UITheme.GOLD
+	m.emission_energy_multiplier = 1.8
+	ring.material_override = m
+	_lesson_mark.add_child(ring)
+	var hand := Label3D.new()
+	hand.text = "👉"
+	hand.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	hand.no_depth_test = true
+	hand.font_size = 96
+	hand.pixel_size = 0.012
+	hand.position = Vector3(0, 1.15, 0)
+	_lesson_mark.add_child(hand)
+	var tw := create_tween().set_loops()
+	tw.tween_property(_lesson_mark, "scale", Vector3(1.18, 1.18, 1.18), 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(_lesson_mark, "scale", Vector3.ONE, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+func _lesson_clear_mark() -> void:
+	if _lesson_mark != null and is_instance_valid(_lesson_mark):
+		_lesson_mark.queue_free()
+	_lesson_mark = null
+
+## Capítulo superado: marca + XP (solo la primera vez) + tarjeta de cierre.
+func _lesson_complete() -> void:
+	if _lesson_done:
+		return
+	_lesson_done = true
+	_busy = true
+	_over = true
+	_lesson_clear_mark()
+	if _tut_panel != null:
+		_tut_panel.visible = false
+	Music.stop()
+	Sfx.play("victory")
+	var res: Dictionary = TutorialLib.complete(_lesson_id)
+	var ch: Dictionary = TutorialLib.chapter(_lesson_id)
+	var cl := CanvasLayer.new()
+	cl.layer = 30
+	add_child(cl)
+	var dim := ColorRect.new()
+	dim.color = Color(0.02, 0.03, 0.06, 0.85)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	cl.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cl.add_child(cc)
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(minf(400.0, get_viewport().get_visible_rect().size.x - 28.0), 0)
+	card.add_theme_stylebox_override("panel", UITheme.panel(Color(0.07, 0.1, 0.09, 0.99), UITheme.SUCCESS, 20, 2, 18))
+	cc.add_child(card)
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 10)
+	card.add_child(v)
+	v.add_child(_vic_lbl("🎓", 42, UITheme.SUCCESS, true, 800))
+	v.add_child(_vic_lbl("¡CAPÍTULO SUPERADO!", 24, UITheme.SUCCESS, true, 800))
+	v.add_child(_vic_lbl(String(ch.get("icon", "")) + "  " + String(ch.get("title", "")), 16, UITheme.TEXT, true, 700))
+	if bool(res.get("first", false)) and int(res.get("xp", 0)) > 0:
+		v.add_child(_vic_chip("✨ +%d XP" % int(res["xp"]), UITheme.GOLD))
+		if int(res.get("leveled", 0)) > 0:
+			v.add_child(_vic_chip("⬆ ¡SUBISTE A NIVEL %d!" % int(res["level"]), UITheme.SUCCESS))
+	else:
+		v.add_child(_vic_chip("Ya lo habías superado — repaso sin XP", UITheme.PRIMARY_EDGE))
+	var cont := Button.new()
+	cont.text = "Continuar  ▶"
+	cont.custom_minimum_size = Vector2(280, 52)
+	UITheme.button_font(cont, 17, Color.WHITE, true, 800)
+	UITheme.style_primary(cont, UITheme.SUCCESS, 14)
+	cont.pressed.connect(_lesson_exit)
+	v.add_child(_center(cont))
+	card.pivot_offset = card.size * 0.5
+	card.scale = Vector2(0.55, 0.55)
+	var tw := create_tween()
+	tw.tween_property(card, "scale", Vector2.ONE, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _lesson_exit() -> void:
+	Loadout.player_modifiers = _lesson_saved_mods
+	Loadout.lesson = ""
+	Engine.time_scale = 1.0
+	get_tree().change_scene_to_file("res://scenes/tutorials.tscn")
 
 ## PORTAL: halo violeta que gira + chispa orbitando (los dos extremos del túnel).
 func _add_portal_vis(nid: int) -> void:
@@ -1540,11 +1739,14 @@ func _refresh_energy_mods() -> void:
 func _on_modifier(mid: String) -> void:
 	if _busy or _over or _gs.turn_team != "player":
 		return
+	if not _lesson_gate("mod", -1, mid):
+		return
 	if mid == "trap":
 		_begin_trap_targeting()
 		return
 	if _gs.activate_modifier("player", mid):
 		var m: Dictionary = GameState.MODIFIERS[mid]
+		_tut_action("mod", -1, mid)
 		_net_send({"kind": "modifier", "mid": mid})
 		_show_banner("Usaste %s — %s" % [String(m["name"]), String(m["desc"])], Color(1.0, 0.85, 0.3))
 		_refresh_bench_ui()   # revivir devuelve una figura a la banca
@@ -1782,7 +1984,9 @@ func _set_highlight(nid: int, col: Color) -> void:
 
 # ---------------------------------------------------------------- player actions
 func _player_deploy(uid: int, node: int) -> void:
-	_tut_action("deploy")
+	if not _lesson_gate("deploy", node):
+		return
+	_tut_action("deploy", node)
 	_clear_highlights()
 	_deploy_uid = -1
 	_gs.deploy(uid, node)
@@ -1799,7 +2003,9 @@ func _player_deploy(uid: int, node: int) -> void:
 func _player_move(node: int) -> void:
 	var cost: int = int(_reach[node])
 	# Compute the path BEFORE moving (board state is still current). Jump-aware.
-	_tut_action("move")
+	if not _lesson_gate("move", node):
+		return
+	_tut_action("move", node)
 	var path := _gs.move_path(_active_uid, node)
 	# Phasing figures walk THROUGH occupants (keep moving/attacking); a non-phasing
 	# move onto a path that starts with an occupied node is a JUMP (ends the turn).
@@ -1910,6 +2116,10 @@ func _dramatize_effect(uid: int, fx_text: String) -> void:
 	tw.tween_callback(l.queue_free)
 
 func _player_attack(foe_uid: int) -> void:
+	if not _lesson_gate("attack"):
+		return
+	# lección: el combate puede venir con el resultado YA marcado (índices fijos)
+	var forced := _lesson_forced()
 	_tut_action("attack")
 	var att := _active_uid
 	var moved := maxi(0, int(_gs.units[att]["stamina"]) - _remaining)   # for Lunge / Dive
@@ -1917,7 +2127,7 @@ func _player_attack(foe_uid: int) -> void:
 	_busy = true
 	_committed = true
 	_update_status()
-	var rec := _gs.attack(att, foe_uid, moved)
+	var rec := _gs.attack(att, foe_uid, moved, int(forced[0]), int(forced[1]))
 	_net_send({"kind": "attack", "att": att, "def": foe_uid, "moved": moved,
 		"idx_a": int(rec.get("idx_a", -1)), "idx_b": int(rec.get("idx_b", -1))})
 	await _play_combat(att, foe_uid, rec)
@@ -1935,6 +2145,9 @@ func _player_attack(foe_uid: int) -> void:
 func _on_end_turn_pressed() -> void:
 	if _busy or _over or _gs.turn_team != "player":
 		return
+	if not _lesson_gate("end"):
+		return
+	_tut_action("end")
 	Sfx.play("end_turn")
 	await _end_player_turn()
 
@@ -2458,6 +2671,11 @@ func _check_and_show_winner() -> bool:
 
 func _show_winner(team: String) -> void:
 	Engine.time_scale = 1.0
+	# LECCIÓN: ganar (p. ej. tomar la portería) completa el capítulo — la
+	# pantalla normal de victoria/XP no aplica dentro del aula.
+	if _lesson_id != "":
+		_lesson_complete()
+		return
 	if _skip_btn != null:
 		_skip_btn.visible = false
 	_over = true
@@ -2469,6 +2687,7 @@ func _show_winner(team: String) -> void:
 	Sfx.play("victory" if win else "defeat")
 	if Loadout.tutorial and win:
 		Settings.set_tutorial_done(true)
+		TutorialLib.complete("primera")   # capítulo del aula + su XP (1ª vez)
 		if _tut_panel != null:
 			_tut_panel.visible = false
 	# XP REAL: se suma aquí, sube de nivel y regala piezas (persistente).

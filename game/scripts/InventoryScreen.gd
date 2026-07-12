@@ -9,6 +9,8 @@ var _inv_box: VBoxContainer
 var _chest_box: VBoxContainer   # TUS COFRES (descifrar / abrir)
 var _chest_hdr: Label           # "Tus cofres (N/4)"
 var _chest_tick := 0.0
+var _guide := ""                # guía "pícale aquí" activa (menu_craft/menu_chest)
+var _guide_banner: PanelContainer
 
 func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
@@ -110,6 +112,68 @@ func _ready() -> void:
 
 	_refresh_mode()
 	_rebuild_inventory()
+	_guide_setup()
+
+# ---------------------------------------------------------------- guías 🎓
+## Guía "PÍCALE AQUÍ" del FULL tutorial: resalta el botón objetivo y completa
+## el capítulo cuando el jugador HACE la acción de verdad.
+func _guide_setup() -> void:
+	_guide = TutorialLib.active_guide
+	if _guide == "":
+		return
+	if _guide == "menu_craft":
+		# que siempre haya algo crafteable: 10 fragmentos de regalo si faltan
+		var has_ten := false
+		for key in Inventory.catalog():
+			if Inventory.frags(String(key)) >= Inventory.FRAG_COST:
+				has_ten = true
+				break
+		if not has_ten:
+			Inventory.add_frags("color:gold", Inventory.FRAG_COST)
+		_rebuild_inventory()
+	elif _guide == "menu_chest":
+		# que siempre haya un cofre que descifrar
+		if Inventory.chest_inv.is_empty():
+			Inventory.chest_inv.append({"tier": "t5", "state": "locked", "ready_at": 0})
+		var any_locked := false
+		for i in Inventory.chest_inv.size():
+			if String(Inventory.chest_info(i).get("state", "")) == "locked":
+				any_locked = true
+		if not any_locked:
+			Inventory.chest_inv.append({"tier": "t5", "state": "locked", "ready_at": 0})
+		_rebuild_chests()
+	_guide_banner = PanelContainer.new()
+	_guide_banner.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_guide_banner.offset_top = -92
+	_guide_banner.offset_bottom = -12
+	_guide_banner.offset_left = 12
+	_guide_banner.offset_right = -12
+	_guide_banner.add_theme_stylebox_override("panel", UITheme.panel(Color(0.05, 0.1, 0.08, 0.97), UITheme.SUCCESS, 14, 2, 10))
+	var l := Label.new()
+	l.text = ("🎓 TUTORIAL · Toca «👉 Convertir» en una pieza con fragmentos completos (10/10) para CRAFTEARLA." \
+		if _guide == "menu_craft" else
+		"🎓 TUTORIAL · Toca «👉 Descifrar» en uno de TUS COFRES para empezar a abrirlo.")
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.label(l, 13, UITheme.TEXT, true, 700)
+	_guide_banner.add_child(l)
+	add_child(_guide_banner)
+
+func _guide_complete() -> void:
+	var id := _guide
+	_guide = ""
+	TutorialLib.active_guide = ""
+	if _guide_banner != null and is_instance_valid(_guide_banner):
+		_guide_banner.queue_free()
+	var res: Dictionary = TutorialLib.complete(id)
+	var ch: Dictionary = TutorialLib.chapter(id)
+	var sub := ("✨ +%d XP ganada" % int(res["xp"])) if bool(res["first"]) else "repaso — sin XP repetida"
+	RewardPopup.show(self, "🎓 ¡Capítulo superado!", UITheme.SUCCESS,
+		[{"icon": String(ch.get("icon", "🎓")), "text": String(ch.get("title", "")), "sub": sub}],
+		"Encuentra más capítulos en 🎓 Cómo jugar")
+
+func _exit_tree() -> void:
+	if _guide != "":
+		TutorialLib.active_guide = ""   # salió sin completar: no re-disparar luego
 
 # ---------------------------------------------------------------- cofres 📦
 const TIER_UI := {
@@ -189,8 +253,14 @@ func _chest_row(i: int) -> Control:
 			act.text = "Descifrar"
 			UITheme.button_font(act, 13, UITheme.TEXT, true, 700)
 			UITheme.style_surface(act, UITheme.SURFACE2, UITheme.BORDER, 10)
+			if _guide == "menu_chest":
+				act.text = "👉 Descifrar"
+				UITheme.button_font(act, 12, Color(0.14, 0.12, 0.02), true, 800)
+				UITheme.style_primary(act, UITheme.GOLD, 10)
 			act.pressed.connect(func():
 				if Inventory.start_unlock(i):
+					if _guide == "menu_chest":
+						_guide_complete()
 					_rebuild_chests())
 		"unlocking":
 			act.text = "⏳"
@@ -360,14 +430,22 @@ func _inv_row(key: String) -> Control:
 	cv.custom_minimum_size = Vector2(92, 34)
 	UITheme.button_font(cv, 12, UITheme.TEXT, false, 700)
 	UITheme.style_surface(cv, UITheme.SURFACE2, UITheme.BORDER, 9)
+	# guía de crafteo: resaltar el botón exacto que hay que picar 👉
+	if _guide == "menu_craft" and fr >= Inventory.FRAG_COST:
+		cv.text = "👉 Convertir"
+		UITheme.button_font(cv, 12, Color(0.14, 0.12, 0.02), false, 800)
+		UITheme.style_primary(cv, UITheme.GOLD, 9)
 	cv.pressed.connect(func():
 		var r: Dictionary = Inventory.convert(key)
 		if bool(r.get("ok", false)):
-			# RECIBO del crafteo: lo que entregó el motor, con saldo de frags.
-			RewardPopup.show(self, "🔨 ¡Crafteo completado!", UITheme.GOLD,
-				[{"icon": Inventory.piece_icon(key), "text": String(r["name"]),
-					"sub": "%d fragmentos → 1 pieza completa · ahora tienes ×%d" % [Inventory.FRAG_COST, int(r["owned"])]}],
-				"Fragmentos restantes de esta pieza: %d/%d" % [int(r["frags"]), Inventory.FRAG_COST])
+			if _guide == "menu_craft":
+				_guide_complete()   # el capítulo ES el recibo (no duplicar popups)
+			else:
+				# RECIBO del crafteo: lo que entregó el motor, con saldo de frags.
+				RewardPopup.show(self, "🔨 ¡Crafteo completado!", UITheme.GOLD,
+					[{"icon": Inventory.piece_icon(key), "text": String(r["name"]),
+						"sub": "%d fragmentos → 1 pieza completa · ahora tienes ×%d" % [Inventory.FRAG_COST, int(r["owned"])]}],
+					"Fragmentos restantes de esta pieza: %d/%d" % [int(r["frags"]), Inventory.FRAG_COST])
 			_rebuild_inventory()
 		else:
 			_result.text = "✗ " + String(r.get("error", "No se pudo convertir")))

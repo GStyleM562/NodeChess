@@ -31,7 +31,7 @@
 ## 🧩 P1 — Contenido del GDD aún no implementado
 | Sistema | GDD | Estado hoy |
 |---|---|---|
-| **Tutoriales** | 10 planeados (Part 3) | 1 (el guiado de primera partida) — faltan los temáticos (buff nodes, modificadores, rodeo, rank-up…) |
+| **Tutoriales** | 10 planeados (Part 3) | ✅ **11 capítulos** (aula "Cómo jugar" 2026-07-11): primera partida + 8 lecciones guionadas de tablero + 2 guías de menú, con XP por capítulo y bienvenida. Falta solo: lección de Rank-Up (requiere más contenido de evoluciones) |
 | **Puzzle Battles** | Part 3 | Nada — buen candidato Vuelta02 (reusa el motor tal cual) |
 | **Boss Battles** | Part 3 (PvE-only, pueden romper reglas) | Nada |
 | **Personalidades de bot** | 8 (incl. Turtle, Random, Expert 3+ turnos) | 5 implementadas; falta profundidad "Expert" |

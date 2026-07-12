@@ -25,6 +25,91 @@ func _ready() -> void:
 	_build_env()
 	_build_ui()
 	Music.play_menu()
+	# BIENVENIDA (1 vez por sesión): si hay tutoriales pendientes, invitarlos —
+	# con las categorías, cuántos por cada una y las recompensas jugosas.
+	if not TutorialLib.welcomed and TutorialLib.pending_total() > 0:
+		TutorialLib.welcomed = true
+		_show_welcome.call_deferred()
+
+## Modal de bienvenida: pendientes por categoría + XP por reclamar.
+func _show_welcome() -> void:
+	var modal := Control.new()
+	modal.name = "WelcomeModal"
+	modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	var layer := CanvasLayer.new()
+	layer.layer = 28
+	modal.add_child(layer)
+	add_child(modal)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.7)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(cc)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(minf(420.0, get_viewport().get_visible_rect().size.x - 28.0), 0)
+	panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.GOLD, 22, 2, 18))
+	cc.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	panel.add_child(vb)
+	vb.add_child(_lbl("👋 ¡Bienvenido a NodeChess!", 20, UITheme.GOLD, true, 800))
+	var body := Label.new()
+	var nb := TutorialLib.pending_in(TutorialLib.CAT_BOARD)
+	var nm := TutorialLib.pending_in(TutorialLib.CAT_MENU)
+	body.text = "Tienes %d tutoriales pendientes en el aula «Cómo jugar»:" % TutorialLib.pending_total()
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(body, 14, UITheme.TEXT, false, 600)
+	vb.add_child(body)
+	if nb > 0:
+		vb.add_child(_welcome_row("🎲", "Tablero — despliegue, combate, saltos, rodeos…", nb))
+	if nm > 0:
+		vb.add_child(_welcome_row("📱", "Menú — craftear piezas y descifrar cofres", nm))
+	var juicy := Label.new()
+	juicy.text = "🎁 Cada capítulo superado da XP: hay ✨ %d XP esperándote (¡con monedas y cofres por subir de nivel!)" % TutorialLib.xp_pending()
+	juicy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	juicy.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(juicy, 13, UITheme.SUCCESS, true, 700)
+	vb.add_child(juicy)
+	var go := Button.new()
+	go.text = "🎓 Ir a los tutoriales"
+	go.custom_minimum_size = Vector2(0, 50)
+	UITheme.button_font(go, 16, Color.WHITE, true, 800)
+	UITheme.style_primary(go, UITheme.PRIMARY, 14)
+	go.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/tutorials.tscn"))
+	vb.add_child(go)
+	var later := Button.new()
+	later.text = "Luego"
+	later.custom_minimum_size = Vector2(0, 42)
+	UITheme.button_font(later, 13, UITheme.TEXT2, true, 700)
+	UITheme.style_surface(later)
+	later.pressed.connect(func(): modal.queue_free())
+	vb.add_child(later)
+
+func _welcome_row(icon: String, text: String, n: int) -> Control:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.PANEL_DEEP, UITheme.GROUP_BORDER, 12, 1, 8))
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 8)
+	p.add_child(hb)
+	var tile := UITheme.icon_tile_node(icon, UITheme.GOLD, 34, 17)
+	hb.add_child(tile)
+	var l := Label.new()
+	l.text = text
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	UITheme.label(l, 12, UITheme.TEXT2, false, 600)
+	hb.add_child(l)
+	var c := Label.new()
+	c.text = "×%d" % n
+	c.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	UITheme.label(c, 15, UITheme.GOLD, true, 800)
+	hb.add_child(c)
+	return p
 
 func _process(delta: float) -> void:
 	if _pivot != null:
@@ -447,10 +532,10 @@ func _build_buttons(layer: CanvasLayer) -> void:
 	layer.add_child(play)
 	_juice_play(play)
 
-	# UNA sola parrilla grande (3×2) — antes había dos barras con botones
-	# duplicados (Colección/Probar) y todo se veía chiquito.
+	# UNA sola parrilla grande (4×2: 7 accesos + Cómo jugar) — antes había dos
+	# barras con botones duplicados y todo se veía chiquito.
 	var grid := GridContainer.new()
-	grid.columns = 3
+	grid.columns = 4
 	grid.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	grid.offset_top = -204
 	grid.offset_bottom = -72
@@ -464,6 +549,7 @@ func _build_buttons(layer: CanvasLayer) -> void:
 	grid.add_child(_menu_button("📦", "Inventario", UITheme.GOLD, func(): get_tree().change_scene_to_file("res://scenes/inventory.tscn")))
 	grid.add_child(_menu_button("🌐", "Online", UITheme.ENERGY, func(): get_tree().change_scene_to_file("res://scenes/online_lobby.tscn")))
 	grid.add_child(_menu_button("🛠", "Crear", UITheme.SUCCESS, func(): get_tree().change_scene_to_file("res://scenes/character_creator.tscn")))
+	grid.add_child(_menu_button("🎓", "Cómo jugar", UITheme.GOLD, func(): get_tree().change_scene_to_file("res://scenes/tutorials.tscn")))
 	grid.add_child(_menu_button("🎲", "Probar", UITheme.ORANGE, func(): get_tree().change_scene_to_file("res://scenes/attack_tester.tscn")))
 
 ## Botón JUGAR "hipnótico": respiración + barrido de brillo diagonal. NO toca `pressed`.
@@ -703,13 +789,12 @@ func _show_settings() -> void:
 	cbb.pressed.connect(func(): Settings.set_colorblind(not Settings.colorblind); cstyle.call())
 	cstyle.call()
 	var tut := Button.new()
-	tut.text = "🎓 Repetir tutorial"
+	tut.text = "🎓 Cómo jugar (tutoriales por capítulos)"
 	tut.custom_minimum_size = Vector2(0, 42)
 	UITheme.button_font(tut, 14, UITheme.TEXT, true, 700)
 	UITheme.style_surface(tut, UITheme.SURFACE2, UITheme.BORDER, 10)
 	tut.pressed.connect(func():
-		Loadout.tutorial = true
-		get_tree().change_scene_to_file("res://scenes/board.tscn"))
+		get_tree().change_scene_to_file("res://scenes/tutorials.tscn"))
 	vb.add_child(tut)
 
 	# --- vista Admin / Usuario (progresión e inventario) ---
@@ -931,10 +1016,12 @@ func _menu_button(icon: String, text: String, accent: Color, cb: Callable) -> Bu
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_theme_constant_override("separation", 4)
 	b.add_child(v)
-	var tile := UITheme.icon_tile_node(icon, accent, 34, 18)   # emoji enmarcado (§5)
+	var tile := UITheme.icon_tile_node(icon, accent, 32, 17)   # emoji enmarcado (§5)
 	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(_center(tile))
-	v.add_child(_lbl(text, 13, UITheme.TEXT2, true, 700))
+	var tl := _lbl(text, 12, UITheme.TEXT2, true, 700)
+	tl.clip_text = true
+	v.add_child(tl)
 	b.pressed.connect(cb)
 	return b
 

@@ -19,6 +19,8 @@ static var map_index := 0
 
 # TUTORIAL guiado: la próxima partida arranca en modo tutorial (CPU pasiva).
 static var tutorial := false
+# LECCIÓN guionada del FULL tutorial ("" = ninguna): id de TutorialLib.lesson().
+static var lesson := ""
 
 static func valid(team: Array) -> bool:
 	return team.size() == DECK_SIZE

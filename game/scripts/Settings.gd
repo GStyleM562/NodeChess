@@ -12,6 +12,7 @@ var cpu_level := 2       # dificultad vs CPU: 0 fácil · 1 media · 2 difícil
 var combat_speed := 1    # 1 = normal · 2 = combates al doble de velocidad
 var colorblind := false  # paleta alternativa + símbolos por color de ataque
 var tutorial_done := false
+var tuts_done: Array = []   # capítulos del FULL tutorial superados (ids)
 
 func _ready() -> void:
 	_load()
@@ -47,6 +48,12 @@ func set_tutorial_done(v: bool) -> void:
 	tutorial_done = v
 	_save()
 
+## Marca un capítulo del FULL tutorial como superado (idempotente).
+func mark_tut(id: String) -> void:
+	if id not in tuts_done:
+		tuts_done.append(id)
+		_save()
+
 func is_favorite(id: String) -> bool:
 	return id in favorites
 
@@ -78,11 +85,12 @@ func _load() -> void:
 		combat_speed = 2 if int(data.get("speed", 1)) >= 2 else 1
 		colorblind = bool(data.get("cb", false))
 		tutorial_done = bool(data.get("tut", false))
+		tuts_done = data.get("tuts", [])
 
 func _save() -> void:
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
 	if f != null:
 		f.store_string(JSON.stringify({"music": music_vol, "sfx": sfx_vol, "board": board_view,
 			"favs": favorites, "cpu": cpu_level, "speed": combat_speed, "cb": colorblind,
-			"tut": tutorial_done}))
+			"tut": tutorial_done, "tuts": tuts_done}))
 		f.close()
