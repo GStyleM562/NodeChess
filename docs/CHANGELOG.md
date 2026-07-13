@@ -126,6 +126,12 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- 🤖 MODO ROBOT (Capa 2-3 del plan): botón admin en Configuración que hace un
+  tour REAL (economía→creador→mazos→cofres→partidas CPU vs CPU renderizando)
+  con log [PASS]/[FAIL] a user://autotest/ + popup con copiar; respalda y
+  RESTAURA los datos del jugador siempre; burn-in de 10 partidas con fps/mem;
+  corrible por CLI (robot_boot.gd, exit code = fallos). 1er hallazgo: bots
+  difíciles pueden empatar técnico a la defensiva (>250 medio-turnos).
 - FULL TUTORIAL: aula "Cómo jugar" con 11 capítulos (8 lecciones guionadas con
   resultados marcados + gate de acciones + 👉, 2 guías de menú, XP por capítulo,
   bienvenida con pendientes). 🤖 Modo Robot en standby (docs/STANDBY_ModoRobot.md).

@@ -76,6 +76,7 @@ var _lesson_id := ""             # "" = sin lección
 var _lesson_saved_mods: Array = []
 var _lesson_mark: Node3D         # marcador 👉 del nodo objetivo del paso
 var _lesson_done := false
+var _robot_acting := false       # 🤖 turno del jugador jugándose solo
 
 const TURN_LIMIT := 75.0     # online: segundos por turno (al agotarse, pasa solo)
 var _turn_left := 0.0
@@ -241,6 +242,13 @@ func _leave_to_menu() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 func _process(delta: float) -> void:
+	# 🤖 MODO ROBOT: el lado del JUGADOR también juega solo (CPU vs CPU real,
+	# con el tablero renderizando — Capa 2-3 del plan de pruebas).
+	if AutoTester.cpu_vs_cpu and not _online and not _over and not _busy \
+			and not _robot_acting and _gs != null and _gs.winner == "" \
+			and _gs.turn_team == "player":
+		_robot_acting = true
+		_robot_turn()
 	# ONLINE: reloj de turno (al agotarse TU turno, se pasa solo). Se divide por
 	# time_scale para que la velocidad ×2 del combate NO drene el reloj más rápido.
 	if _online and not _over and not _net_blocked:
@@ -2265,6 +2273,19 @@ func _on_rematch_start(s: int, m: int, decks: Array) -> void:
 	Loadout.map_index = m
 	Roster.FIGURES = _saved_roster                 # des-swap antes de reconstruir
 	get_tree().change_scene_to_file("res://scenes/board.tscn")
+
+## 🤖 Un turno del jugador jugado por la CPU (usa el MISMO motor y las MISMAS
+## animaciones que el bot enemigo, y el flujo normal de fin de turno).
+func _robot_turn() -> void:
+	await get_tree().create_timer(0.1).timeout
+	if _over or _gs.winner != "" or _gs.turn_team != "player":
+		_robot_acting = false
+		return
+	var rec := _gs.bot_action("player")
+	await _animate_bot(rec)
+	if not _check_and_show_winner():
+		await _end_player_turn()
+	_robot_acting = false
 
 func _bot_loop() -> void:
 	while _gs.winner == "" and _gs.turn_team == "enemy":

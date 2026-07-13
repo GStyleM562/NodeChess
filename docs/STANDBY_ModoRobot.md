@@ -1,8 +1,9 @@
-# STANDBY — 🤖 Modo Robot (retomar cuando Gojan lo pida)
+# ✅ IMPLEMENTADO — 🤖 Modo Robot (2026-07-12)
 
-> Contexto congelado del auto-tester EN LA APP (Capa 2-3 de `PLAN_Testing.md`).
-> Se pausó el 2026-07-11 para priorizar el FULL tutorial. Todo lo necesario
-> para retomarlo sin re-derivar contexto está aquí.
+> **Este standby ya se ejecutó**: el robot vive en `game/scripts/AutoTester.gd`
+> (botones en Configuración admin: "🤖 Prueba automática" y "🔥 Burn-in") y por
+> CLI con `game/tools/robot_boot.gd`. Ver `PLAN_Testing.md` Capa 2-3. Se
+> conserva este doc como registro del diseño original.
 
 ## Qué es
 Botón **"🤖 Prueba automática"** en Configuración (solo admin) que ejecuta un

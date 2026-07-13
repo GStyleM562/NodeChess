@@ -14,9 +14,9 @@ publicar a testers sin la capa 4.
 
 | Capa | Qué es | Quién la corre | Cuándo |
 |---|---|---|---|
-| 1 | **Suite headless** (43 tests de motor/UI/red) | Claude o TÚ (`run_suite.ps1`) | En CADA cambio de código |
-| 2 | **🤖 Modo Robot** (tour automático DENTRO de la app, con log) | Tú, en el teléfono (1 botón) | Antes de cada `.aab` |
-| 3 | **Burn-in** (N partidas CPU vs CPU aceleradas) | Parte del Modo Robot | Antes de cada `.aab` |
+| 1 | **Suite headless** (44 tests de motor/UI/red) | Claude o TÚ (`run_suite.ps1`) | En CADA cambio de código |
+| 2 | **🤖 Modo Robot** ✅ LISTO (Config admin → "🤖 Prueba automática") | Tú, en el teléfono (1 botón) | Antes de cada `.aab` |
+| 3 | **Burn-in** ✅ LISTO (Config admin → "🔥 Burn-in", 10 partidas) | Parte del Modo Robot | Antes de cada `.aab` |
 | 4 | **Checklist humana SI-O-SI** (§4) | Tú + un segundo tester | Antes de subir a Play |
 
 ---
@@ -49,11 +49,16 @@ instalado para el test del relay local (si no hay Node, ese test se salta).
 `quit()`. Autoloads via `get_root().get_node("Nombre")` (su `_ready` no corre
 en `--script`; todos ya tienen lazy-init).
 
-## Capa 2 — 🤖 Modo Robot (POR CONSTRUIR — la pieza que falta)
+## Capa 2 — 🤖 Modo Robot (✅ CONSTRUIDO — `AutoTester.gd`, 2026-07-12)
 
-Un botón **"🤖 Prueba automática"** en Configuración (solo admin) que ejecuta
-un TOUR real dentro de la app — con el juego renderizando de verdad en el
-teléfono — y deja un LOG legible:
+Botón **"🤖 Prueba automática"** en Configuración (solo admin): ejecuta el TOUR
+real dentro de la app — el juego renderizando de verdad — y deja un LOG en
+`user://autotest/reporte_*.txt` + popup con resumen y "⧉ Copiar reporte".
+También corrible por línea de comandos (PC/CI):
+`Godot --path game --rendering-driver opengl3 --script res://tools/robot_boot.gd`
+(imprime el reporte y sale con exit code = fallos). Primer hallazgo real del
+robot: dos bots difíciles pueden estancarse a la defensiva (>250 medio-turnos)
+→ registrado como EMPATE TÉCNICO (dato de balance para Piece Points/IA).
 
 **El tour (orden propuesto):**
 1. **Higiene**: respaldar inventario/loadout reales → cuenta de prueba limpia.

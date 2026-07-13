@@ -857,6 +857,42 @@ func _show_settings() -> void:
 			fb.pressed.connect(func(): fund.call(dc, dg))
 			frow.add_child(fb)
 
+	# --- ADMIN: 🤖 MODO ROBOT (pruebas automáticas EN la app, con log) ---
+	if Inventory.is_admin():
+		var rh := Label.new()
+		UITheme.section(rh, "Pruebas automáticas (admin)")
+		rh.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		vb.add_child(rh)
+		var rrow := HBoxContainer.new()
+		rrow.add_theme_constant_override("separation", 8)
+		vb.add_child(rrow)
+		var rb := Button.new()
+		rb.text = "🤖 Prueba automática"
+		rb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		rb.custom_minimum_size = Vector2(0, 42)
+		UITheme.button_font(rb, 13, UITheme.TEXT, true, 700)
+		UITheme.style_surface(rb, UITheme.SURFACE2, UITheme.ORANGE.darkened(0.2), 10)
+		rb.pressed.connect(func():
+			modal.queue_free()
+			AutoTester.start(get_tree(), false))
+		rrow.add_child(rb)
+		var bb := Button.new()
+		bb.text = "🔥 Burn-in (10 partidas)"
+		bb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bb.custom_minimum_size = Vector2(0, 42)
+		UITheme.button_font(bb, 13, UITheme.TEXT, true, 700)
+		UITheme.style_surface(bb, UITheme.SURFACE2, UITheme.DANGER.darkened(0.3), 10)
+		bb.pressed.connect(func():
+			modal.queue_free()
+			AutoTester.start(get_tree(), true))
+		rrow.add_child(bb)
+		var rhint := Label.new()
+		rhint.text = "Hace compras/crafteos/mazos/cofres reales y juega partidas CPU vs CPU con log [PASS]/[FAIL]. Respalda y RESTAURA tus datos al terminar."
+		rhint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		rhint.custom_minimum_size = Vector2(430, 0)
+		UITheme.label(rhint, 11, UITheme.MUTED, false, 600)
+		vb.add_child(rhint)
+
 	# --- reiniciar inventario (piezas + fragmentos; NADA más) ---
 	var wipe := Button.new()
 	wipe.text = "🗑 Borrar inventario (piezas y fragmentos)"
