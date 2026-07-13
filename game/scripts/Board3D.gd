@@ -75,6 +75,7 @@ var _steps_src: Array = []   # pasos activos (TUT_STEPS legado o lección guiona
 var _lesson_id := ""             # "" = sin lección
 var _lesson_saved_mods: Array = []
 var _lesson_mark: Node3D         # marcador 👉 del nodo objetivo del paso
+var _lesson_mark_tw: Tween       # su pulso en bucle (se mata al limpiar)
 var _lesson_done := false
 var _robot_acting := false       # 🤖 turno del jugador jugándose solo
 
@@ -556,11 +557,17 @@ func _lesson_place_mark(nid: int) -> void:
 	hand.pixel_size = 0.012
 	hand.position = Vector3(0, 1.15, 0)
 	_lesson_mark.add_child(hand)
-	var tw := create_tween().set_loops()
-	tw.tween_property(_lesson_mark, "scale", Vector3(1.18, 1.18, 1.18), 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(_lesson_mark, "scale", Vector3.ONE, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# Tween en bucle VINCULADO al marcador (bind_node): muere con él al liberarlo,
+	# sin quedar huérfano animando un nodo muerto (eso disparaba "Infinite loop
+	# detected" cada frame y congelaba la lección). Se guarda para matarlo aparte.
+	_lesson_mark_tw = create_tween().bind_node(_lesson_mark).set_loops()
+	_lesson_mark_tw.tween_property(_lesson_mark, "scale", Vector3(1.18, 1.18, 1.18), 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_lesson_mark_tw.tween_property(_lesson_mark, "scale", Vector3.ONE, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _lesson_clear_mark() -> void:
+	if _lesson_mark_tw != null and _lesson_mark_tw.is_valid():
+		_lesson_mark_tw.kill()
+	_lesson_mark_tw = null
 	if _lesson_mark != null and is_instance_valid(_lesson_mark):
 		_lesson_mark.queue_free()
 	_lesson_mark = null
