@@ -1,129 +1,279 @@
-# NodeChess — Piezas, fórmulas de creación y el futuro sistema "Piece Points"
+# NodeChess — Construcción y balance de personajes (Piece Points v2)
 
-> NodeChess es un ajedrez dinámico **y** un "construye tus piezas": el jugador
-> desbloquea PIEZAS (stats, ataques, clases…) y las combina con creatividad en
-> el Creador. Este documento explica (1) qué es pieza HOY y sus reglas de
-> consumo, y (2) cómo evolucionar esto hacia un sistema de **Piece Points (PP)**
-> para darle razón y movimiento a las fórmulas de creación y balance.
+> Plan exhaustivo del sistema de **Puntos de Construcción (PC)**: qué te DA
+> presupuesto, qué te lo GASTA, cómo las CLASES cambian al personaje (buffs y
+> debuffs reales), qué aportan las FIGURAS/modelos (PC + pasivas/resistencias
+> ocultas gratis), y cómo funciona la mecánica de **EVOLUCIÓN** (bono de
+> presupuesto + castigo por usarla sin evolucionar). Escrito para revisar el
+> DISEÑO antes de codificar. Los números son SEMILLA — se calibran en la Fase 1
+> contra las 8 figuras integradas (que ya se sienten bien en mesa).
+>
+> Estado del inventario base y reglas de consumo por color: ver el CHANGELOG y
+> `Inventory.required_pieces`. Este doc añade la CAPA de PODER encima de eso.
 
 ---
 
-## 1. El inventario HOY: todo lo creable es una pieza
+## 0. La idea en una frase
 
-Cada atributo del Creador es una pieza coleccionable (`prefijo:valor`), que se
-consigue en cofres/tienda/crafteo y **se consume 1 vez al guardar la figura**
-(editar cobra solo el delta y reembolsa lo retirado):
+Hoy el límite creativo es *poseer las piezas*. El PC añade un segundo eje:
+**cada cosa que le pones a tu figura cuesta puntos, y tu figura tiene un
+presupuesto**. Poseer la pieza te deja usarla; el presupuesto decide si CABE.
+Así una figura no puede ser "todo a la vez" y cada decisión (clase, rareza,
+evolución, modelo) importa.
 
-| Pieza | Rango | La consume… |
+---
+
+## 1. El libro mayor: FUENTES vs COSTOS
+
+```
+PC_disponible  =  ( Rareza  +  Clase  +  Modelo_innato )  × ( 1.30 si Es Evolución )
+PC_gastado     =  Σ segmentos_de_ataque  +  Estamina  +  Tipo_de_ataque
+                  +  Σ pasivas_construidas  +  Σ resistencias_construidas
+REGLA DURA:  PC_gastado ≤ PC_disponible   (si no, la figura es INVÁLIDA)
+```
+
+Lo que la figura/modelo trae de fábrica (pasivas y resistencias OCULTAS) **no
+gasta PC ni piezas** y **no cuenta contra los topes** (§4).
+
+---
+
+## 2. FUENTES de presupuesto
+
+### 2.1 Rareza (la fuente principal)
+La pieza `rarity:` deja de ser cosmética: **compra techo de poder**.
+
+| Rareza | Presupuesto base |
+|---|---|
+| Común | 70 |
+| Rara | 95 |
+| Épica | 120 |
+| Legendaria | 155 |
+| Mítica | 200 |
+
+### 2.2 Clase (§3 detalla buffs/debuffs)
+Algunas clases dan +PC en vez de stats:
+
+| Clase | +PC |
+|---|---|
+| Balanced | +20 |
+| Especialista | +30 |
+| Controlador | +5 |
+| (las demás) | +0 (su valor está en los stats) |
+
+### 2.3 Modelo / figura (innato)
+Cada MODELO 3D tiene un perfil innato: **+PC** + pasivas ocultas + resistencias
+ocultas (§4). Los modelos con identidad fuerte (Stone Golem = muralla) dan más
+PC/rasgos; el modelo placeholder da 0. Es lo que hace que ELEGIR modelo importe.
+
+### 2.4 Evolución (checkbox "Es Evolución")
+Multiplica TODO el presupuesto por **1.30**. Razón: una figura marcada como
+evolución solo entrega sus stats COMPLETOS si de verdad evolucionó en partida
+(más difícil de lograr) → se le permite ser más fuerte. El castigo por usarla
+sin evolucionar está en §5.
+
+---
+
+## 3. COSTOS de presupuesto (qué gasta PC)
+
+### 3.1 Segmentos de ataque (el grueso del costo)
+```
+CostoSegmento = [ V(color) + V(daño ó estrellas) + V(efecto) ] × M(prob)
+M(prob) = prob / 50      # 50% = costo nominal ·1.0 · 70% = ·1.4 · 10% = ·0.2
+```
+
+| Componente | Valor semilla |
+|---|---|
+| color Blanco | 0 (daño puro, referencia) |
+| color Oro | +5 (además vence a Púrpura, inmune a sus efectos) |
+| color Púrpura | +8 (aplica efecto) |
+| color Azul | +22 (bloqueo: vence a todo lo ofensivo) |
+| color Rojo | **−6** (Fallo: pagas MENOS por meter una debilidad) |
+| Daño (Blanco/Oro) | `pow × 0.35` (60 daño → 21) |
+| Estrellas ★1/★2/★3 (Púrpura) | 10 / 22 / 40 (no lineal: ★3 gana a casi todo) |
+| Efecto leve (Debilitado, Marcado, Escudo Roto…) | +8 |
+| Efecto de control duro (Miedo, Paralizado, Congelado, Sueño) | +20 |
+| Desplazamiento (Empuje/Jalón/Dash/Retirada/Teleport) | +12 |
+
+### 3.2 Estamina (la movilidad escala fuerte)
+| Estamina | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|---|
+| Costo | 0 | 3 | 8 | 16 | 28 | 44 | 64 |
+
+### 3.3 Tipo de ataque (consistencia = costo)
+Ruleta 0 (base) · Dado D4/D6 +4 · Dado D8/D10/D12 +10 · Moneda +6 ·
+Doble Moneda +12 · Suma 2d6 +15.
+
+### 3.4 Pasivas y resistencias construidas
+- Pasiva: tabla por pasiva (semilla 8–25; default 15). Las auras y las
+  "once-per-match" fuertes cuestan más.
+- Resistencia: 10 cada una.
+
+> Las pasivas/resistencias que vienen del MODELO (ocultas) **no** entran aquí.
+
+---
+
+## 4. FIGURAS con rasgos OCULTOS (gratis y por encima de los topes)
+
+Cada modelo declara un perfil innato, **visible** al inspeccionar la figura
+("Este modelo YA trae: 🛡 Resiste Miedo · ✨ Bedrock"):
+
+```gdscript
+# en Roster.FIGURES[i]:
+"innate": { "pc": 10, "passives": ["bedrock"], "resists": ["fear"] }
+```
+
+Reglas:
+- **Gratis**: no gastan PC ni piezas.
+- **Superan los topes**: hoy máx 3 pasivas / 2 resistencias CONSTRUIDAS. Las
+  ocultas se SUMAN encima (p. ej. 3 construidas + 1 oculta = 4 activas). Así una
+  figura "de raza" puede tener más rasgos que una genérica — recompensa elegir
+  bien el modelo.
+- **Visibles siempre**: en el Creador (aviso "ahorras esta pasiva, ya la trae")
+  y en la Dex.
+- Beneficio de diseño: te **ahorra** PC y piezas si el rasgo que ibas a poner ya
+  lo trae el modelo → premia la sinergia modelo↔build.
+
+---
+
+## 5. CLASES — buffs y debuffs que CAMBIAN al personaje
+
+Hoy las 8 clases están inventariadas pero vacías. Propuesta: cada clase aplica
+modificadores **EN PARTIDA** sobre los stats construidos (como el ejemplo del
+Ágil: construyes estamina 2, pero JUEGA con 3). Mantengo las 8 (mapean 1:1 con
+las actuales), redefinidas con identidad afilada. **Cada una es un trueque.**
+
+| Clase | +PC | BUFF (en partida) | DEBUFF (en partida) |
+|---|---|---|---|
+| **Balanced** | +20 | — | — |
+| **Ágil** | 0 | +1 estamina | Blanco/Oro −10 · Púrpura −1★ |
+| **Tanque** | 0 | +1 resistencia innata · su Azul ignora "Escudo Roto" | −1 estamina |
+| **Atacante** | 0 | Blanco/Oro +15 | −1 estamina |
+| **Debilitador** | 0 | Púrpura +1★ · sus estados duran +2 turnos | Blanco/Oro −15 |
+| **Potenciador** | 0 | +1 energía por turno | Blanco/Oro −10 · −1 estamina |
+| **Controlador** | +5 | desplazamientos +1 nodo · inmune a ser desplazado | Blanco/Oro −10 |
+| **Especialista** | +30 | — (presupuesto puro) | NO hereda las pasivas ocultas del modelo |
+
+Notas de diseño:
+- Los buffs/debuffs de daño son **aditivos** (−10 sobre un ataque de 60 = 50) y
+  **con piso 0** (nunca negativo). Las estrellas nunca bajan de 1.
+- El debuff hace que armar un Ágil con ataques de daño sea mala idea (pega
+  flojo) y empuja a jugarlo con Púrpura/Azul/movilidad → **la clase moldea el
+  arquetipo**, justo lo que pediste.
+- ¿Añadir/quitar clases? Recomiendo **mantener 8**: cubren los arquetipos del
+  GDD (agro, muralla, control, apoyo, movilidad, generalista, min-maxer) sin
+  solaparse. Si en pruebas dos se sienten iguales, se fusionan; no antes.
+- Todo esto ya encaja en el motor: los buffs/debuffs se aplican como una capa
+  al calcular `effective_stamina`, el daño en `_roll_full` y las estrellas —
+  los mismos puntos donde hoy se aplican aura/haste/buff-node.
+
+---
+
+## 6. EVOLUCIÓN — el checkbox y su castigo
+
+### 6.1 "Es Evolución" (marca en el Creador)
+- **Sube el presupuesto ×1.30** (§2.4): puedes meterle más poder.
+- Pensada para figuras que son el DESTINO de un Rank-Up (otra figura evoluciona
+  EN ésta y hereda sus stats completos).
+
+### 6.2 Castigo por usarla SIN evolucionar (todo la partida)
+Si una figura marcada "Es Evolución" se **despliega directamente** (va en el
+mazo como forma base, no se alcanza por Rank-Up), arranca con un debuff que dura
+**toda la partida** — para enseñar que NO debes usar tu evolución sin evolucionarla:
+
+- **Estamina** → a la mitad, redondeando abajo (4→2, 3→1).
+- **Daño Blanco/Oro** → a la mitad (100→50).
+- **Estrellas Púrpura** → −1 (si ya es 1, se queda en 1).
+- **Se le quitan TODAS**: pasivas construidas, pasivas ocultas del modelo, y los
+  buffs de clase.
+- **Resistencias ocultas** del modelo → también se retiran. Las resistencias que
+  CONSTRUISTE (pagaste piezas) se conservan.
+- El debuff de clase se **neutraliza** junto con el buff (no se doble-castiga):
+  la figura juega como una versión "a medio hacer", floja y sin trucos.
+
+Marcado visual en el tablero: nombre con "⧗ sin evolucionar" y tinte apagado.
+Cuando SÍ llega por Rank-Up, entra con todos sus stats completos (el motor ya
+cambia la figura en el Rank-Up; aquí solo NO se aplica el castigo).
+
+### 6.3 Cómo lo sabe el motor
+- El dict de figura lleva `is_evolution: true`.
+- Al desplegar desde banca: si `is_evolution` y la unidad **no** provino de un
+  Rank-Up → aplicar el transform del castigo (una función `_deform_unevolved`
+  sobre la copia de combate, no sobre la figura guardada).
+- Rank-Up hacia esta figura → sin castigo (stats completos).
+
+---
+
+## 7. VALIDACIÓN — imposible guardar una figura errónea
+
+El PC entra en el `FigureValidator` como una regla DURA:
+
+- `PC_gastado > PC_disponible` → **INVÁLIDO** (no solo aviso). El Creador YA
+  bloquea el guardado en INVÁLIDO (candado airtight, arreglado 2026-07-13), así
+  que una figura sobre-presupuesto **no se puede guardar** → jamás entra a una
+  partida y no puede romper el balance ni desincronizar el online.
+- El banner del Creador muestra en vivo **"PC 138/120 — te pasas por 18"** con
+  el ⓘ desglosando de dónde sale cada punto (segmentos, estamina, pasivas…).
+- Una barra "PC usados / presupuesto" (verde→ámbar→rojo) da feedback inmediato.
+
+---
+
+## 8. CALIBRACIÓN — los 8 integrados son la regla de medir
+
+Las figuras integradas YA se sienten bien → calcula su PC y ajusta las CONSTANTES
+(no las figuras) hasta que cada una caiga cerca del presupuesto de su rareza.
+
+**Ejemplo trabajado — Nightblade (hoy épica, tipo Moneda, ST3):**
+```
+Estamina 3 ............................. 16
+Tipo Moneda ............................ +6
+Killing Edge  Blanco 100 @ 49.5% ....... (0 + 100×0.35) × (49.5/50) ≈ 35
+Fear Gas  Púrpura ★2 + Miedo @ 49.5% ... (8 + 22 + 20) × 0.99 ≈ 50
+Rojo @ 1% .............................. ≈ 0
+Pasivas lunge+bloodthirst+parkour ...... 15+18+12 = 45
+                                          ─────
+TOTAL ≈ 152      vs      presupuesto ÉPICO 120
+```
+Sale **+32 sobre presupuesto** → señal de calibración. Opciones (elige en F1):
+(a) Nightblade en realidad es **Legendaria** (155) y cuadra; o (b) baja el costo
+de pasivas / el multiplicador M(prob). Repetir con las 8 hasta que la regla de
+medir cuadre, y SOLO entonces aplicarla a las figuras custom.
+
+**Balance vivo (cuando haya jugadores):** telemetría de winrate/pick por pieza →
+regla 55/45 (pieza en >55% de mazos ganadores sube su V un paso; <45% baja).
+Ajustar V de PIEZAS, no nerfear figuras a mano. Revisar por "vueltas", no en caliente.
+
+**Techos duros que se mantienen SIEMPRE** (además del PC): prob ≤ 70%, daño ≤ 100,
+★ ≤ 3, pasivas construidas ≤ 3, resistencias construidas ≤ 2, mazo de 6,
+suma de ruleta = 100%.
+
+---
+
+## 9. Roadmap de implementación (tras aprobar este diseño)
+
+| Fase | Qué | Nota |
 |---|---|---|
-| `model:<id>` | 1 por figura integrada | el modelo/figura elegida |
-| `rarity:<r>` | común/rara/épica/legendaria/mítica | la rareza de la figura |
-| `class:<c>` | 8 clases (Balanced, Agile, Tank…) | la clase elegida¹ |
-| `atype:<t>` | Ruleta, Dados, Monedas, Suma 2d6 | el tipo de ataque |
-| `stamina:<n>` | 0–6 | la estamina de la figura |
-| `color:<c>` | blanco/oro/púrpura/azul/rojo | cada color usado en el pool |
-| `pow:<n>` | **5–100, de 5 en 5** | el daño del segmento — **solo Blanco/Oro** |
-| `stars:<n>` | **1–3** | las estrellas — **solo Púrpura** |
-| `prob:<n>` | **5–70%, de 5 en 5** | el peso de **cada** segmento |
-| `fx:<estado>` | 13 estados + desplazamientos | el efecto del segmento |
-| `passive:<id>` | catálogo de pasivas | cada pasiva equipada (máx 3) |
-| `resist:<id>` | 13 estados | cada resistencia (máx 2) |
+| **F1 — Medidor** | `FigureValidator.pp_cost(fig)` + `pp_budget(fig)` + barra y desglose en el Creador/Dex. **Solo informa** (no bloquea). Calibrar las constantes contra los 8 integrados (§8). | Barato, sin riesgo, da identidad al Creador. |
+| **F2 — Presupuesto real** | El validador marca INVÁLIDO si `cost > budget`. Las custom viejas que se pasen se marcan "legado" (se pueden editar para cuadrar). Admin ilimitado. | El candado de guardado ya existe. |
+| **F3 — Clases con efectos** | Aplicar buffs/debuffs de §5 en partida (capa sobre estamina/daño/estrellas/energía). Mostrarlos en la ficha ("Ágil: +1⚡, −10 daño"). | Toca `GameState` (mismos puntos que aura/haste). |
+| **F4 — Modelo innato** | Campo `innate` por modelo (§4), gratis + supera topes + visible. Poblar los 8 integrados. | Da peso a elegir modelo. |
+| **F5 — Evolución** | Checkbox `is_evolution` (+30% budget) + `_deform_unevolved` en despliegue directo (§6). Marca visual en tablero. | Enseña a evolucionar. |
+| **F6 — Telemetría** | Datos anónimos de winrate por pieza para el ajuste 55/45. | Post-lanzamiento. |
 
-¹ Las clases aún no otorgan pasivas ocultas ni bonos; ya están inventariadas
-para que cuando definan su contenido no haya migración.
-
-**Reglas de consumo por color** (en `Inventory.required_pieces`):
-- Blanco/Oro consumen su `pow:` — van con 0 estrellas (no consumen `stars:`).
-- Púrpura consume sus `stars:` — no lleva daño (no consume `pow:`).
-- Azul/Rojo no consumen ni daño ni estrellas.
-- TODO segmento consume su `prob:` (pesos legados fuera de 5–70/paso 5 no cobran).
-
-**Fuentes y sumideros** (economía cerrada):
-- Fuentes: cofres ganados por VICTORIA (60/30/10), cofre de nivel, caja gratis
-  (fragmentos; 10 = 1 pieza), tienda (🪙 por nivel, 💎 cada 5 niveles y % en cajas).
-- Sumideros: crear figuras (consume piezas), comprar (consume 🪙/💎).
-- Blindaje: precios canónicos en el motor, transacciones atómicas con recibo,
-  🧾 log persistente (evidencia para soporte).
+> **Regla de oro**: los valores de este doc son SEMILLA, no ley. La única verdad
+> es la mesa: calibrar contra los integrados primero, contra datos después.
 
 ---
 
-## 2. El futuro: Piece Points (PP) — presupuesto de poder por figura
+## 10. Decisiones que necesito de TI antes de codificar F1
 
-**Problema a resolver**: hoy el límite creativo es *poseer las piezas*. Cuando
-la colección crece, un jugador con todo podría armar "la figura perfecta"
-(daño 100 al 70%, estamina 6, 3 pasivas top). El PP añade un segundo eje:
-**cada pieza cuesta puntos y cada figura tiene un presupuesto**.
-
-### 2.1 La fórmula base
-
-```
-PP(figura) = PP(stamina) + PP(clase) + Σ PP(segmento_i) + Σ PP(pasiva) + Σ PP(resist)
-PP(segmento) = [ V(color) + V(pow ó stars) + V(fx) ] × M(prob)
-```
-
-- `M(prob)` = multiplicador por peso: un ataque fuerte al 70% debe costar mucho
-  más que al 10%. Propuesta: `M = prob / 25` (25% = costo "nominal").
-- El **presupuesto** lo fija la RAREZA de la figura (la pieza `rarity:` compra
-  techo de poder, no cosmética):
-
-| Rareza | Presupuesto PP (propuesta) |
-|---|---|
-| Común | 90 |
-| Rara | 120 |
-| Épica | 150 |
-| Legendaria | 190 |
-| Mítica | 240 |
-
-### 2.2 Valores semilla (V) — punto de partida para calibrar
-
-| Componente | V propuesto |
-|---|---|
-| `pow:n` | `n × 0.5` (daño 60 → 30 PP) |
-| `stars:1/2/3` | 15 / 32 / 55 (no lineal: ★3 gana a casi todo) |
-| color Azul (bloqueo) | 22 plano |
-| color Rojo (fallo) | **−8** (descuento: pagas por fiabilidad, cobras por riesgo) |
-| `fx:` estado leve (Debilitado, Marcado…) | 8–12 |
-| `fx:` control duro (Miedo, Paralizado, Congelado, Sueño) | 20–28 |
-| desplazamientos (empuje/dash/teleport…) | 10–18 |
-| `stamina:n` | `n² × 3` (2→12, 4→48, 6→108: la movilidad escala brutal) |
-| pasiva | 15–35 según catálogo (tabla propia) |
-| resistencia | 12 c/u |
-| clase | 0 hoy; cuando den bonos, su V = valor del bono |
-
-### 2.3 Cómo calibrar: los 8 integrados son la regla de medir
-
-Los integrados YA se sienten bien en mesa → calcula su PP con las tablas y
-ajusta los V hasta que caigan cerca del presupuesto de su rareza:
-
-```
-Nightblade (épica, ST3, Moneda):
-  Killing Edge  blanco 100 al 49.5% → (100×0.5) × (50/25) ≈ 100
-  Fear Gas      púrpura ★2 + Miedo al 49.5% → (32+24) × 2 ≈ 112 → ¡se pasa!
-  → o el presupuesto épico sube, o V(Miedo)/M(prob) bajan: ITERAR AQUÍ.
-```
-
-Ese "se pasa" es la señal de calibración: repetir con los 8 hasta que la regla
-de medir cuadre, y SOLO entonces aplicárselo a las customs.
-
-### 2.4 Proceso de balance vivo (cuando haya jugadores)
-
-1. **Telemetría mínima**: por figura custom → winrate, pick-rate; por pieza →
-   presencia en mazos ganadores. (Local primero: el 🧾 log ya registra creación.)
-2. **Regla 55/45**: pieza presente en >55% de mazos ganadores → sube su V un
-   paso (+10–15%); <45% → baja. Ajustar V de PIEZAS, no nerfear figuras a mano.
-3. **Cadencia**: revisar por "vueltas" (como Vuelta01/02), no en caliente.
-4. **Techos duros que ya existen** (mantener siempre): prob ≤ 70%, daño ≤ 100,
-   ★ ≤ 3, pasivas ≤ 3, resist ≤ 2, mazo de 6, validador de suma 100%.
-
-### 2.5 Roadmap de implementación
-
-- **F1 — Medidor (sin bloquear)**: `FigureValidator.pp_of(fig)` + barra
-  "PP usados / presupuesto" en el Creador y la Dex. Solo informa.
-- **F2 — Presupuesto real**: guardar figura exige PP ≤ presupuesto de su rareza
-  (modo usuario; admin ilimitado). Las figuras viejas se marcan "legado".
-- **F3 — Rarezas con dientes**: subir de rareza una figura (fusión de piezas
-  `rarity:`) amplía su presupuesto → progresión de colección con propósito.
-- **F4 — Telemetría y ajuste por temporada** (§2.4).
-
-> **Regla de oro**: los valores de este doc son SEMILLA, no ley. La única
-> verdad es la mesa: calibrar contra los integrados primero, contra datos después.
+1. **Presupuestos por rareza** (§2.1): ¿te cuadran 70/95/120/155/200, o quieres
+   más/menos separación entre rarezas?
+2. **Bono de evolución** (§2.4): ¿+30% te parece "medianamente más", o prefieres
+   +20% / +40%?
+3. **Clases** (§5): ¿apruebas las 8 propuestas y sus trueques? ¿Alguna te sobra
+   o falta un arquetipo que imaginabas?
+4. **Castigo de evolución sin evolucionar** (§6.2): confirmé "mitad de todo +
+   sin pasivas/buffs". ¿Las resistencias CONSTRUIDAS se conservan (mi propuesta)
+   o también caen?
+5. **Modelo innato** (§4): ¿los rasgos ocultos SÍ superan los topes de 3/2, o
+   prefieres que cuenten dentro del tope?

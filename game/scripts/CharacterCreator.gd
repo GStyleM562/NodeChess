@@ -94,6 +94,8 @@ var _total_lbl: Label
 var _status_lbl: Label
 var _status_box: PanelContainer   # banner de validación (§9.4)
 var _status_icon: Label
+var _status_detail := ""          # detalle completo (para el popup ⓘ)
+var _status_info_btn: Button      # ⓘ "ver por qué" (solo si hay avisos/errores)
 var _save_btn: Button
 var _model_ids: Array = []
 var _editing_id := ""             # non-empty when editing -> save overwrites it
@@ -118,7 +120,7 @@ func _ready() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.offset_top = 60
-	scroll.offset_bottom = -96
+	scroll.offset_bottom = -112   # deja libre el footer fijo (banner + Guardar)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	add_child(scroll)
 	_scroll = scroll
@@ -191,17 +193,22 @@ func _build_topbar() -> void:
 	imp.pressed.connect(_show_import)
 	hb.add_child(imp)
 
+## Footer FIJO abajo: banner de validación de UNA línea (el detalle va en el
+## popup ⓘ, para que NUNCA crezca y tape el botón) + botón Guardar siempre
+## visible y pegado al borde inferior.
 func _build_footer() -> void:
 	var bar := PanelContainer.new()
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	bar.offset_top = -92     # más alto: los avisos GDD/🔒 caben sin encimarse
+	bar.offset_top = -108
 	bar.add_theme_stylebox_override("panel", UITheme.panel(UITheme.BG, UITheme.BORDER, 0, 1, 8))
 	add_child(bar)
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", 6)
 	bar.add_child(vb)
-	# Banner de validación: fondo/borde tintado + icono (§9.4), no texto suelto.
+	# Banner de validación: fondo/borde tintado + icono (§9.4). Texto de UNA
+	# línea (clip); el "¿por qué?" completo se abre con ⓘ.
 	_status_box = PanelContainer.new()
+	_status_box.custom_minimum_size = Vector2(0, 40)
 	_status_box.add_theme_stylebox_override("panel", UITheme.alert_box(UITheme.SUCCESS))
 	vb.add_child(_status_box)
 	var sbh := HBoxContainer.new()
@@ -212,20 +219,27 @@ func _build_footer() -> void:
 	UITheme.label(_status_icon, 15, UITheme.SUCCESS, true, 800)
 	sbh.add_child(_status_icon)
 	_status_lbl = Label.new()
-	_status_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_status_lbl.clip_text = true
+	_status_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_status_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UITheme.label(_status_lbl, 12, UITheme.TEXT, false, 600)
 	sbh.add_child(_status_lbl)
-	var hb := HBoxContainer.new()
-	hb.add_theme_constant_override("separation", 8)
-	vb.add_child(hb)
+	_status_info_btn = Button.new()
+	_status_info_btn.text = "ⓘ ¿por qué?"
+	_status_info_btn.custom_minimum_size = Vector2(0, 30)
+	_status_info_btn.visible = false
+	UITheme.button_font(_status_info_btn, 11, UITheme.TEXT, true, 700)
+	UITheme.style_surface(_status_info_btn, UITheme.SURFACE2, UITheme.BORDER, 8)
+	_status_info_btn.pressed.connect(func(): _show_info("Estado de la figura", _status_detail))
+	sbh.add_child(_status_info_btn)
 	_save_btn = Button.new()
 	_save_btn.text = "Guardar figura"
+	_save_btn.custom_minimum_size = Vector2(0, 50)   # área táctil generosa, fija
 	_save_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UITheme.button_font(_save_btn, 16, UITheme.TEXT, true, 800)
 	UITheme.style_primary(_save_btn, UITheme.SUCCESS)
 	_save_btn.pressed.connect(_on_save)
-	hb.add_child(_save_btn)
+	vb.add_child(_save_btn)
 
 # ---------------------------------------------------------------- sections
 func _section(parent: VBoxContainer, title: String) -> VBoxContainer:
@@ -750,17 +764,31 @@ func _revalidate() -> void:
 		for key in missing:
 			names.append(_inv().piece_name(String(key)))
 		msgs.push_front("🔒 Te falta: " + ", ".join(names) + " — consíguelo en 🎁 Cajas")
-	var head: String = {"VALID": "Válido", "WARNING": "Válido con avisos", "INVALID": "Inválido"}[state]
-	if not missing.is_empty():
-		head = "Piezas faltantes"
-	_status_lbl.text = head + ("  ·  " + "  ·  ".join(msgs) if not msgs.is_empty() else "")
-	# Banner tintado por estado (§9.4): rojo inválido/faltante · oro avisos · verde ok.
 	var bad := state == "INVALID" or not missing.is_empty()
+	# RESUMEN de UNA línea para el banner (nunca crece → no tapa Guardar).
+	var head := ""
+	if not missing.is_empty():
+		head = "🔒 Te faltan %d pieza(s)" % missing.size()
+	elif state == "INVALID":
+		head = "✗ Inválido: %d error(es)" % (r["errors"] as Array).size()
+	elif state == "WARNING":
+		head = "⚠ Válido con %d aviso(s)" % (r["warnings"] as Array).size()
+	else:
+		head = "✓ Válido — listo para guardar"
+	_status_lbl.text = head
+	# DETALLE completo (para el popup ⓘ, y solo si hay algo que explicar).
+	_status_detail = ("\n".join(msgs)) if not msgs.is_empty() else "Todo en orden. Puedes guardar la figura."
+	if _status_info_btn != null:
+		_status_info_btn.visible = not msgs.is_empty()
+	# Banner tintado por estado (§9.4): rojo inválido/faltante · oro avisos · verde ok.
 	var tint: Color = UITheme.DANGER if bad else (UITheme.SUCCESS if state == "VALID" else UITheme.GOLD)
 	_status_box.add_theme_stylebox_override("panel", UITheme.alert_box(tint))
 	_status_icon.text = "⚠" if bad else ("✓" if state == "VALID" else "⚠")
 	_status_icon.add_theme_color_override("font_color", tint)
-	_save_btn.disabled = state == "INVALID" or not missing.is_empty()
+	_status_lbl.add_theme_color_override("font_color", tint if bad else UITheme.TEXT)
+	# CANDADO DURO: jamás se puede guardar una build inválida o sin piezas.
+	_save_btn.disabled = bad
+	_save_btn.text = "Guardar figura" if not bad else "🔒 Corrige para guardar"
 
 func _on_save() -> void:
 	var fig: Dictionary = build_figure()

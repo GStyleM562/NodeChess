@@ -24,11 +24,14 @@
 - Iconografía propia para piezas/cofres/botones (hoy emojis enmarcados).
 - Clips de ataque extra por figura (el sistema de clips ya los soporta).
 
-## ⚖ P1 — Piece Points (roadmap en `Balance_PiecePoints.md`)
-1. **F1 Medidor**: `pp_of(fig)` + barra "PP usados" en Creador/Dex (solo informa).
-2. **F2 Presupuesto real**: guardar exige PP ≤ presupuesto de la rareza (usuario).
-3. **F3 Rarezas con dientes**: subir de rareza amplía presupuesto.
-4. **F4 Telemetría y ajuste por temporada** (regla 55/45).
+## ⚖ P1 — Piece Points / Construcción de personajes (PLAN v2 EXHAUSTIVO listo:
+## `Balance_PiecePoints.md` — pendiente APROBAR §10 y luego codificar F1–F6)
+1. **F1 Medidor**: `pp_cost`/`pp_budget` + barra y desglose en Creador/Dex (solo informa; calibrar vs los 8 integrados).
+2. **F2 Presupuesto real**: guardar exige PC ≤ presupuesto (candado de guardado ya existe).
+3. **F3 Clases con efectos**: buffs/debuffs en partida (Ágil +1⚡/−10 daño, etc.).
+4. **F4 Modelo innato**: pasivas/resistencias ocultas gratis que superan topes.
+5. **F5 Evolución**: checkbox +30% budget + castigo (mitad de todo, sin pasivas) al usarla sin evolucionar.
+6. **F6 Telemetría** para el ajuste 55/45.
 
 ## 🧩 P1 — Contenido del GDD aún no implementado
 | Sistema | GDD | Estado hoy |
