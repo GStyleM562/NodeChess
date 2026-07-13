@@ -44,11 +44,17 @@ La pieza `rarity:` deja de ser cosmética: **compra techo de poder**.
 
 | Rareza | Presupuesto base |
 |---|---|
-| Común | 70 |
-| Rara | 95 |
-| Épica | 120 |
-| Legendaria | 155 |
-| Mítica | 200 |
+| Común | **100** |
+| Rara | **135** |
+| Épica | **175** |
+| Legendaria | **220** |
+| Mítica | **280** |
+
+> **Calibrados (2026-07-13) contra los integrados**: costo máximo medido por
+> rareza — común 75 (Ironclad) · rara 79 (Storm Valkyrie) · épica 145
+> (Nightblade, el más fuerte) · legendaria 103 (Coin Trickster). Todos CABEN,
+> con margen creciente por rareza (mejores piezas → más techo). Implementado en
+> `PiecePoints.gd`; test `test_piecepoints`.
 
 ### 2.2 Clase (§3 detalla buffs/debuffs)
 Algunas clases dan +PC en vez de stats:
@@ -250,13 +256,13 @@ suma de ruleta = 100%.
 
 ## 9. Roadmap de implementación (tras aprobar este diseño)
 
-| Fase | Qué | Nota |
+| Fase | Qué | Estado |
 |---|---|---|
-| **F1 — Medidor** | `FigureValidator.pp_cost(fig)` + `pp_budget(fig)` + barra y desglose en el Creador/Dex. **Solo informa** (no bloquea). Calibrar las constantes contra los 8 integrados (§8). | Barato, sin riesgo, da identidad al Creador. |
-| **F2 — Presupuesto real** | El validador marca INVÁLIDO si `cost > budget`. Las custom viejas que se pasen se marcan "legado" (se pueden editar para cuadrar). Admin ilimitado. | El candado de guardado ya existe. |
-| **F3 — Clases con efectos** | Aplicar buffs/debuffs de §5 en partida (capa sobre estamina/daño/estrellas/energía). Mostrarlos en la ficha ("Ágil: +1⚡, −10 daño"). | Toca `GameState` (mismos puntos que aura/haste). |
-| **F4 — Modelo innato** | Campo `innate` por modelo (§4), gratis + supera topes + visible. Poblar los 8 integrados. | Da peso a elegir modelo. |
-| **F5 — Evolución** | Checkbox `is_evolution` (+30% budget) + `_deform_unevolved` en despliegue directo (§6). Marca visual en tablero. | Enseña a evolucionar. |
+| **F1 — Medidor** | `PiecePoints.cost/budget/breakdown` + barra "PC usado/presupuesto" + ⓘ desglose en el Creador. Calibrado vs los 8 integrados. | ✅ HECHO (2026-07-13). |
+| **F2 — Presupuesto real** | Pasarse de PC bloquea el guardado (modo usuario; admin bypass, herramienta de dev). El aviso de evolución (destino ya tiene esa resistencia/pasiva) también entra aquí. | ✅ HECHO. |
+| **F3 — Clases con efectos** | Aplicar buffs/debuffs de §5 en partida (capa sobre estamina/daño/estrellas/energía). Mostrarlos en la ficha ("Ágil: +1⚡, −10 daño"). | ⏳ siguiente (toca `GameState`). |
+| **F4 — Modelo innato** | Poblar `innate` en los 8 modelos (§4); ya lo respeta el motor (gratis + supera topes). Mostrarlo en Creador/Dex. | ⏳ (el motor ya lo lee). |
+| **F5 — Evolución** | `is_evolution` +30% budget ya cuenta; falta `_deform_unevolved` al desplegar directo (§6) + marca en tablero. | ⏳ |
 | **F6 — Telemetría** | Datos anónimos de winrate por pieza para el ajuste 55/45. | Post-lanzamiento. |
 
 > **Regla de oro**: los valores de este doc son SEMILLA, no ley. La única verdad

@@ -91,6 +91,9 @@ var _resist_boxes := {}           # status id -> toggle Button (resistencias)
 var _rows: Array = []             # each: { panel, col, name, pow, stars, fx, prob }
 var _rows_box: VBoxContainer
 var _total_lbl: Label
+var _pc_lbl: Label                # medidor "PC 95/175" (Piece Points, F1)
+var _pc_bar: ProgressBar
+var _pc_detail := ""              # desglose para el popup ⓘ del medidor
 var _status_lbl: Label
 var _status_box: PanelContainer   # banner de validación (§9.4)
 var _status_icon: Label
@@ -137,6 +140,7 @@ func _ready() -> void:
 	form.add_theme_constant_override("separation", 18)
 	pad.add_child(form)
 
+	_build_pc_meter(form)
 	_build_identity(form)
 	_build_combat(form)
 	_build_passives(form)
@@ -240,6 +244,73 @@ func _build_footer() -> void:
 	UITheme.style_primary(_save_btn, UITheme.SUCCESS)
 	_save_btn.pressed.connect(_on_save)
 	vb.add_child(_save_btn)
+
+# ---------------------------------------------------------------- PC meter (F1)
+## Medidor de PUNTOS DE CONSTRUCCIÓN: barra + "usado / presupuesto" + ⓘ desglose.
+## Se actualiza en cada _revalidate. El presupuesto sube con rareza/clase/evolución.
+func _build_pc_meter(form: VBoxContainer) -> void:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UITheme.group_panel(16, 12))
+	form.add_child(p)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 6)
+	p.add_child(vb)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	vb.add_child(row)
+	var t := Label.new()
+	t.text = "🔧 PUNTOS DE CONSTRUCCIÓN"
+	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	t.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	UITheme.label(t, 13, UITheme.SECTION, true, 700)
+	row.add_child(t)
+	_pc_lbl = Label.new()
+	_pc_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	UITheme.label(_pc_lbl, 15, UITheme.SUCCESS, true, 800)
+	row.add_child(_pc_lbl)
+	var info := Button.new()
+	info.text = "ⓘ"
+	info.custom_minimum_size = Vector2(34, 30)
+	UITheme.button_font(info, 14, UITheme.PRIMARY_EDGE, false, 700)
+	UITheme.style_surface(info, UITheme.SURFACE2, UITheme.BORDER, 8)
+	info.pressed.connect(func(): _show_info("Puntos de Construcción", _pc_detail))
+	row.add_child(info)
+	_pc_bar = ProgressBar.new()
+	_pc_bar.custom_minimum_size = Vector2(0, 10)
+	_pc_bar.show_percentage = false
+	var pbg := StyleBoxFlat.new(); pbg.bg_color = Color(0.10, 0.13, 0.22); pbg.set_corner_radius_all(5)
+	_pc_bar.add_theme_stylebox_override("background", pbg)
+	vb.add_child(_pc_bar)
+	var hint := Label.new()
+	hint.text = "Cada stat cuesta PC. Tu presupuesto sube con la RAREZA, la CLASE y si marcas «Evoluciona». Mejores piezas → figuras más potentes."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.label(hint, 11, UITheme.MUTED, false, 500)
+	vb.add_child(hint)
+
+## Pinta el medidor y devuelve true si la build CABE en su presupuesto.
+func _update_pc_meter(fig: Dictionary) -> bool:
+	var c := PiecePoints.cost(fig)
+	var b := PiecePoints.budget(fig)
+	var fits := c <= b
+	if _pc_lbl != null:
+		_pc_lbl.text = "%d / %d" % [c, b]
+		_pc_lbl.add_theme_color_override("font_color", UITheme.SUCCESS if fits else UITheme.DANGER)
+	if _pc_bar != null:
+		_pc_bar.max_value = maxf(1.0, float(maxi(b, c)))
+		_pc_bar.value = c
+		var fill := StyleBoxFlat.new()
+		fill.bg_color = UITheme.SUCCESS if fits else UITheme.DANGER
+		fill.set_corner_radius_all(5)
+		_pc_bar.add_theme_stylebox_override("fill", fill)
+	var lines: Array = PiecePoints.breakdown(fig)
+	lines.append("——")
+	lines.append("Presupuesto: %d  (rareza %s%s%s)" % [b, String(fig.get("rarity", "common")),
+		("  + clase" if int(PiecePoints.CLASS_PC.get(String(fig.get("class", "")), 0)) > 0 else ""),
+		("  ×1.30 evolución" if bool(fig.get("is_evolution", false)) else "")])
+	lines.append("Usado: %d" % c)
+	lines.append("✓ CABE — te sobran %d PC" % (b - c) if fits else "✗ TE PASAS por %d PC — sube la rareza, cambia la clase, o quita/baja stats" % (c - b))
+	_pc_detail = "\n".join(lines)
+	return fits
 
 # ---------------------------------------------------------------- sections
 func _section(parent: VBoxContainer, title: String) -> VBoxContainer:
@@ -764,17 +835,45 @@ func _revalidate() -> void:
 		for key in missing:
 			names.append(_inv().piece_name(String(key)))
 		msgs.push_front("🔒 Te falta: " + ", ".join(names) + " — consíguelo en 🎁 Cajas")
-	var bad := state == "INVALID" or not missing.is_empty()
+	# AVISO de evolución: si el personaje al que EVOLUCIONA ya trae una
+	# resistencia/pasiva que elegiste, se la estás poniendo de más (la tendrá
+	# igual al evolucionar). Solo INFORMA — el jugador decide si continúa.
+	if _evolve.button_pressed:
+		for opt in _phase_opts:
+			var sel := int(opt.selected)
+			if sel < 0 or sel >= _evo_fig_ids.size():
+				continue
+			var tgt: Dictionary = _figure_by_id(String(_evo_fig_ids[sel]))
+			if tgt.is_empty():
+				continue
+			var tn := String(tgt.get("name", "?"))
+			for sid in fig.get("resists", []):
+				if String(sid) in (tgt.get("resists", []) as Array):
+					msgs.append("⚠ «%s» ya tiene la resistencia «%s» — la tendrá al evolucionar" % [tn, _inv().piece_name("resist:" + String(sid)).trim_prefix("Resistencia ")])
+			for pid in fig.get("passives", []):
+				if String(pid) in (tgt.get("passives", []) as Array):
+					msgs.append("⚠ «%s» ya tiene la pasiva «%s»" % [tn, String(Roster.PASSIVES.get(pid, {}).get("name", pid))])
+
+	# PUNTOS DE CONSTRUCCIÓN (F1 medidor + F2 candado): pasarse de presupuesto
+	# BLOQUEA el guardado en modo usuario (admin puede, es herramienta de dev).
+	var pc_fits := _update_pc_meter(fig)
+	var pc_blocks: bool = not pc_fits and not bool(_inv().is_admin())
+	if pc_blocks:
+		msgs.push_front("🔧 Te pasas de Puntos de Construcción (%d/%d). Sube la rareza, cambia la clase o baja stats." % [PiecePoints.cost(fig), PiecePoints.budget(fig)])
+
+	var bad := state == "INVALID" or not missing.is_empty() or pc_blocks
 	# RESUMEN de UNA línea para el banner (nunca crece → no tapa Guardar).
 	var head := ""
-	if not missing.is_empty():
+	if pc_blocks:
+		head = "🔧 PC %d/%d — te pasas" % [PiecePoints.cost(fig), PiecePoints.budget(fig)]
+	elif not missing.is_empty():
 		head = "🔒 Te faltan %d pieza(s)" % missing.size()
 	elif state == "INVALID":
 		head = "✗ Inválido: %d error(es)" % (r["errors"] as Array).size()
-	elif state == "WARNING":
-		head = "⚠ Válido con %d aviso(s)" % (r["warnings"] as Array).size()
+	elif not msgs.is_empty():
+		head = "⚠ Válido con %d aviso(s) — PC %d/%d" % [msgs.size(), PiecePoints.cost(fig), PiecePoints.budget(fig)]
 	else:
-		head = "✓ Válido — listo para guardar"
+		head = "✓ Válido — PC %d/%d" % [PiecePoints.cost(fig), PiecePoints.budget(fig)]
 	_status_lbl.text = head
 	# DETALLE completo (para el popup ⓘ, y solo si hay algo que explicar).
 	_status_detail = ("\n".join(msgs)) if not msgs.is_empty() else "Todo en orden. Puedes guardar la figura."
@@ -793,7 +892,8 @@ func _revalidate() -> void:
 func _on_save() -> void:
 	var fig: Dictionary = build_figure()
 	var r: Dictionary = FigureValidator.validate(fig)
-	if String(r["state"]) == "INVALID" or not _inv().missing_pieces_for(fig, _edit_original).is_empty():
+	var pc_blocks: bool = not PiecePoints.fits(fig) and not bool(_inv().is_admin())
+	if String(r["state"]) == "INVALID" or not _inv().missing_pieces_for(fig, _edit_original).is_empty() or pc_blocks:
 		_revalidate()
 		return
 	if _editing_id != "":

@@ -126,6 +126,12 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- PIECE POINTS F1+F2: motor `PiecePoints` (costo/presupuesto/desglose) calibrado
+  contra los 8 integrados; medidor "PC usado/presupuesto" con barra y ⓘ en el
+  Creador; pasarse de PC BLOQUEA el guardado (usuario; admin bypass); aviso si
+  el destino de evolución ya trae la resistencia/pasiva elegida. Fix del botón
+  Guardar tapado (banner de 1 línea + candado airtight). Plan v2 en
+  `docs/Balance_PiecePoints.md`.
 - 🤖 MODO ROBOT (Capa 2-3 del plan): botón admin en Configuración que hace un
   tour REAL (economía→creador→mazos→cofres→partidas CPU vs CPU renderizando)
   con log [PASS]/[FAIL] a user://autotest/ + popup con copiar; respalda y
