@@ -80,15 +80,52 @@ func add_to_bench(team: String, rindex: int) -> int:
 # --- statuses --------------------------------------------------------------
 ## RESISTENCIAS (GDD): una figura con `resists: ["fear", …]` es INMUNE a esos
 ## estados — apply_status los ignora y devuelve false.
+# --- CLASES (F3): buffs/debuffs EN PARTIDA. Ver docs/Balance_PiecePoints.md §5.
+## Cada figura construida tiene una "class"; su efecto se aplica en combate en
+## los mismos puntos que aura/haste/buff-node. `class_off` (F5) los anula si la
+## evolución se usó sin evolucionar.
+const CLASS_FX := {
+	"Agile": {"stamina": 1, "dmg": -10, "stars": -1},
+	"Tank": {"stamina": -1, "blue_solid": true, "resist": "weakened"},
+	"Striker": {"stamina": -1, "dmg": 15},
+	"Debuffer": {"dmg": -15, "stars": 1, "status_turns": 2},
+	"Buffer": {"stamina": -1, "dmg": -10, "team_energy": 1},
+	"Controller": {"dmg": -10, "disp_bonus": 1, "disp_immune": true},
+	# Balanced / Specialist: sin efectos de combate (su valor está en el PC).
+}
+
+func _unit_class(uid: int) -> String:
+	var ri := int(units[uid].get("rindex", -1))
+	if ri < 0 or ri >= Roster.FIGURES.size():
+		return ""
+	return String(Roster.FIGURES[ri].get("class", ""))
+
+## Valor entero de un efecto de clase de la unidad (0 si no aplica / anulado).
+func _cfx(uid: int, key: String) -> int:
+	if bool(units[uid].get("class_off", false)):
+		return 0
+	return int((CLASS_FX.get(_unit_class(uid), {}) as Dictionary).get(key, 0))
+
+func _cflag(uid: int, key: String) -> bool:
+	if bool(units[uid].get("class_off", false)):
+		return false
+	return bool((CLASS_FX.get(_unit_class(uid), {}) as Dictionary).get(key, false))
+
 func resists_status(uid: int, s: String) -> bool:
-	return s in (rank_data(uid).get("resists", []) as Array)
+	if s in (rank_data(uid).get("resists", []) as Array):
+		return true
+	# CLASE — Tanque: resiste "Debilitado" de forma innata.
+	if not bool(units[uid].get("class_off", false)):
+		return s == String((CLASS_FX.get(_unit_class(uid), {}) as Dictionary).get("resist", ""))
+	return false
 
 ## dur < 0 → use the status' own default length (DOTs last longer than debuffs).
+## `extra` = turnos adicionales (CLASE Debilitador: +2 a los estados que aplica).
 ## Devuelve false si la figura RESISTIÓ el estado (no se aplicó).
-func apply_status(uid: int, s: String, dur: int = -1) -> bool:
+func apply_status(uid: int, s: String, dur: int = -1, extra: int = 0) -> bool:
 	if resists_status(uid, s):
 		return false
-	units[uid]["statuses"][s] = turn_no + (dur if dur >= 0 else _status_dur(s))
+	units[uid]["statuses"][s] = turn_no + (dur if dur >= 0 else _status_dur(s)) + maxi(0, extra)
 	return true
 
 func _status_dur(s: String) -> int:
@@ -341,6 +378,12 @@ func _roll_full(uid: int, is_attacker := false, forced := -1) -> Dictionary:
 	if forced < 0 and is_attacker and pending_buff[units[uid]["team"]].get("adrenaline", false) and String(pool[bidx].get("col", "")) == "red":
 		bidx = _weighted_index(pool)
 	var s: Dictionary = pool[bidx].duplicate(true)
+	# CLASE (F3): buff/debuff de DAÑO (Blanco/Oro) y ESTRELLAS (Púrpura).
+	var scol := String(s.get("col", ""))
+	if (scol == "white" or scol == "gold") and s.has("pow"):
+		s["pow"] = maxi(0, int(s["pow"]) + _cfx(uid, "dmg"))
+	if scol == "purple" and s.has("stars"):
+		s["stars"] = clampi(int(s["stars"]) + _cfx(uid, "stars"), 1, 3)
 	if has_status(uid, "weakened"):
 		if s.has("pow"):
 			s["pow"] = maxi(0, int(s["pow"]) - 20)
@@ -349,8 +392,9 @@ func _roll_full(uid: int, is_attacker := false, forced := -1) -> Dictionary:
 	# BURN — the flames sap the burning figure's damage.
 	if has_status(uid, "burn") and s.has("pow"):
 		s["pow"] = maxi(0, int(s["pow"]) - BURN_DMG_PEN)
-	# FROZEN / SHIELD BREAK — the figure cannot raise a Blue defence (it collapses to a Miss).
-	if String(s.get("col", "")) == "blue" and (has_status(uid, "freeze") or has_status(uid, "shield_break")):
+	# FROZEN / SHIELD BREAK — the figure cannot raise a Blue defence (it collapses to a
+	# Miss). CLASE Tanque: su Azul es indestructible (ignora ese colapso).
+	if String(s.get("col", "")) == "blue" and (has_status(uid, "freeze") or has_status(uid, "shield_break")) and not _cflag(uid, "blue_solid"):
 		s = {"col": "red", "name": String(s.get("name", "Bloqueo"))}
 	# SILENCE — the figure cannot cast Purple specials (they fizzle to a Miss).
 	elif String(s.get("col", "")) == "purple" and has_status(uid, "silence"):
@@ -454,7 +498,8 @@ func attack(att_uid: int, def_uid: int, att_moved: int = 0, fidx_a: int = -1, fi
 		var wcol := String(ws.get("col", ""))
 		var fx := String(ws.get("fx", ""))
 		if FX_STATUS.has(fx):
-			if apply_status(loser_uid, FX_STATUS[fx]):   # DOTs use their own longer timer
+			# CLASE — Debilitador: sus estados duran +2 turnos.
+			if apply_status(loser_uid, FX_STATUS[fx], -1, _cfx(winner_uid, "status_turns")):
 				applied = {"status": FX_STATUS[fx], "target": loser_uid, "fx": fx}
 			else:
 				applied = {"status": "", "target": loser_uid, "fx": fx, "resisted": true}
@@ -597,6 +642,7 @@ func _try_rank_up(uid: int) -> bool:
 ## Movement budget after auras (Venom Aura: adjacent enemy -> -1 stamina).
 func effective_stamina(uid: int) -> int:
 	var s := int(units[uid]["stamina"])
+	s += _cfx(uid, "stamina")   # CLASE: Ágil +1 · Tanque/Atacante/Potenciador −1
 	# MODIFIER — Prisa: este turno tu equipo tiene +1 estamina.
 	if bool((pending_buff[units[uid]["team"]] as Dictionary).get("haste", false)):
 		s += 1
@@ -614,6 +660,8 @@ func has_passive(uid: int, pid: String) -> bool:
 ## Bedrock (self) or a neighbouring ally's Bulwark aura -> immune to push/pull/swap.
 func _displacement_immune(uid: int) -> bool:
 	if has_passive(uid, "bedrock"):
+		return true
+	if _cflag(uid, "disp_immune"):   # CLASE — Controlador: inmune a ser desplazado
 		return true
 	# MODIFIER — Iron Wall: este turno el equipo entero está anclado.
 	if bool((pending_buff[units[uid]["team"]] as Dictionary).get("anchored", false)):
@@ -676,6 +724,7 @@ func _apply_displacement(winner_uid: int, loser_uid: int, seg: Dictionary) -> Di
 	# push / pull along the graph, guided by node positions
 	var win_pos := map.pos_of(w["node"])
 	var steps := int(seg.get("n", 1))
+	steps += _cfx(winner_uid, "disp_bonus")       # CLASE — Controlador: +1 nodo
 	if has_passive(winner_uid, "arcane_pull"):   # PASSIVE — Arcane Pull: +1 distance
 		steps += 1
 	if typ == "push" and _att_moved_ctx >= 3 and has_passive(winner_uid, "dive"):  # PASSIVE — Dive
@@ -807,6 +856,9 @@ func _grant_energy(team: String) -> void:
 	var gain := ENERGY_PER_TURN
 	if controls_buff(team):
 		gain += BUFF_ENERGY
+	# CLASE — Potenciador: cada uno en el tablero da +1 energía por turno al equipo.
+	for uid in units_on_board(team):
+		gain += _cfx(uid, "team_energy")
 	energy[team] = mini(ENERGY_MAX, int(energy[team]) + gain)
 
 func controls_buff(team: String) -> bool:

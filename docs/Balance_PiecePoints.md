@@ -260,7 +260,7 @@ suma de ruleta = 100%.
 |---|---|---|
 | **F1 — Medidor** | `PiecePoints.cost/budget/breakdown` + barra "PC usado/presupuesto" + ⓘ desglose en el Creador. Calibrado vs los 8 integrados. | ✅ HECHO (2026-07-13). |
 | **F2 — Presupuesto real** | Pasarse de PC bloquea el guardado (modo usuario; admin bypass, herramienta de dev). El aviso de evolución (destino ya tiene esa resistencia/pasiva) también entra aquí. | ✅ HECHO. |
-| **F3 — Clases con efectos** | Aplicar buffs/debuffs de §5 en partida (capa sobre estamina/daño/estrellas/energía). Mostrarlos en la ficha ("Ágil: +1⚡, −10 daño"). | ⏳ siguiente (toca `GameState`). |
+| **F3 — Clases con efectos** | Buffs/debuffs de §5 aplicados en partida (estamina, daño Blanco/Oro, estrellas Púrpura, duración de estados, energía de equipo, desplazamiento e inmunidad; Tanque: Azul indestructible + resiste Debilitado). Efecto visible en el Creador. `class_off` anula todo (hook para F5). | ✅ HECHO (2026-07-13). |
 | **F4 — Modelo innato** | Poblar `innate` en los 8 modelos (§4); ya lo respeta el motor (gratis + supera topes). Mostrarlo en Creador/Dex. | ⏳ (el motor ya lo lee). |
 | **F5 — Evolución** | `is_evolution` +30% budget ya cuenta; falta `_deform_unevolved` al desplegar directo (§6) + marca en tablero. | ⏳ |
 | **F6 — Telemetría** | Datos anónimos de winrate por pieza para el ajuste 55/45. | Post-lanzamiento. |

@@ -126,6 +126,11 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- PIECE POINTS F3 (clases con efectos): cada clase aplica buff+debuff EN PARTIDA
+  (Ágil +1⚡/−10 daño/−1★ · Tanque azul indestructible+resiste Debilitado/−1⚡ ·
+  Atacante +15 daño/−1⚡ · Debilitador +1★+estados+2t/−15 · Potenciador +1
+  energía equipo/−10/−1⚡ · Controlador desplaza+1 nodo+inmune/−10). Visible en el
+  Creador; `class_off` los anula (hook para F5). Test `test_classes`.
 - PIECE POINTS F1+F2: motor `PiecePoints` (costo/presupuesto/desglose) calibrado
   contra los 8 integrados; medidor "PC usado/presupuesto" con barra y ⓘ en el
   Creador; pasarse de PC BLOQUEA el guardado (usuario; admin bypass); aviso si

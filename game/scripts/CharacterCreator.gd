@@ -75,6 +75,7 @@ var _scroll: ScrollContainer
 var _name: LineEdit
 var _desc: LineEdit
 var _class: OptionButton
+var _class_fx_lbl: Label          # efecto de la clase en partida (buff/debuff)
 var _rarity: OptionButton
 var _type: OptionButton
 var _model: OptionButton
@@ -245,6 +246,20 @@ func _build_footer() -> void:
 	_save_btn.pressed.connect(_on_save)
 	vb.add_child(_save_btn)
 
+# ---------------------------------------------------------------- clase (F3)
+## Descripción legible del buff/debuff EN PARTIDA de una clase (ver GameState.CLASS_FX).
+func _class_fx_text(cls: String) -> String:
+	match cls:
+		"Balanced": return "⚖ Sin cambios de combate · +20 puntos de construcción."
+		"Agile": return "🏃 +1 estamina ⚡ · pero Blanco/Oro −10 daño y Púrpura −1★."
+		"Tank": return "🛡 Azul indestructible + resiste Debilitado · pero −1 estamina."
+		"Striker": return "⚔ Blanco/Oro +15 daño · pero −1 estamina."
+		"Debuffer": return "☠ Púrpura +1★ y sus estados duran +2 turnos · pero Blanco/Oro −15."
+		"Buffer": return "✨ +1 energía por turno al equipo · pero Blanco/Oro −10 y −1 estamina."
+		"Controller": return "🌀 Desplazamientos +1 nodo e inmune a ser desplazado · pero Blanco/Oro −10. (+5 PC)"
+		"Specialist": return "🔧 Sin cambios de combate · +30 PC, pero NO hereda pasivas ocultas del modelo."
+	return ""
+
 # ---------------------------------------------------------------- PC meter (F1)
 ## Medidor de PUNTOS DE CONSTRUCCIÓN: barra + "usado / presupuesto" + ⓘ desglose.
 ## Se actualiza en cada _revalidate. El presupuesto sube con rareza/clase/evolución.
@@ -356,8 +371,16 @@ func _build_identity(form: VBoxContainer) -> void:
 	for c in CLASSES:
 		clkeys.append("class:" + String(c))
 	_lock_items(_class, clkeys)   # las clases también son piezas del inventario
-	_class.item_selected.connect(func(_i): _revalidate())
+	_class.item_selected.connect(func(_i):
+		_class_fx_lbl.text = _class_fx_text(CLASSES[_class.selected])
+		_revalidate())
 	_field(s, "Clase", _class)
+	# efecto de la clase EN PARTIDA (buff/debuff) — para que el trueque sea claro
+	_class_fx_lbl = Label.new()
+	_class_fx_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.label(_class_fx_lbl, 11, UITheme.GOLD, false, 600)
+	_class_fx_lbl.text = _class_fx_text(CLASSES[_class.selected])
+	s.add_child(_class_fx_lbl)
 	_rarity = _opt(RARITY_ES)
 	_rarity.select(2)   # Épica by default
 	var rkeys: Array = []
