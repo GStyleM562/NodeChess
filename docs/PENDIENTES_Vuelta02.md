@@ -1,17 +1,19 @@
 # PENDIENTES — Vuelta 02 (lo que queda POR agregar)
 
-> Estado tras cerrar la Vuelta01 + tandas de economía (2026-07-11). Cruzado
-> contra el GDD completo (`GDD_Context_Summary.md` y Parts 1–5), el CHANGELOG
-> y los docs de balance/testing. Prioridades: **P0** = para la prueba pública ·
+> Estado tras cerrar la Vuelta01 + economía + FULL tutorial + Modo Robot.
+> Última revisión: 2026-07-13. Cruzado contra el GDD completo
+> (`GDD_Context_Summary.md` y Parts 1–5), el CHANGELOG y los docs de
+> balance/testing. Prioridades: **P0** = para la prueba pública ·
 > **P1** = para el lanzamiento · **P2** = post-lanzamiento / si hay tracción.
 
 ---
 
-## 🤖 P0 — Testing (el plan nuevo: `PLAN_Testing.md`)
-| Qué | Detalle |
+## 🤖 P0 — Testing (el plan: `PLAN_Testing.md`)
+| Qué | Estado |
 |---|---|
-| **Modo Robot en la app** | Botón admin "🤖 Prueba automática": tour real (economía→creador→mazos→3 partidas CPU vs CPU→cofres) con log `[PASS]/[FAIL]` a archivo + reporte en pantalla. **El siguiente paso natural.** |
-| **Burn-in** | 10+ partidas CPU vs CPU aceleradas midiendo fps/memoria/errores en el teléfono. |
+| **Modo Robot en la app** | ✅ HECHO (`AutoTester.gd`, commit 4946df1): botón admin, tour real (economía→creador→mazos→cofres→partidas CPU vs CPU) con log `[PASS]/[FAIL]` + reporte. Verificado 34/0. |
+| **Burn-in** | ✅ HECHO (botón "🔥 Burn-in", 10 partidas con fps/memoria). |
+| **⚠ HUECO — el robot NO conduce las lecciones del tutorial** | Ni `AutoTester` ni `test_full_tutorial` instancian Board3D para RECORRER cada una de las 11 lecciones paso a paso. El crash del marcador 👉 (8fd3d29) vivió justo ahí y fue invisible a la suite. **Prioridad alta**: añadir al robot un paso que cargue cada lección, avance sus pasos y ejecute la acción de cada uno (cazaría tweens huérfanos, gates rotos, nodos inválidos EN VIVO). |
 | **Checklist humana** | Pasar la lista SI-O-SI completa en 2 teléfonos antes de cada subida a Play. |
 | **Prueba de ACTUALIZACIÓN** | Instalar versión vieja → jugar → actualizar → verificar que NO se pierde nada (inventario/mazos/customs/nivel). Nunca la hemos hecho formalmente. |
 
@@ -65,10 +67,12 @@
 
 ---
 
-## El orden que recomiendo para la Vuelta 02
-1. **Modo Robot + burn-in** (asegura TODO lo demás; 1 tanda).
-2. **Prueba de actualización** + checklist humana en 2 teléfonos → subir a Play.
-3. **Piece Points F1 (medidor)** — barato y le da identidad al Creador.
-4. **Puzzle Battles + 2-3 tutoriales temáticos** (contenido barato con el motor actual).
-5. **Duplicados→fragmentos + misiones diarias** (cierra el loop económico).
-6. Lo demás según feedback de los testers.
+## El orden que recomiendo para la Vuelta 02 (actualizado 2026-07-13)
+1. ~~Modo Robot + burn-in~~ ✅ HECHO.
+2. **Robot recorre las 11 lecciones del tutorial** (cierra el hueco que dejó
+   pasar el crash del 👉; media tanda).
+3. **Prueba de actualización** + checklist humana en 2 teléfonos → subir a Play.
+4. **Piece Points F1 (medidor)** — barato y le da identidad al Creador.
+5. **Puzzle Battles + 2-3 tutoriales temáticos** (contenido barato con el motor actual).
+6. **Duplicados→fragmentos + misiones diarias** (cierra el loop económico).
+7. Lo demás según feedback de los testers.
