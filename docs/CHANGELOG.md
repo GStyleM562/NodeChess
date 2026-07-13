@@ -126,6 +126,11 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- PIECE POINTS F4 (modelo innato): cada modelo trae pasivas/resistencias OCULTAS
+  + PC; el motor las OTORGA en combate (gratis, superan los topes 3/2). Pobladas
+  las 12 figuras (Stone Golem: Bedrock + resiste Congelado, etc.). El Especialista
+  no hereda las pasivas ocultas (las paga si las pone); una evolución sin
+  evolucionar (class_off) pierde ambas. Visible en el Creador bajo el modelo.
 - PIECE POINTS F3 (clases con efectos): cada clase aplica buff+debuff EN PARTIDA
   (Ágil +1⚡/−10 daño/−1★ · Tanque azul indestructible+resiste Debilitado/−1⚡ ·
   Atacante +15 daño/−1⚡ · Debilitador +1★+estados+2t/−15 · Potenciador +1

@@ -51,11 +51,13 @@ static func cost(fig: Dictionary) -> int:
 	c += _pool_cost(fig.get("attack", []))
 	c += float(STAMINA_COST[clampi(int(fig.get("stamina", 2)), 0, 6)])
 	c += float(TYPE_COST.get(String(fig.get("type", "Ruleta")), 0))
-	# pasivas/resistencias CONSTRUIDAS (las ocultas del modelo no cuestan)
+	# pasivas/resistencias CONSTRUIDAS (las ocultas del modelo no cuestan, salvo
+	# al Especialista: NO hereda las pasivas ocultas, así que las paga si las pone).
 	var innate: Dictionary = _innate(fig)
+	var inherits_p: bool = String(fig.get("class", "")) != "Specialist"
 	var innate_p: Array = innate.get("passives", [])
 	for pid in fig.get("passives", []):
-		if String(pid) in innate_p:
+		if inherits_p and String(pid) in innate_p:
 			continue                      # ya la trae el modelo → gratis
 		c += float(PASSIVE_COST.get(String(pid), PASSIVE_DEFAULT))
 	var innate_r: Array = innate.get("resists", [])
@@ -119,10 +121,11 @@ static func breakdown(fig: Dictionary) -> Array:
 	if tv != 0:
 		lines.append("Tipo %s: %d" % [String(fig.get("type", "Ruleta")), tv])
 	var innate: Dictionary = _innate(fig)
+	var inherits_p: bool = String(fig.get("class", "")) != "Specialist"
 	var np: Array = innate.get("passives", [])
 	var pc := 0
 	for pid in fig.get("passives", []):
-		if String(pid) not in np:
+		if not (inherits_p and String(pid) in np):
 			pc += int(PASSIVE_COST.get(String(pid), PASSIVE_DEFAULT))
 	if pc > 0:
 		lines.append("Pasivas: %d" % pc)

@@ -39,6 +39,7 @@ static var FIGURES := [
 	{
 		"id": "stone_golem", "name": "Stone Golem", "stamina": 1, "type": "Ruleta",
 		"passives": ["bedrock", "counter_stone"],
+		"innate": {"pc": 8, "passives": ["bedrock"], "resists": ["freeze"]},
 		"glb": "res://assets/figures/stone_golem/stone_golem.glb",
 		"size": 1.30, "complete": true,
 		"clips": {
@@ -55,6 +56,7 @@ static var FIGURES := [
 	{
 		"id": "ironclad_knight", "name": "Ironclad Knight", "stamina": 2, "type": "Dado (D6)",
 		"passives": ["hold_the_line", "bulwark"],
+		"innate": {"pc": 6, "passives": ["hold_the_line"], "resists": ["fear"]},
 		"glb": "res://assets/figures/ironclad_knight/ironclad_knight.glb",
 		"size": 1.00, "complete": true,
 		"clips": {
@@ -71,6 +73,7 @@ static var FIGURES := [
 	{
 		"id": "nightblade", "name": "Nightblade", "stamina": 3, "type": "Moneda",
 		"passives": ["lunge", "bloodthirst", "parkour"],
+		"innate": {"pc": 6, "passives": ["parkour"], "resists": []},
 		"glb": "res://assets/figures/nightblade/nightblade.glb",
 		"size": 0.95, "complete": true,
 		"clips": {
@@ -86,6 +89,7 @@ static var FIGURES := [
 	{
 		"id": "rift_mage", "name": "Rift Mage", "stamina": 2, "type": "Suma 2d6",
 		"passives": ["arcane_pull", "blink"],
+		"innate": {"pc": 6, "passives": ["blink"], "resists": ["immobilized"]},
 		"glb": "res://assets/figures/rift_mage/rift_mage.glb",
 		"size": 0.95, "complete": true,
 		"clips": {
@@ -105,6 +109,7 @@ static var FIGURES := [
 	{
 		"id": "venom_witch", "name": "Venom Witch", "stamina": 2, "type": "Ruleta",
 		"passives": ["venom_hex", "hexstep"],
+		"innate": {"pc": 6, "passives": ["hexstep"], "resists": ["poison"]},
 		"glb": "res://assets/figures/venom_witch/witch/witch.glb",
 		"size": 1.00, "complete": true,
 		"clips": {
@@ -136,6 +141,7 @@ static var FIGURES := [
 	{
 		"id": "storm_valkyrie", "name": "Storm Valkyrie", "stamina": 4, "type": "Ruleta", # anim incomplete (1 clip)
 		"passives": ["aerial", "dive"],
+		"innate": {"pc": 6, "passives": ["aerial"], "resists": ["immobilized"]},
 		"glb": "res://assets/figures/storm_valkyrie/Meshy_AI_model_Animation_Walking_withSkin.glb",
 		"size": 1.00, "complete": false,
 		"clips": {
@@ -152,6 +158,7 @@ static var FIGURES := [
 		# res://assets/figures/emberborn/{squire,champion,warlord}/ (folders ready).
 		"id": "emberborn", "name": "Emberborn", "stamina": 3, "type": "Dado (D6)",
 		"passives": ["kindling_resolve"], "placeholder": true,
+		"innate": {"pc": 5, "passives": [], "resists": ["burn"]},
 		"glb": "res://assets/figures/ironclad_knight/ironclad_knight.glb",
 		"size": 1.00, "complete": true,
 		"clips": {
@@ -190,6 +197,7 @@ static var FIGURES := [
 		# res://assets/figures/coin_trickster/ (folder ready).
 		"id": "coin_trickster", "name": "Coin Trickster", "stamina": 3, "type": "Doble Moneda",
 		"passives": ["loaded_dice"], "placeholder": true,
+		"innate": {"pc": 5, "passives": [], "resists": ["confusion"]},
 		"glb": "res://assets/figures/nightblade/nightblade.glb",
 		"size": 0.95, "complete": true,
 		"clips": {
@@ -213,6 +221,7 @@ static var FIGURES := [
 	{
 		"id": "heal_bunny", "name": "Heal Bunny", "stamina": 2, "type": "Ruleta", "rarity": "rare",
 		"passives": [], "complete": true, "size": 1.0,
+		"innate": {"pc": 4, "passives": [], "resists": ["weakened"]},
 		"glb": "res://assets/figures/heal_bunny/Meshy_AI_Meshy_Merged_Animations.glb",
 		"clips": {
 			"idle": "Idle_6", "move_walk": "Walking", "move_run": "Running",
@@ -227,6 +236,7 @@ static var FIGURES := [
 	{
 		"id": "mage_bunny", "name": "Mage Bunny", "stamina": 3, "type": "Ruleta", "rarity": "epic",
 		"passives": [], "complete": true, "size": 1.0,
+		"innate": {"pc": 5, "passives": ["blink"], "resists": []},
 		"glb": "res://assets/figures/mage_bunny/Meshy_AI_Meshy_Merged_Animations (1).glb",
 		"clips": {
 			"idle": "Idle_7", "move_walk": "Walking", "move_run": "Running",
@@ -241,6 +251,7 @@ static var FIGURES := [
 	{
 		"id": "tank_bunny", "name": "Tank Bunny", "stamina": 1, "type": "Ruleta", "rarity": "rare",
 		"passives": [], "complete": true, "size": 1.0,
+		"innate": {"pc": 6, "passives": ["bedrock"], "resists": ["freeze"]},
 		"glb": "res://assets/figures/tank_bunny/Meshy_AI_Meshy_Merged_Animations.glb",
 		"clips": {
 			"idle": "Idle_15", "move_walk": "Walking", "move_run": "Running",
@@ -256,6 +267,7 @@ static var FIGURES := [
 		"id": "ninja", "name": "Kage Ninja", "stamina": 3, "type": "Ruleta", "rarity": "epic",
 		"class": "Agile",
 		"passives": ["lunge", "parkour"], "complete": true, "size": 0.95,
+		"innate": {"pc": 5, "passives": ["parkour"], "resists": []},
 		"glb": "res://assets/figures/ninja/Meshy_AI_Meshy_Merged_Animations.glb",
 		"clips": {
 			"idle": "Idle_10", "move_walk": "Walking", "move_run": "Running",

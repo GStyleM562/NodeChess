@@ -79,6 +79,7 @@ var _class_fx_lbl: Label          # efecto de la clase en partida (buff/debuff)
 var _rarity: OptionButton
 var _type: OptionButton
 var _model: OptionButton
+var _model_innate_lbl: Label      # rasgos ocultos del modelo (F4)
 var _stamina: SpinBox
 var _evolve: CheckBox
 var _evo_box: VBoxContainer       # evolution sub-section (hidden until "Evoluciona")
@@ -245,6 +246,34 @@ func _build_footer() -> void:
 	UITheme.style_primary(_save_btn, UITheme.SUCCESS)
 	_save_btn.pressed.connect(_on_save)
 	vb.add_child(_save_btn)
+
+# ---------------------------------------------------------------- modelo innato (F4)
+## Texto de los rasgos OCULTOS del modelo seleccionado (pasivas/resistencias
+## gratis que superan los topes). "" si el modelo no trae nada.
+func _model_innate_text() -> String:
+	if _model == null or _model.selected < 0 or _model.selected >= _model_ids.size():
+		return ""
+	var innate: Dictionary = {}
+	for f in Roster.FIGURES:
+		if String(f.get("id", "")) == String(_model_ids[_model.selected]):
+			innate = f.get("innate", {})
+			break
+	var parts: Array = []
+	for pid in innate.get("passives", []):
+		parts.append("✨ " + String(Roster.PASSIVES.get(pid, {}).get("name", pid)))
+	for sid in innate.get("resists", []):
+		var nm := String(sid)
+		for label in GameState.FX_STATUS.keys():
+			if String(GameState.FX_STATUS[label]) == String(sid):
+				nm = String(label)
+				break
+		parts.append("🛡 Resiste " + nm)
+	if parts.is_empty():
+		return "Este modelo no trae rasgos ocultos."
+	var extra := ""
+	if int(innate.get("pc", 0)) > 0:
+		extra = "  (+%d PC)" % int(innate["pc"])
+	return "Este modelo YA trae (GRATIS, sobre el tope): " + "  ·  ".join(parts) + extra
 
 # ---------------------------------------------------------------- clase (F3)
 ## Descripción legible del buff/debuff EN PARTIDA de una clase (ver GameState.CLASS_FX).
@@ -415,7 +444,16 @@ func _build_combat(form: VBoxContainer) -> void:
 	for mid in _model_ids:
 		mkeys.append("model:" + String(mid))
 	_lock_items(_model, mkeys)
+	_model.item_selected.connect(func(_i):
+		_model_innate_lbl.text = _model_innate_text()
+		_revalidate())
 	_field(s, "Modelo (placeholder)", _model)
+	# rasgos OCULTOS que trae el modelo (gratis, superan topes) — F4
+	_model_innate_lbl = Label.new()
+	_model_innate_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.label(_model_innate_lbl, 11, UITheme.PRIMARY_EDGE, false, 600)
+	_model_innate_lbl.text = _model_innate_text()
+	s.add_child(_model_innate_lbl)
 	# --- evolution ---
 	_evolve = CheckBox.new()
 	_evolve.text = "Evoluciona (Rank Up)"

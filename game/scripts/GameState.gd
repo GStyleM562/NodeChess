@@ -111,13 +111,31 @@ func _cflag(uid: int, key: String) -> bool:
 		return false
 	return bool((CLASS_FX.get(_unit_class(uid), {}) as Dictionary).get(key, false))
 
+# --- MODELO INNATO (F4): pasivas/resistencias OCULTAS del modelo — gratis,
+## superan los topes 3/2, y las OTORGA de verdad el motor. La evolución usada
+## sin evolucionar (class_off) las pierde; el Especialista NO hereda las pasivas.
+func _model_innate(uid: int) -> Dictionary:
+	var ri := int(units[uid].get("rindex", -1))
+	if ri < 0 or ri >= Roster.FIGURES.size():
+		return {}
+	var base: Dictionary = Roster.FIGURES[ri]
+	var ref := String(base.get("model_ref", base.get("id", "")))
+	for f in Roster.FIGURES:
+		if String(f.get("id", "")) == ref:
+			return f.get("innate", {})
+	return {}
+
 func resists_status(uid: int, s: String) -> bool:
 	if s in (rank_data(uid).get("resists", []) as Array):
-		return true
+		return true                                # resistencia CONSTRUIDA (siempre)
+	# Evolución sin evolucionar: pierde clase E innatas (las construidas de arriba sí).
+	if bool(units[uid].get("class_off", false)):
+		return false
 	# CLASE — Tanque: resiste "Debilitado" de forma innata.
-	if not bool(units[uid].get("class_off", false)):
-		return s == String((CLASS_FX.get(_unit_class(uid), {}) as Dictionary).get("resist", ""))
-	return false
+	if s == String((CLASS_FX.get(_unit_class(uid), {}) as Dictionary).get("resist", "")):
+		return true
+	# MODELO (F4): resistencias ocultas del modelo (gratis, superan el tope).
+	return s in (_model_innate(uid).get("resists", []) as Array)
 
 ## dur < 0 → use the status' own default length (DOTs last longer than debuffs).
 ## `extra` = turnos adicionales (CLASE Debilitador: +2 a los estados que aplica).
@@ -655,7 +673,13 @@ func effective_stamina(uid: int) -> int:
 
 # --- passives --------------------------------------------------------------
 func has_passive(uid: int, pid: String) -> bool:
-	return pid in (rank_data(uid)["passives"] as Array)
+	if pid in (rank_data(uid)["passives"] as Array):
+		return true                                # pasiva CONSTRUIDA / de rango
+	# MODELO (F4): pasivas ocultas — gratis, superan el tope. NO las hereda el
+	# Especialista, ni una evolución usada sin evolucionar (class_off).
+	if bool(units[uid].get("class_off", false)) or _unit_class(uid) == "Specialist":
+		return false
+	return pid in (_model_innate(uid).get("passives", []) as Array)
 
 ## Bedrock (self) or a neighbouring ally's Bulwark aura -> immune to push/pull/swap.
 func _displacement_immune(uid: int) -> bool:

@@ -65,9 +65,44 @@ func _initialize() -> void:
 	same["passives"] = []
 	same["resists"] = []
 	ok = _expect("pasiva/resistencia innata es GRATIS", PiecePoints.cost(innate_fig), PiecePoints.cost(same)) and ok
+	# … salvo el ESPECIALISTA: no hereda la pasiva oculta, así que la paga
+	var spec := innate_fig.duplicate(true)
+	spec["class"] = "Specialist"
+	ok = _expect("Especialista PAGA la pasiva oculta", PiecePoints.cost(spec) > PiecePoints.cost(innate_fig), true) and ok
+
+	# --- F4: el MOTOR otorga las innatas en combate (gratis, superan topes) ---
+	var g := GameState.new(MapData.new(0))
+	var uid := g.add_to_bench("player", Roster.FIGURES.size() - 1)   # la figura "pp_innate"
+	ok = _expect("motor: otorga la pasiva oculta (Bedrock)", g.has_passive(uid, "bedrock"), true) and ok
+	ok = _expect("motor: otorga la resistencia oculta (fear)", g.resists_status(uid, "fear"), true) and ok
+	# construir 3 pasivas ADEMÁS de la oculta → 4 activas (supera el tope de 3)
+	g.units[uid]["rindex"] = _mk_fig({"model_ref": "pp_innate", "passives": ["lunge", "warcry", "scavenger"]})
+	var active := 0
+	for pid in ["bedrock", "lunge", "warcry", "scavenger"]:
+		if g.has_passive(uid, pid):
+			active += 1
+	ok = _expect("3 construidas + 1 oculta = 4 activas", active, 4) and ok
+	# ESPECIALISTA no hereda la pasiva oculta en combate
+	var uid2 := g.add_to_bench("player", _mk_fig({"model_ref": "pp_innate", "class": "Specialist", "passives": []}))
+	ok = _expect("Especialista NO hereda la pasiva oculta", g.has_passive(uid2, "bedrock"), false) and ok
+	# … pero SÍ la resistencia oculta
+	ok = _expect("Especialista SÍ hereda la resistencia oculta", g.resists_status(uid2, "fear"), true) and ok
+	# class_off (evolución sin evolucionar) pierde ambas
+	g.units[uid]["class_off"] = true
+	ok = _expect("class_off pierde la pasiva oculta", g.has_passive(uid, "bedrock"), false) and ok
+	ok = _expect("class_off pierde la resistencia oculta", g.resists_status(uid, "fear"), false) and ok
 
 	print("PIECEPOINTS_OK" if ok else "PIECEPOINTS_FAIL")
 	quit()
+
+## Crea una figura de prueba con overrides y devuelve su rindex.
+func _mk_fig(over: Dictionary) -> int:
+	var f := {"id": "ppf_" + str(randi()), "name": "F", "stamina": 2, "type": "Ruleta",
+		"attack": [{"col": "white", "pow": 40, "w": 100}]}
+	for k in over:
+		f[k] = over[k]
+	Roster.FIGURES.append(f)
+	return Roster.FIGURES.size() - 1
 
 func _with(d: Dictionary, k: String, v) -> Dictionary:
 	var out := d.duplicate(true)
