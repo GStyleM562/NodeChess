@@ -82,6 +82,8 @@ var _model: OptionButton
 var _model_innate_lbl: Label      # rasgos ocultos del modelo (F4)
 var _stamina: SpinBox
 var _evolve: CheckBox
+var _is_evo: CheckBox             # "Es Evolución" (F5): +30% PC, castigo si no evoluciona
+var _is_evo_lbl: Label
 var _evo_box: VBoxContainer       # evolution sub-section (hidden until "Evoluciona")
 var _phase_count: SpinBox
 var _phase_holder: VBoxContainer
@@ -454,6 +456,21 @@ func _build_combat(form: VBoxContainer) -> void:
 	UITheme.label(_model_innate_lbl, 11, UITheme.PRIMARY_EDGE, false, 600)
 	_model_innate_lbl.text = _model_innate_text()
 	s.add_child(_model_innate_lbl)
+	# --- ES EVOLUCIÓN (F5): +30% de presupuesto PC, pero si se despliega SIN
+	# evolucionar, juega toda la partida a la MITAD y sin pasivas/clase. ---
+	_is_evo = CheckBox.new()
+	_is_evo.text = "Es Evolución (forma evolucionada)"
+	UITheme.button_font(_is_evo, 14, UITheme.R_LEGEND, false, 700)
+	_is_evo.toggled.connect(func(_p):
+		_is_evo_lbl.visible = _is_evo.button_pressed
+		_revalidate())
+	s.add_child(_is_evo)
+	_is_evo_lbl = Label.new()
+	_is_evo_lbl.text = "⚠ +30% de PC. Pero si la usas SIN que evolucione a ella, jugará TODA la partida a la mitad de estamina/daño, −1★, y SIN pasivas ni clase. ¡Ponla como destino de evolución de otra figura!"
+	_is_evo_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_is_evo_lbl.visible = false
+	UITheme.label(_is_evo_lbl, 11, UITheme.GOLD, false, 600)
+	s.add_child(_is_evo_lbl)
 	# --- evolution ---
 	_evolve = CheckBox.new()
 	_evolve.text = "Evoluciona (Rank Up)"
@@ -702,6 +719,7 @@ func build_figure() -> Dictionary:
 		"stamina": int(_stamina.value), "type": TYPES[_type.selected],
 		"passives": passives, "resists": resists, "model_ref": model_ref,
 		"evolve": _evolve.button_pressed, "stages": stages,
+		"is_evolution": _is_evo.button_pressed,
 		"pool": pool,
 	})
 
@@ -768,6 +786,10 @@ func _load_figure(fig: Dictionary) -> void:
 	_stamina.value = int(fig.get("stamina", 2))
 	_select_index(_type, TYPES.find(String(fig.get("type", "Ruleta"))))
 	_select_index(_model, _model_ids.find(String(fig.get("model_ref", ""))))
+	_model_innate_lbl.text = _model_innate_text()
+	_class_fx_lbl.text = _class_fx_text(CLASSES[_class.selected])
+	_is_evo.button_pressed = bool(fig.get("is_evolution", false))
+	_is_evo_lbl.visible = _is_evo.button_pressed
 	var pl: Array = fig.get("passives", [])
 	for pid in _passive_boxes.keys():
 		_passive_boxes[pid].button_pressed = pid in pl
@@ -817,6 +839,8 @@ static func make_figure(p: Dictionary) -> Dictionary:
 		"model_ref": String(p.get("model_ref", "")),
 		"attack": attack,
 	}
+	if bool(p.get("is_evolution", false)):
+		fig["is_evolution"] = true
 	var stages: Array = p.get("stages", [])
 	if not stages.is_empty():
 		fig["ranks"] = stages                       # each phase = an existing figure

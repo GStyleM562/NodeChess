@@ -2081,12 +2081,19 @@ func _refresh_status_labels() -> void:
 		var sl := _gs.status_list(uid)
 		lbl.text = _status_text(sl)
 		lbl.visible = not sl.is_empty()
-	# ⚡ = figura potenciada por buff node (permanente hasta caer)
+	# ⚡ = potenciada por buff node · ⧗ = evolución SIN evolucionar (a la mitad)
 	for uid in _name_lbls.keys():
 		var nl = _name_lbls[uid]
 		if is_instance_valid(nl) and _gs.units.has(uid):
 			var base := _gs.name_for(uid)
-			nl.text = ("⚡" + base) if bool(_gs.units[uid].get("buffed", false)) else base
+			var unevo: bool = bool(_gs.units[uid].get("unevolved", false))
+			if unevo:
+				nl.text = "⧗ " + base + " (sin evolucionar)"
+				nl.modulate = Color(0.7, 0.7, 0.75)
+			elif bool(_gs.units[uid].get("buffed", false)):
+				nl.text = "⚡" + base
+			else:
+				nl.text = base
 
 func _status_text(list: Array) -> String:
 	var parts := []

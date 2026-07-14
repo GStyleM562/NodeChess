@@ -69,11 +69,20 @@ func _init(_map: MapData) -> void:
 func add_to_bench(team: String, rindex: int) -> int:
 	var uid := _next_uid
 	_next_uid += 1
-	units[uid] = {
+	var st := int(Roster.FIGURES[rindex].get("stamina", 2))
+	var u := {
 		"uid": uid, "rindex": rindex, "team": team, "node": -1,
-		"stamina": int(Roster.FIGURES[rindex].get("stamina", 2)), "alive": true,
-		"statuses": {}, "rank": 0,
+		"stamina": st, "alive": true, "statuses": {}, "rank": 0,
 	}
+	# EVOLUCIÓN SIN EVOLUCIONAR (F5): una figura marcada "Es Evolución" desplegada
+	# DIRECTA (no alcanzada por Rank-Up) juega toda la partida a la mitad de sus
+	# capacidades, sin pasivas y con la clase anulada. (El Rank-Up no cambia el
+	# rindex a la figura-evolución, así que solo penaliza las desplegadas directas.)
+	if bool(Roster.FIGURES[rindex].get("is_evolution", false)):
+		u["unevolved"] = true
+		u["class_off"] = true           # anula clase + pasivas/resistencias ocultas
+		u["stamina"] = st / 2           # estamina a la mitad (floor)
+	units[uid] = u
 	bench[team].append(uid)
 	return uid
 
@@ -396,6 +405,12 @@ func _roll_full(uid: int, is_attacker := false, forced := -1) -> Dictionary:
 	if forced < 0 and is_attacker and pending_buff[units[uid]["team"]].get("adrenaline", false) and String(pool[bidx].get("col", "")) == "red":
 		bidx = _weighted_index(pool)
 	var s: Dictionary = pool[bidx].duplicate(true)
+	# EVOLUCIÓN SIN EVOLUCIONAR (F5): la mitad de daño y −1★ (piso 1) toda la partida.
+	if bool(units[uid].get("unevolved", false)):
+		if s.has("pow"):
+			s["pow"] = int(s["pow"]) / 2
+		if s.has("stars"):
+			s["stars"] = maxi(1, int(s["stars"]) - 1)
 	# CLASE (F3): buff/debuff de DAÑO (Blanco/Oro) y ESTRELLAS (Púrpura).
 	var scol := String(s.get("col", ""))
 	if (scol == "white" or scol == "gold") and s.has("pow"):
@@ -673,6 +688,8 @@ func effective_stamina(uid: int) -> int:
 
 # --- passives --------------------------------------------------------------
 func has_passive(uid: int, pid: String) -> bool:
+	if bool(units[uid].get("unevolved", false)):
+		return false                               # evolución sin evolucionar: SIN pasivas
 	if pid in (rank_data(uid)["passives"] as Array):
 		return true                                # pasiva CONSTRUIDA / de rango
 	# MODELO (F4): pasivas ocultas — gratis, superan el tope. NO las hereda el

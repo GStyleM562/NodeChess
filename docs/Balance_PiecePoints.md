@@ -262,7 +262,7 @@ suma de ruleta = 100%.
 | **F2 — Presupuesto real** | Pasarse de PC bloquea el guardado (modo usuario; admin bypass, herramienta de dev). El aviso de evolución (destino ya tiene esa resistencia/pasiva) también entra aquí. | ✅ HECHO. |
 | **F3 — Clases con efectos** | Buffs/debuffs de §5 aplicados en partida (estamina, daño Blanco/Oro, estrellas Púrpura, duración de estados, energía de equipo, desplazamiento e inmunidad; Tanque: Azul indestructible + resiste Debilitado). Efecto visible en el Creador. `class_off` anula todo (hook para F5). | ✅ HECHO (2026-07-13). |
 | **F4 — Modelo innato** | `innate` poblado en los 12 modelos (pasivas/resistencias ocultas + PC); el motor las OTORGA en combate (has_passive/resists_status, gratis + superan topes 3/2). Especialista no hereda las pasivas; `class_off` pierde ambas. Visible en el Creador bajo el modelo. | ✅ HECHO (2026-07-13). |
-| **F5 — Evolución** | `is_evolution` +30% budget ya cuenta; falta `_deform_unevolved` al desplegar directo (§6) + marca en tablero. | ⏳ |
+| **F5 — Evolución** | Checkbox "Es Evolución" (+30% budget) + castigo al desplegar directo: mitad de estamina/daño, −1★, sin pasivas (construidas+ocultas) ni clase, resistencias construidas SÍ sobreviven; marca ⧗ en tablero. | ✅ HECHO (2026-07-14). |
 | **F6 — Telemetría** | Datos anónimos de winrate por pieza para el ajuste 55/45. | Post-lanzamiento. |
 
 > **Regla de oro**: los valores de este doc son SEMILLA, no ley. La única verdad

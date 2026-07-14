@@ -126,6 +126,12 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- PIECE POINTS F5 (evolución): checkbox "Es Evolución" (+30% de PC) + CASTIGO al
+  desplegarla sin evolucionar — toda la partida a la mitad de estamina/daño, −1★,
+  SIN pasivas (construidas+ocultas) ni clase; las resistencias construidas SÍ
+  sobreviven. Marca ⧗ atenuada en el tablero. El Rank-Up llega con stats
+  completos (no cambia el rindex a la figura-evolución). test_evolution.
+  → Sistema Piece Points COMPLETO (F1–F5).
 - PIECE POINTS F4 (modelo innato): cada modelo trae pasivas/resistencias OCULTAS
   + PC; el motor las OTORGA en combate (gratis, superan los topes 3/2). Pobladas
   las 12 figuras (Stone Golem: Bedrock + resiste Congelado, etc.). El Especialista
