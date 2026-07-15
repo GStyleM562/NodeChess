@@ -126,6 +126,15 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- 🐛 FIX CRÍTICO online: al pulsar "Empezar Partida" AMBAS pantallas "tronaban" y
+  volvían al lobby ANTES de jugar. Causa: el "start" del relay lleva LOS DOS mazos
+  completos y, con figuras engordadas por Piece Points (clase/evolución/pasivas/
+  rangos), cruzaba los 64 KB del buffer WS por defecto de Godot → `WebSocketPeer`
+  CIERRA el socket al recibir un mensaje mayor que el buffer → ambos clientes caían
+  justo al iniciar (el join, que lleva UN solo mazo, sí cabía → por eso emparejaban
+  bien). Fix: `NetClient._open_ws` fija `inbound/outbound_buffer_size = 1 MiB`
+  ANTES de `connect_to_url`. Requiere el nuevo build en LOS DOS teléfonos. Guardado
+  por `test_net` (caso "start grande" ~85 KB que sin el fix tira el socket).
 - PIECE POINTS F5 (evolución): checkbox "Es Evolución" (+30% de PC) + CASTIGO al
   desplegarla sin evolucionar — toda la partida a la mitad de estamina/daño, −1★,
   SIN pasivas (construidas+ocultas) ni clase; las resistencias construidas SÍ

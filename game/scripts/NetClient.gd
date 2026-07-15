@@ -86,8 +86,17 @@ func _on_wake_done(result: int, code: int, _h: PackedStringArray, _b: PackedByte
 func _elapsed() -> float:
 	return float(Time.get_ticks_msec() - _start_ms) / 1000.0
 
+## Buffers de WebSocket (bytes). El DEFAULT de Godot son 64 KB y si UN mensaje
+## los supera, WebSocketPeer CIERRA el socket al recibirlo. El "start" lleva los
+## DOS mazos completos (figuras con clase/evolución/pasivas/rangos = dicts gordos)
+## y cruzaba los 64 KB -> ambos clientes se caían justo al empezar la partida.
+## Con 1 MB caben mazos enormes de sobra. Debe fijarse ANTES de connect_to_url.
+const WS_BUFFER := 1 << 20   # 1 MiB (inbound y outbound)
+
 func _open_ws() -> void:
 	_ws = WebSocketPeer.new()
+	_ws.inbound_buffer_size = WS_BUFFER
+	_ws.outbound_buffer_size = WS_BUFFER
 	_connecting = true
 	_connect_t = 0.0
 	if _ws.connect_to_url(_ws_url) != OK:
