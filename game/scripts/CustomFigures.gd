@@ -169,6 +169,46 @@ static func import_code(code: String) -> Dictionary:
 		return {"ok": false, "names": [], "skipped": skipped, "error": "Ningún personaje del código pasó la validación."}
 	return {"ok": true, "names": names, "skipped": skipped, "error": ""}
 
+# ---------------------------------------------------------------- mazo online
+## FORMATO DE RED del mazo (v24): las figuras INTEGRADAS viajan como
+## {"nc_ref": id} — el rival tiene el MISMO roster, así que basta la referencia —
+## y las CUSTOM viajan SIN campos de runtime (glb/clips/placeholder), que el
+## receptor reconstruye igual que al importar un código NCFIG. Antes viajaba el
+## dict COMPLETO de cada figura (con runtime embebido hasta en cada rank): el
+## "start" con los DOS mazos se inflaba y cualquier tope de tamaño en el camino
+## (buffer WS, proxy, red del teléfono) mataba la partida al empezar.
+static func wire_pack(fig: Dictionary) -> Dictionary:
+	if not bool(fig.get("custom", false)):
+		return {"nc_ref": String(fig.get("id", ""))}
+	var f := _strip_runtime(fig)
+	for st in f.get("ranks", []):
+		if st is Dictionary:
+			st.erase("glb")
+			st.erase("clips")
+			st.erase("size")
+	return f
+
+## Reconstruye UNA entrada del mazo recibido. Acepta el formato nuevo
+## ({"nc_ref"} / custom sin runtime) y el LEGADO (dict completo). Devuelve {}
+## si la entrada es irrecuperable (el llamador la descarta y lo reporta).
+static func wire_unpack(e) -> Dictionary:
+	if not (e is Dictionary):
+		return {}
+	if e.has("nc_ref"):
+		return _builtin(String(e["nc_ref"]))   # {} si no existe en este build
+	# LEGADO: una integrada enviada completa -> usar la copia LOCAL (idéntica).
+	if not bool(e.get("custom", false)):
+		var b := _builtin(String(e.get("id", "")))
+		if not b.is_empty():
+			return b
+	var f: Dictionary = (e as Dictionary).duplicate(true)
+	if String(f.get("id", "")) == "":
+		return {}
+	f["custom"] = true
+	_ensure_model(f)
+	_refresh_stage_models(f)
+	return f
+
 ## Remove fields that are rebuilt on import (borrowed placeholder model, runtime
 ## flags) so codes stay short and survive asset renames between versions.
 static func _strip_runtime(fig: Dictionary) -> Dictionary:

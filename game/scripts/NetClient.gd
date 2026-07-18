@@ -38,6 +38,14 @@ var _start_ms := 0         # inicio del connect_to() actual (ventana total)
 var _remote := false       # wss:// (Render: puede dormir) vs ws:// local
 var _active := false       # hay un intento de conexion en curso (wake + WS + reintentos)
 var _http: HTTPRequest
+var _last_close := 0       # último código de cierre del socket (diagnóstico)
+var _last_start_bytes := 0 # tamaño del último mensaje "start" recibido (diagnóstico)
+
+func last_close_code() -> int:
+	return _last_close
+
+func last_start_bytes() -> int:
+	return _last_start_bytes
 
 func _ensure_http() -> void:
 	if _http != null:
@@ -151,8 +159,10 @@ func _process(delta: float) -> void:
 		WebSocketPeer.STATE_CLOSED:
 			if _open:
 				_open = false
+				_last_close = _ws.get_close_code()
 				disconnected.emit()
 			elif _connecting:
+				_last_close = _ws.get_close_code()
 				_retry_or_fail("cerrado cod %d" % _ws.get_close_code())
 
 ## Un intento fallo. Con Render el server puede estar ENCENDIENDO (30-60s): en vez de
@@ -185,6 +195,7 @@ func _handle(text: String) -> void:
 		"room":
 			room_map.emit(int(data["map"]))
 		"start":
+			_last_start_bytes = text.length()
 			match_start.emit(int(data["seed"]), int(data["map"]), data.get("decks", []))
 		"action":
 			remote_action.emit(data.get("action", {}))
@@ -200,8 +211,13 @@ func _handle(text: String) -> void:
 			error_msg.emit(String(data.get("msg", "Error")))
 
 func _send(obj: Dictionary) -> void:
-	if _open:
-		_ws.send_text(JSON.stringify(obj))
+	if not _open:
+		return
+	# Un fallo de envío ANTES era mudo (p. ej. mensaje más grande que el buffer
+	# de salida): la sala parecía crearse/unirse pero el servidor jamás lo supo.
+	var txt := JSON.stringify(obj)
+	if _ws.send_text(txt) != OK:
+		error_msg.emit("No se pudo ENVIAR al servidor (%d bytes). Reintenta." % txt.length())
 
 # --- API --------------------------------------------------------------------
 ## `deck` es opaco para el relay: hoy {"team": [...], "lib": [...]} (antes Array).

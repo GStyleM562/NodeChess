@@ -126,6 +126,26 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- 🐛🎯 CAUSA RAÍZ REAL del online roto: **Render corría el server.js del 1-jul**,
+  que solo aceptaba mazos ARRAY (`Array.isArray(msg.deck)`); desde el 4-jul el
+  cliente manda `{team, lib}` (Dictionary) → el server viejo guardaba `[]` → el
+  "start" viajaba SIN mazos (113 bytes, medido con sonda en vivo) → bancas 0/0 →
+  la red de seguridad rebotaba a AMBOS al menú al instante (y antes de existir
+  la red: "mapa sin figuras", el síntoma histórico). El fix del buffer (e799e7a)
+  era real pero NO era el bug de los teléfonos. Remedios en esta tanda:
+  · server.js: versión visible en el health (`NodeChess relay OK v24`) para
+    verificar QUÉ corre Render desde fuera; push → redeploy.
+  · FORMATO DE RED v24: integradas viajan como `{"nc_ref": id}` y customs SIN
+    runtime (reusa `_strip_runtime`); rehidratación en NetSession.build_match
+    (`CustomFigures.wire_unpack`, tolera el formato legado). Payloads: 168 B /
+    1.6 KB (antes decenas de KB) — inmune a topes de tamaño para siempre.
+  · VALIDACIÓN con voz: el lobby rechaza mazos rotos en ORIGEN (antes de crear
+    sala) y en DESTINO (start con mazos vacíos → mensaje claro, sin ir al
+    tablero); la red de seguridad del tablero deja el motivo en un popup del
+    menú; bitácora persistente `user://logs/online_debug.txt` + botón 📶 en el
+    lobby (ver/copiar); etiqueta "red v24" visible para confirmar que AMBOS
+    teléfonos traen el mismo build. test_online_deck reescrito (formato v24,
+    espejo, legado); AMBOS teléfonos deben actualizar a v24.
 - 🐛 FIX CRÍTICO online: al pulsar "Empezar Partida" AMBAS pantallas "tronaban" y
   volvían al lobby ANTES de jugar. Causa: el "start" del relay lleva LOS DOS mazos
   completos y, con figuras engordadas por Piece Points (clase/evolución/pasivas/

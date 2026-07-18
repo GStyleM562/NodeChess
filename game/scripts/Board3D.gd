@@ -134,7 +134,13 @@ func _ready() -> void:
 		_setup_online_state()
 		# RED DE SEGURIDAD (la PEOR regla es empezar sin banca): si algún mazo
 		# llegó vacío/roto, abortamos y regresamos al menú en vez de jugar así.
+		# El lobby ya valida los mazos antes de venir aquí; si esto llegara a
+		# dispararse, deja el POR QUÉ en abort_reason (el menú lo muestra).
 		if (_gs.bench["player"] as Array).is_empty() or (_gs.bench["enemy"] as Array).is_empty():
+			NetSession.abort_reason = "La partida online se abortó al armar el tablero: banca mía=%d, rival=%d (asiento %d, start=%d bytes). Manda el log 📶 del lobby para revisarlo." % [
+				(_gs.bench["player"] as Array).size(), (_gs.bench["enemy"] as Array).size(),
+				_seat, NetSession.client.last_start_bytes()]
+			NetSession.dlog("tablero ABORTADO: " + NetSession.abort_reason)
 			push_warning("Online sin banca: mazo vacío — partida abortada")
 			Roster.FIGURES = _saved_roster
 			NetSession.end_online()
@@ -2283,9 +2289,11 @@ func _on_peer_status(_seat: int, online_now: bool) -> void:
 func _on_rematch_start(s: int, m: int, decks: Array) -> void:
 	if not _online or not _over:
 		return
+	# Des-swap ANTES de build_match: la rehidratación del mazo (wire_unpack)
+	# busca las figuras integradas en el roster COMPLETO, no en el de la partida.
+	Roster.FIGURES = _saved_roster
 	NetSession.build_match(decks, NetSession.seat, s, m)
 	Loadout.map_index = m
-	Roster.FIGURES = _saved_roster                 # des-swap antes de reconstruir
 	get_tree().change_scene_to_file("res://scenes/board.tscn")
 
 ## 🤖 Un turno del jugador jugado por la CPU (usa el MISMO motor y las MISMAS

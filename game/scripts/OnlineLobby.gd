@@ -47,6 +47,14 @@ func _ready() -> void:
 	UITheme.label(title, 28, UITheme.GOLD, true, 800)
 	root.add_child(title)
 
+	# Versión de RED visible: si en un teléfono dice v24 y en el otro no, los
+	# builds no coinciden y la partida NO puede funcionar — primer sospechoso.
+	var ver := Label.new()
+	ver.text = "red v%d" % NetSession.NET_BUILD
+	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(ver, 11, UITheme.MUTED, false, 600)
+	root.add_child(ver)
+
 	_status = Label.new()
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -109,9 +117,19 @@ func _ready() -> void:
 	_panel_room.add_child(_start_btn)
 
 	root.add_child(_spacer())
+	var foot := HBoxContainer.new()
+	foot.add_theme_constant_override("separation", 8)
+	root.add_child(foot)
 	var back := _button("← Menú", UITheme.SURFACE)
+	back.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	back.pressed.connect(_leave)
-	root.add_child(back)
+	foot.add_child(back)
+	# 📶 bitácora online: ver/copiar user://logs/online_debug.txt desde el
+	# teléfono para poder reportar EXACTAMENTE qué pasó si algo falla.
+	var logs := _button("📶", UITheme.SURFACE)
+	logs.custom_minimum_size = Vector2(64, 52)
+	logs.pressed.connect(_show_log)
+	foot.add_child(logs)
 
 	_wire(NetSession.client)
 
@@ -125,6 +143,11 @@ func _wire(c) -> void:
 	c.room_map.connect(func(m): _map = m; _build_maps(); _refresh_players([]))
 	c.match_start.connect(_on_match_start)
 	c.player_left.connect(func(_id): _players_lbl.text = "El rival salió…"; _start_btn.disabled = true)
+	# ANTES una caída del socket en el lobby era MUDA (la pantalla se quedaba
+	# igual y parecía que "no pasaba nada" al pulsar EMPEZAR). Ahora se ve.
+	c.disconnected.connect(func():
+		_status.text = "⚠ Se perdió la conexión con el servidor. Vuelve a intentar."
+		NetSession.dlog("lobby: socket caído (código %d)" % NetSession.client.last_close_code()))
 
 # ---------------------------------------------------------------- mazo en uso
 ## LA regla de oro: JAMÁS ir online sin un mazo completo. Devuelve el problema
@@ -214,10 +237,22 @@ func _on_connected() -> void:
 	var pn := _name.text.strip_edges()
 	if pn == "":
 		pn = "Jugador"
+	# VALIDAR EL MAZO EN ORIGEN: si por lo que sea no pudimos armar las 6
+	# figuras, NO entramos a la sala con un mazo roto (antes viajaba vacío en
+	# silencio y la partida moría al empezar, sin pista alguna).
+	var deck := _my_deck()
+	var n: int = (deck.get("team", []) as Array).size()
+	if n != Loadout.DECK_SIZE:
+		_pending = ""
+		_status.text = "⚠ No pude armar tu mazo (%d/%d figuras). Revísalo en 🃏 Mazos." % [n, Loadout.DECK_SIZE]
+		NetSession.dlog("mazo en origen INCOMPLETO: %d/%d (team=%s)" % [n, Loadout.DECK_SIZE, str(Loadout.player_team)])
+		return
+	NetSession.dlog("enviando mazo: %d figuras, %d lib, %d bytes (%s)" % [
+		n, (deck.get("lib", []) as Array).size(), JSON.stringify(deck).length(), _pending])
 	if _pending == "create":
-		NetSession.client.create_room(pn, _my_deck(), _map)
+		NetSession.client.create_room(pn, deck, _map)
 	elif _pending == "join":
-		NetSession.client.join_room(_code_in.text.strip_edges(), pn, _my_deck())
+		NetSession.client.join_room(_code_in.text.strip_edges(), pn, deck)
 	_pending = ""
 
 func _on_room_created(code: String, you: int, players: Array) -> void:
@@ -257,7 +292,18 @@ func _refresh_players(players: Array) -> void:
 			_start_btn.disabled = players.size() < 2
 
 func _on_match_start(seed: int, map: int, decks: Array) -> void:
+	NetSession.dlog("start recibido: %d bytes, decks=%d" % [
+		NetSession.client.last_start_bytes(), decks.size()])
 	NetSession.build_match(decks, NetSession.seat, seed, map)
+	# VALIDAR EN DESTINO: si algún mazo llegó vacío/roto, quedarse AQUÍ con el
+	# motivo visible (antes: ir al tablero → rebote mudo al menú, sin pista).
+	var n0 := NetSession.team_p0.size()
+	var n1 := NetSession.team_p1.size()
+	if n0 < Loadout.DECK_SIZE or n1 < Loadout.DECK_SIZE:
+		NetSession.end_online()
+		_status.text = "⚠ La partida no pudo empezar: llegó un mazo roto (anfitrión %d/6, invitado %d/6). Revisen que AMBOS teléfonos tengan la versión red v%d." % [n0, n1, NetSession.NET_BUILD]
+		NetSession.dlog("start ABORTADO en lobby: team0=%d team1=%d" % [n0, n1])
+		return
 	Loadout.map_index = map
 	get_tree().change_scene_to_file("res://scenes/board.tscn")
 
@@ -266,12 +312,40 @@ func _leave() -> void:
 		NetSession.client.leave_room()
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
+## Modal con la cola de la bitácora online + botón copiar (para reportes).
+func _show_log() -> void:
+	var txt := "(sin bitácora aún)"
+	if FileAccess.file_exists(NetSession.DEBUG_LOG):
+		var f := FileAccess.open(NetSession.DEBUG_LOG, FileAccess.READ)
+		if f != null:
+			var lines := f.get_as_text().split("\n")
+			f.close()
+			var tail := lines.slice(maxi(0, lines.size() - 40))
+			txt = "\n".join(tail)
+	var dlg := AcceptDialog.new()
+	dlg.title = "📶 Bitácora online (red v%d)" % NetSession.NET_BUILD
+	dlg.ok_button_text = "Cerrar"
+	var te := TextEdit.new()
+	te.text = txt
+	te.editable = false
+	te.custom_minimum_size = Vector2(minf(430.0, size.x - 40.0), 340)
+	dlg.add_child(te)
+	dlg.add_button("Copiar", false, "copy")
+	dlg.custom_action.connect(func(_a):
+		DisplayServer.clipboard_set(txt)
+		dlg.title = "📋 Copiada")
+	add_child(dlg)
+	dlg.popup_centered()
+
 # ---------------------------------------------------------------- deck
 ## El mazo viaja SEPARADO: "team" = exactamente las figuras jugables (en orden,
 ## duplicados incluidos) y "lib" = el cierre de evoluciones (evolves_id), solo
 ## para renderizar/simular rank-ups. ANTES todo iba en UNA lista y el cierre la
 ## inflaba distinto en cada cliente -> uids/modelos desalineados (el caos online:
 ## controlar piezas del rival, modelos cambiados, pantallas distintas).
+## FORMATO DE RED (v24): cada figura se EMPAQUETA (CustomFigures.wire_pack) —
+## integradas como referencia, customs sin runtime — y el receptor rehidrata en
+## NetSession.build_match. El payload pasa de decenas de KB a unos pocos KB.
 func _my_deck() -> Dictionary:
 	var team: Array = []
 	var seen := {}
@@ -292,7 +366,13 @@ func _my_deck() -> Dictionary:
 						lib.append(g)
 						queue.append(g)
 						break
-	return {"team": team, "lib": lib}
+	var team_w: Array = []
+	for f in team:
+		team_w.append(CustomFigures.wire_pack(f))
+	var lib_w: Array = []
+	for f in lib:
+		lib_w.append(CustomFigures.wire_pack(f))
+	return {"team": team_w, "lib": lib_w}
 
 # ---------------------------------------------------------------- maps / widgets
 func _build_maps(is_host := true) -> void:

@@ -25,6 +25,16 @@ func _ready() -> void:
 	_build_env()
 	_build_ui()
 	Music.play_menu()
+	# Si una partida ONLINE se abortó, decir POR QUÉ (antes: rebote mudo al menú
+	# y nadie sabía qué pasó — imposible de diagnosticar desde el teléfono).
+	if NetSession.abort_reason != "":
+		var dlg := AcceptDialog.new()
+		dlg.title = "Partida online abortada"
+		dlg.dialog_text = NetSession.abort_reason
+		dlg.ok_button_text = "Entendido"
+		NetSession.abort_reason = ""
+		add_child(dlg)
+		dlg.popup_centered.call_deferred()
 	# BIENVENIDA (1 vez por sesión): si hay tutoriales pendientes, invitarlos —
 	# con las categorías, cuántos por cada una y las recompensas jugosas.
 	if not TutorialLib.welcomed and TutorialLib.pending_total() > 0:

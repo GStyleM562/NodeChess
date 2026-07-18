@@ -15,9 +15,15 @@ const PORT = process.env.PORT || 8080;
 const rooms = new Map(); // code -> room
 let nextId = 1;
 
+// Version VISIBLE en el health check: permite verificar DESDE FUERA que Render
+// corre este build. (El bug historico del online fue justo este: Render se
+// quedo con el server del 1-jul que solo aceptaba mazos Array y convertia los
+// {team, lib} en [] -> el start viajaba SIN mazos -> ambos clientes abortaban.)
+const VERSION = "v24";
+
 const server = http.createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/plain" });
-  res.end("NodeChess relay OK\n");
+  res.end(`NodeChess relay OK ${VERSION}\n`);
 });
 const wss = new WebSocketServer({ server });
 
