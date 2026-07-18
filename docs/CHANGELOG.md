@@ -103,6 +103,13 @@
 > pruebas (suite + 🤖 robot + checklist humana): `docs/PLAN_Testing.md`.
 
 **Del lado de GOJAN (assets, no bloquean código)**
+- 🔴 URGENTE — REDESPLEGAR EL RELAY EN RENDER (el auto-deploy NO funciona: los
+  pushes del 4-jul, 8-jul y 17-jul nunca se desplegaron; Render corre el server
+  del 1-jul que vacía los mazos → el online muere al empezar). En
+  dashboard.render.com → nodechess-server → "Manual Deploy → Deploy latest
+  commit"; y en Settings → Build & Deploy poner Auto-Deploy: Yes (branch main).
+  VERIFICAR: https://nodechess-server.onrender.com debe responder
+  "NodeChess relay OK v24". Después, ambos teléfonos con el build v24.
 - SFX reales (11 carpetas en `game/assets/audio/sfx/`).
 - Meshy: Storm Valkyrie nueva (sigue excluida de la CPU), isla real,
   rocas/árboles de borde, clips de ataque extra por figura.
