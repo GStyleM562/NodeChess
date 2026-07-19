@@ -324,7 +324,7 @@ func _build_pc_meter(form: VBoxContainer) -> void:
 	_pc_bar = ProgressBar.new()
 	_pc_bar.custom_minimum_size = Vector2(0, 10)
 	_pc_bar.show_percentage = false
-	var pbg := StyleBoxFlat.new(); pbg.bg_color = Color(0.10, 0.13, 0.22); pbg.set_corner_radius_all(5)
+	var pbg := StyleBoxFlat.new(); pbg.bg_color = Color(0.88, 0.85, 0.76); pbg.set_corner_radius_all(5)
 	_pc_bar.add_theme_stylebox_override("background", pbg)
 	vb.add_child(_pc_bar)
 	var hint := Label.new()
@@ -425,6 +425,7 @@ func _build_combat(form: VBoxContainer) -> void:
 	_stamina = SpinBox.new()
 	_stamina.min_value = 0; _stamina.max_value = 6; _stamina.value = 2
 	_stamina.value_changed.connect(func(_v): _revalidate())
+	_style_spin(_stamina)
 	_field(s, "Estamina", _stamina)
 	_type = _opt(TYPES)
 	_type.select(0)
@@ -497,6 +498,7 @@ func _build_combat(form: VBoxContainer) -> void:
 	_phase_count.max_value = 3
 	_phase_count.value = 1
 	_phase_count.value_changed.connect(func(v): _rebuild_phases(int(v)))
+	_style_spin(_phase_count)
 	_field(_evo_box, "¿Cuántas fases?", _phase_count)
 	_phase_holder = VBoxContainer.new()
 	_phase_holder.add_theme_constant_override("separation", 6)
@@ -1096,7 +1098,17 @@ func _spin(lo: float, hi: float, step: float, val: int, _suffix: String) -> Spin
 	var sp := SpinBox.new()
 	sp.min_value = lo; sp.max_value = hi; sp.step = step; sp.value = val
 	sp.custom_minimum_size = Vector2(64, 0)
+	_style_spin(sp)
 	return sp
+
+## El LineEdit interno del SpinBox usa el theme por defecto de Godot (oscuro):
+## sobre el tema claro se ve un tajo negro. Campo blanco + tinta, como input().
+func _style_spin(sp: SpinBox) -> void:
+	var le := sp.get_line_edit()
+	le.add_theme_stylebox_override("normal", UITheme.input())
+	le.add_theme_stylebox_override("focus", UITheme.input(UITheme.INPUT_BG, UITheme.PRIMARY))
+	le.add_theme_color_override("font_color", UITheme.TEXT)
+	le.add_theme_color_override("caret_color", UITheme.PRIMARY_EDGE)
 
 func _labeled(cap: String, control: Control) -> Control:
 	var vb := VBoxContainer.new()

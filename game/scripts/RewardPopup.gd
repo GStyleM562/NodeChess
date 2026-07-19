@@ -50,7 +50,7 @@ static func show(host: Node, title: String, accent: Color, items: Array, footer 
 	var panel := PanelContainer.new()
 	var vw: float = host.get_viewport().get_visible_rect().size.x
 	panel.custom_minimum_size = Vector2(minf(420.0, vw - 28.0), 0)
-	panel.add_theme_stylebox_override("panel", UITheme.panel(Color(0.07, 0.09, 0.17, 0.99), accent, 20, 2, 18))
+	panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, accent, 20, 2, 18))
 	cc.add_child(panel)
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", 10)

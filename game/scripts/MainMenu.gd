@@ -19,11 +19,11 @@ const CHEST_LOBBY := {
 # tema oscuro de UITheme). Estilo "juicy" tipo TCG Pocket: fondo amarillo
 # cálido, tarjetas CREMA con LABIO inferior 3D (borde grueso abajo = botón
 # físico presionable) y brillo superior en los botones de modo.
-const INK := Color(0.24, 0.21, 0.13)          # texto principal sobre claro
+const INK := UITheme.TEXT                     # texto principal sobre claro
 const INK_SOFT := Color(0.52, 0.47, 0.36)     # texto secundario
 const SUN := Color(1.0, 0.83, 0.30)           # amarillo del cielo
-const CARD_BG := Color(1.0, 0.985, 0.94)      # tarjeta crema
-const CARD_LIP := Color(0.86, 0.78, 0.56)     # labio inferior neutro (tarjetas)
+const CARD_BG := UITheme.SURFACE              # tarjeta crema
+const CARD_LIP := UITheme.BORDER              # labio inferior neutro (tarjetas)
 const DOT_RED := Color(0.94, 0.26, 0.30)      # punto de aviso
 const GREEN_OK := Color(0.10, 0.55, 0.28)     # "listo" legible sobre claro
 const MODE_BLUE := Color(0.30, 0.62, 0.97)    # 🎲 Probar

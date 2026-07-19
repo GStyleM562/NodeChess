@@ -411,7 +411,7 @@ func _tut_build_panel() -> void:
 	_tut_panel.offset_right = -12
 	_tut_panel.offset_top = 96
 	_tut_panel.offset_bottom = 178
-	_tut_panel.add_theme_stylebox_override("panel", UITheme.panel(Color(0.05, 0.1, 0.08, 0.97), UITheme.SUCCESS, 14, 2, 10))
+	_tut_panel.add_theme_stylebox_override("panel", UITheme.panel(Color(0.92, 0.975, 0.92, 0.97), UITheme.SUCCESS, 14, 2, 10))
 	_ui_layer.add_child(_tut_panel)
 	var vb := VBoxContainer.new()
 	_tut_panel.add_child(vb)
@@ -605,7 +605,7 @@ func _lesson_complete() -> void:
 	cl.add_child(cc)
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(minf(400.0, get_viewport().get_visible_rect().size.x - 28.0), 0)
-	card.add_theme_stylebox_override("panel", UITheme.panel(Color(0.07, 0.1, 0.09, 0.99), UITheme.SUCCESS, 20, 2, 18))
+	card.add_theme_stylebox_override("panel", UITheme.panel(Color(0.95, 0.985, 0.94, 0.99), UITheme.SUCCESS, 20, 2, 18))
 	cc.add_child(card)
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1155,7 +1155,7 @@ func _build_ui() -> void:
 	_wait_banner.offset_top = 58
 	_wait_banner.offset_left = -180
 	_wait_banner.offset_right = 180
-	_wait_banner.add_theme_stylebox_override("panel", UITheme.pill(Color(0.12, 0.07, 0.04, 0.96), UITheme.ORANGE, 14))
+	_wait_banner.add_theme_stylebox_override("panel", UITheme.pill(Color(1.0, 0.965, 0.90, 0.96), UITheme.ORANGE, 14))
 	_wait_banner.visible = false
 	layer.add_child(_wait_banner)
 	var wl := Label.new()
@@ -1206,7 +1206,7 @@ func _build_ui() -> void:
 	for st in ["hover", "pressed", "hover_pressed", "focus"]:
 		_end_btn.add_theme_stylebox_override(st, glow_hot)
 	_end_btn.add_theme_stylebox_override("disabled",
-		UITheme.panel(Color(0.078, 0.102, 0.188), UITheme.BORDER, 14, 1, 8))
+		UITheme.panel(Color(1.0, 0.985, 0.94, 0.96), UITheme.BORDER, 14, 1, 8))
 	var pulse := create_tween().set_loops()
 	pulse.tween_property(glow, "shadow_size", 18, 0.75).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	pulse.tween_property(glow, "shadow_size", 5, 0.75).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
@@ -1219,7 +1219,7 @@ func _build_ui() -> void:
 	bench_panel.offset_bottom = -8
 	bench_panel.offset_left = 8
 	bench_panel.offset_right = -8
-	bench_panel.add_theme_stylebox_override("panel", UITheme.panel(Color(0.07, 0.08, 0.14, 0.95), UITheme.BORDER, 14, 1, 6))
+	bench_panel.add_theme_stylebox_override("panel", UITheme.panel(Color(1.0, 0.985, 0.94, 0.94), UITheme.BORDER, 14, 1, 6))
 	layer.add_child(bench_panel)
 	# La banca ahora es de 6 (+ K.O. con contador): scroll horizontal si no cabe.
 	var bench_scroll := ScrollContainer.new()
@@ -1235,7 +1235,7 @@ func _build_ui() -> void:
 	en_pill.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	en_pill.offset_left = 10
 	en_pill.offset_top = 48
-	en_pill.add_theme_stylebox_override("panel", UITheme.pill(Color(0.05, 0.08, 0.14, 0.95), UITheme.ENERGY.darkened(0.25), 9))
+	en_pill.add_theme_stylebox_override("panel", UITheme.pill(Color(1.0, 0.99, 0.95, 0.95), UITheme.ENERGY.darkened(0.1), 9))
 	layer.add_child(en_pill)
 	_energy_label = Label.new()
 	UITheme.label(_energy_label, 18, UITheme.ENERGY, true, 800)
@@ -1247,6 +1247,9 @@ func _build_ui() -> void:
 	mods_panel.offset_bottom = -122
 	mods_panel.offset_left = 8
 	mods_panel.offset_right = -8
+	# sin esto usa el panel GRIS OSCURO por defecto de Godot (franja fea sobre
+	# el tema claro); tarjeta crema translúcida como el resto del HUD
+	mods_panel.add_theme_stylebox_override("panel", UITheme.panel(Color(1.0, 0.985, 0.94, 0.92), UITheme.BORDER, 12, 1, 4))
 	layer.add_child(mods_panel)
 	_mods_box = HBoxContainer.new()
 	_mods_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1260,7 +1263,7 @@ func _build_ui() -> void:
 	_banner.offset_bottom = 150
 	_banner.offset_left = 20
 	_banner.offset_right = -20
-	_banner.add_theme_stylebox_override("panel", UITheme.panel(Color(0.1, 0.09, 0.05, 0.97), UITheme.GOLD.darkened(0.2), 14, 2, 10))
+	_banner.add_theme_stylebox_override("panel", UITheme.panel(Color(1.0, 0.985, 0.94, 0.97), UITheme.GOLD.darkened(0.05), 14, 2, 10))
 	_banner.visible = false
 	layer.add_child(_banner)
 	_banner_lbl = Label.new()
@@ -1303,7 +1306,7 @@ func _build_ui() -> void:
 	_net_banner.offset_right = 230
 	_net_banner.offset_top = 160
 	_net_banner.offset_bottom = 220
-	_net_banner.add_theme_stylebox_override("panel", UITheme.panel(Color(0.12, 0.06, 0.05, 0.97), UITheme.DANGER, 14, 2, 10))
+	_net_banner.add_theme_stylebox_override("panel", UITheme.panel(Color(1.0, 0.955, 0.94, 0.97), UITheme.DANGER, 14, 2, 10))
 	_net_banner.visible = false
 	layer.add_child(_net_banner)
 	_net_banner_lbl = Label.new()
@@ -2755,7 +2758,7 @@ func _show_winner(team: String) -> void:
 	card.offset_right = 210
 	card.offset_top = -300
 	card.offset_bottom = 300
-	card.add_theme_stylebox_override("panel", UITheme.panel(Color(0.09, 0.10, 0.18, 0.98), (UITheme.GOLD if win else UITheme.DANGER).darkened(0.1), 22, 2, 18))
+	card.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, (UITheme.GOLD if win else UITheme.DANGER).darkened(0.05), 22, 2, 18))
 	cl.add_child(card)
 	card.pivot_offset = Vector2(210, 300)
 	if win:

@@ -44,7 +44,7 @@ func setup(data: Dictionary, rank: int = 0, team_col: Color = UITheme.PRIMARY, c
 	var accent := accent_of(data)
 	var rar := rarity_color(data)
 	# Fondo #12172E + marco por rareza (§6.7 del handoff).
-	var sb := UITheme.panel(Color(0.071, 0.09, 0.18), rar, 16, 2, 8)
+	var sb := UITheme.panel(UITheme.SURFACE, rar, 16, 2, 8)
 	add_theme_stylebox_override("panel", sb)
 	if compact:
 		_build_compact(data, rank, accent, rar, team_col)
@@ -100,7 +100,7 @@ func _portrait(accent: Color, rar: Color, data: Dictionary, sz: Vector2, stamina
 		badge.offset_top = -26
 		badge.offset_right = -4
 		badge.offset_bottom = -4
-		badge.add_theme_stylebox_override("panel", UITheme.pill(Color(0.05, 0.08, 0.14, 0.92), UITheme.ENERGY.darkened(0.2), 5))
+		badge.add_theme_stylebox_override("panel", UITheme.pill(Color(1.0, 0.99, 0.95, 0.94), UITheme.ENERGY.darkened(0.1), 5))
 		var bl := Label.new()
 		UITheme.label(bl, 13, UITheme.ENERGY, true, 800)
 		bl.text = "⚡%d" % int(data.get("stamina", 2))

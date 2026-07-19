@@ -190,7 +190,7 @@ func _build_deck_tabs() -> void:
 	if Loadout.decks.size() < Loadout.MAX_DECKS:
 		var add := Button.new()
 		add.custom_minimum_size = Vector2(72, 64)
-		UITheme.style_surface(add, Color(0.06, 0.08, 0.15), UITheme.SUCCESS.darkened(0.35), 14)
+		UITheme.style_surface(add, UITheme.SURFACE2, UITheme.SUCCESS.darkened(0.15), 14)
 		var av := VBoxContainer.new()
 		av.alignment = BoxContainer.ALIGNMENT_CENTER
 		av.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -425,7 +425,7 @@ func _theme_scrollbar(sb: ScrollBar) -> void:
 	grab.bg_color = Color(0.2, 0.251, 0.42)   # #33406B
 	grab.set_corner_radius_all(99)
 	var rail := StyleBoxFlat.new()
-	rail.bg_color = Color(0.043, 0.063, 0.141)   # #0B1024
+	rail.bg_color = UITheme.PANEL_DEEP
 	rail.set_corner_radius_all(99)
 	sb.add_theme_stylebox_override("grabber", grab)
 	sb.add_theme_stylebox_override("grabber_highlight", grab)
@@ -531,7 +531,7 @@ func _refresh() -> void:
 		else:
 			b.text = "+"
 			UITheme.button_font(b, 26, UITheme.MUTED, true, 700)
-			UITheme.style_surface(b, Color(0.07, 0.08, 0.13), UITheme.BORDER, 12)
+			UITheme.style_surface(b, UITheme.SURFACE2, UITheme.BORDER, 12)
 			b.disabled = true
 		_team_box.add_child(b)
 	_play_btn.disabled = not (Loadout.valid(_team) and _team_owned())

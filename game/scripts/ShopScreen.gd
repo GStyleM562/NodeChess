@@ -84,7 +84,7 @@ func _ready() -> void:
 	ts.offset_right = 170
 	ts.offset_top = -30
 	ts.offset_bottom = 30
-	ts.add_theme_stylebox_override("panel", UITheme.panel(Color(0.08, 0.09, 0.16, 0.97), UITheme.GOLD.darkened(0.2), 12, 1, 10))
+	ts.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.GOLD.darkened(0.1), 12, 1, 10))
 	ts.visible = false
 	_toast = Label.new()
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -203,7 +203,7 @@ func _item_card(it: Dictionary) -> Control:
 	var key := String(it.get("key", ""))
 	var p := PanelContainer.new()
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	p.add_theme_stylebox_override("panel", UITheme.panel(Color(0.071, 0.09, 0.18), Color(rar.r, rar.g, rar.b, 0.5), 14, 1, 10))
+	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, Color(rar.r, rar.g, rar.b, 0.55), 14, 1, 10))
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 5)
@@ -271,7 +271,7 @@ func _toast_msg(text: String) -> void:
 func _coin(icon: String, value: String, col: Color) -> Control:
 	var p := PanelContainer.new()
 	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	p.add_theme_stylebox_override("panel", UITheme.pill(Color(0.07, 0.09, 0.16), UITheme.BORDER, 8))
+	p.add_theme_stylebox_override("panel", UITheme.pill(UITheme.SURFACE2, UITheme.BORDER, 8))
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 3)
 	p.add_child(h)
@@ -289,7 +289,7 @@ func _coin(icon: String, value: String, col: Color) -> Control:
 ## Nav inferior Home / Tienda (activa) / Perfil.
 func _build_nav(root: VBoxContainer) -> void:
 	var nav := PanelContainer.new()
-	nav.add_theme_stylebox_override("panel", UITheme.panel(Color(0.07, 0.08, 0.14, 0.99), UITheme.BORDER, 12, 1, 4))
+	nav.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.BORDER, 12, 1, 4))
 	root.add_child(nav)
 	var nb := HBoxContainer.new()
 	nb.alignment = BoxContainer.ALIGNMENT_CENTER

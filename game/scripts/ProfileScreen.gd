@@ -48,7 +48,7 @@ func _ready() -> void:
 	ts.offset_right = 150
 	ts.offset_top = -26
 	ts.offset_bottom = 26
-	ts.add_theme_stylebox_override("panel", UITheme.panel(Color(0.08, 0.09, 0.16, 0.97), UITheme.GOLD.darkened(0.2), 12, 1, 10))
+	ts.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.GOLD.darkened(0.1), 12, 1, 10))
 	ts.visible = false
 	_toast = Label.new()
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -97,7 +97,7 @@ func _build_identity(body: VBoxContainer) -> void:
 	xpbar.show_percentage = false
 	xpbar.max_value = maxf(1.0, float(Inventory.xp_needed()))
 	xpbar.value = clampf(float(Inventory.xp), 0.0, xpbar.max_value)
-	var xbg := StyleBoxFlat.new(); xbg.bg_color = Color(0.10, 0.13, 0.22); xbg.set_corner_radius_all(3)
+	var xbg := StyleBoxFlat.new(); xbg.bg_color = Color(0.88, 0.85, 0.76); xbg.set_corner_radius_all(3)
 	var xfg := StyleBoxFlat.new(); xfg.bg_color = UITheme.PRIMARY; xfg.set_corner_radius_all(3)
 	xpbar.add_theme_stylebox_override("background", xbg)
 	xpbar.add_theme_stylebox_override("fill", xfg)
@@ -207,7 +207,7 @@ func _toast_msg(text: String) -> void:
 ## Nav inferior Home / Tienda / Perfil (activa).
 func _build_nav(root: VBoxContainer) -> void:
 	var nav := PanelContainer.new()
-	nav.add_theme_stylebox_override("panel", UITheme.panel(Color(0.07, 0.08, 0.14, 0.99), UITheme.BORDER, 12, 1, 4))
+	nav.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.BORDER, 12, 1, 4))
 	root.add_child(nav)
 	var nb := HBoxContainer.new()
 	nb.alignment = BoxContainer.ALIGNMENT_CENTER

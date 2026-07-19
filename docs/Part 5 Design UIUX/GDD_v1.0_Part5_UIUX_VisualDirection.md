@@ -6,6 +6,14 @@ Version: 1.0
 
 Status: WORK IN PROGRESS
 
+> ⚠️ **ACTUALIZACIÓN 2026-07-19 — Dirección visual VIGENTE: "JUICY HALL"**
+> (reglas canónicas y checklist en **`docs/UIUX_Juicy_Hall.md`**): tema CLARO
+> cálido estilo TCG Pocket — fondo amarillo, tarjetas crema con labio 3D,
+> botones extruidos "físicos", texto tinta y acentos profundos. La filosofía
+> de este Part 5 (Pokemon Duel + Clash Royale + Modern Mobile UX, legibilidad
+> rápida, uso con una mano) SE MANTIENE; la ejecución de color/materiales es
+> la de Juicy Hall. Implementación central: `game/scripts/UITheme.gd`.
+
 ---
 
 # 1. UI Philosophy

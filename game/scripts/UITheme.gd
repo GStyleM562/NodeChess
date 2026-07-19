@@ -5,26 +5,31 @@ class_name UITheme
 ## consistent. Pure presentation — no game logic.
 
 # --- palette ---------------------------------------------------------------
-const BG := Color(0.043, 0.055, 0.102)        # #0B0E1A
-const BG_DEEP := Color(0.027, 0.035, 0.07)    # #070912
-const SURFACE := Color(0.086, 0.106, 0.18)    # #161B2E
-const SURFACE2 := Color(0.118, 0.145, 0.251)  # #1E2540
-const BORDER := Color(0.18, 0.212, 0.345)     # #2E3658
-const PRIMARY := Color(0.18, 0.42, 1.0)       # #2E6BFF
-const PRIMARY_EDGE := Color(0.353, 0.627, 1.0)# #5AA0FF
-const ORANGE := Color(1.0, 0.541, 0.239)      # #FF8A3D
-const GOLD := Color(1.0, 0.773, 0.239)        # #FFC53D
-const SUCCESS := Color(0.212, 0.82, 0.498)    # #36D17F
-const DANGER := Color(1.0, 0.322, 0.278)      # #FF5247
-const ENERGY := Color(0.31, 0.765, 0.969)     # #4FC3F7
-const TEXT := Color(0.957, 0.965, 1.0)        # #F4F6FF
-const TEXT2 := Color(0.663, 0.698, 0.816)     # #A9B2D0
-const MUTED := Color(0.42, 0.459, 0.588)      # #6B7596
+# TEMA "JUICY HALL" (2026-07-19, reglas en docs/UIUX_Juicy_Hall.md): claro y
+# cálido tipo TCG Pocket — fondo amarillo pálido, tarjetas CREMA con LABIO
+# inferior 3D, texto TINTA y acentos vivos PROFUNDOS (legibles sobre claro).
+# Los nombres de los tokens se conservan del tema oscuro anterior para no
+# tocar 12 pantallas: BG/SURFACE/TEXT significan lo mismo, en clave clara.
+const BG := Color(0.976, 0.937, 0.76)         # amarillo pálido (pantallas)
+const BG_DEEP := Color(0.972, 0.925, 0.72)    # amarillo cálido (fondo raíz)
+const SURFACE := Color(1.0, 0.985, 0.94)      # tarjeta crema
+const SURFACE2 := Color(0.984, 0.955, 0.885)  # crema honda (botón secundario)
+const BORDER := Color(0.85, 0.77, 0.58)       # tan cálido (bordes/labios)
+const PRIMARY := Color(0.18, 0.42, 1.0)       # #2E6BFF azul de acción
+const PRIMARY_EDGE := Color(0.14, 0.36, 0.86) # azul texto/acentos sobre claro
+const ORANGE := Color(0.93, 0.45, 0.12)       # naranja profundo
+const GOLD := Color(0.93, 0.65, 0.05)         # ámbar (legible sobre crema)
+const SUCCESS := Color(0.10, 0.60, 0.33)      # verde profundo
+const DANGER := Color(0.86, 0.20, 0.18)       # rojo profundo
+const ENERGY := Color(0.07, 0.55, 0.80)       # cian profundo
+const TEXT := Color(0.24, 0.21, 0.13)         # TINTA (texto principal)
+const TEXT2 := Color(0.45, 0.41, 0.32)        # tinta suave
+const MUTED := Color(0.58, 0.53, 0.43)        # gris cálido
 
-const R_COMMON := Color(0.541, 0.576, 0.678)  # #8A93AD
-const R_RARE := Color(0.239, 0.49, 1.0)       # #3D7DFF
-const R_EPIC := Color(0.722, 0.451, 1.0)      # #B873FF
-const R_LEGEND := Color(1.0, 0.773, 0.239)    # #FFC53D
+const R_COMMON := Color(0.47, 0.49, 0.55)
+const R_RARE := Color(0.16, 0.42, 0.95)
+const R_EPIC := Color(0.55, 0.28, 0.85)
+const R_LEGEND := Color(0.93, 0.60, 0.05)
 
 # --- fonts -----------------------------------------------------------------
 static var _sora: Font
@@ -72,6 +77,9 @@ static func button_font(b: Button, size: int, col := TEXT, title := true, weight
 	b.add_theme_color_override("font_color", col)
 	b.add_theme_color_override("font_hover_color", col)
 	b.add_theme_color_override("font_pressed_color", col.darkened(0.1))
+	# deshabilitado = mismo color al 45% (el default de Godot era blanco lavado:
+	# ilegible sobre las tarjetas crema del tema claro)
+	b.add_theme_color_override("font_disabled_color", Color(col.r, col.g, col.b, 0.45))
 	var f := display(weight) if title else body(weight)
 	if f != null:
 		b.add_theme_font_override("font", f)
@@ -88,16 +96,26 @@ static func _ui_click() -> void:
 			s.call("play", "ui_click")
 
 # --- styleboxes ------------------------------------------------------------
+## Sombra CÁLIDA estándar del tema claro (nunca negra dura).
+static func _warm_shadow(sb: StyleBoxFlat, size := 6, dy := 3) -> void:
+	sb.shadow_color = Color(0.45, 0.34, 0.06, 0.16)
+	sb.shadow_size = size
+	sb.shadow_offset = Vector2(0, dy)
+
+## Panel/tarjeta: crema con LABIO inferior 3D (borde grueso abajo, fino a los
+## lados) tintado con `border` — la regla №1 del tema Juicy Hall.
 static func panel(bg := SURFACE, border := BORDER, radius := 16, bw := 2, pad := 10) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
 	sb.set_corner_radius_all(radius)
-	sb.set_border_width_all(bw)
 	sb.border_color = border
+	sb.border_width_left = bw
+	sb.border_width_right = bw
+	sb.border_width_top = bw
+	sb.border_width_bottom = bw + 4
 	sb.set_content_margin_all(pad)
-	sb.shadow_color = Color(0, 0, 0, 0.35)
-	sb.shadow_size = 10
-	sb.shadow_offset = Vector2(0, 6)
+	sb.content_margin_bottom = pad + 3
+	_warm_shadow(sb)
 	return sb
 
 static func pill(bg := SURFACE2, border := BORDER, pad := 8) -> StyleBoxFlat:
@@ -105,48 +123,55 @@ static func pill(bg := SURFACE2, border := BORDER, pad := 8) -> StyleBoxFlat:
 	sb.bg_color = bg
 	sb.set_corner_radius_all(999)
 	sb.set_border_width_all(1)
+	sb.border_width_bottom = 3
 	sb.border_color = border
 	sb.content_margin_left = pad
 	sb.content_margin_right = pad
 	sb.content_margin_top = 4
-	sb.content_margin_bottom = 4
+	sb.content_margin_bottom = 5
 	return sb
 
-## A "juicy" primary button stylebox (accent fill, lighter top edge, drop shadow).
+## Botón primario EXTRUIDO: cara de color + labio inferior oscuro grueso.
 static func primary(accent := PRIMARY, radius := 16) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = accent
 	sb.set_corner_radius_all(radius)
-	sb.border_width_top = 2
-	sb.border_color = accent.lightened(0.35)
+	sb.border_color = accent.darkened(0.32)
+	sb.border_width_bottom = 6
 	sb.set_content_margin_all(8)
-	sb.shadow_color = Color(accent.r, accent.g, accent.b, 0.45)
-	sb.shadow_size = 12
-	sb.shadow_offset = Vector2(0, 8)
+	sb.content_margin_bottom = 10
+	_warm_shadow(sb, 6, 3)
 	return sb
 
-## Apply the juicy look (normal/hover/pressed) to a button.
+## Apply the juicy look (normal/hover/pressed) to a button. Al PRESIONAR, el
+## labio se encoge y la cara baja — botón físico.
 static func style_primary(b: Button, accent := PRIMARY, radius := 16) -> void:
 	b.add_theme_stylebox_override("normal", primary(accent, radius))
-	var hov := primary(accent.lightened(0.06), radius)
-	b.add_theme_stylebox_override("hover", hov)
-	var pr := primary(accent.darkened(0.18), radius)
-	pr.shadow_size = 4
-	pr.shadow_offset = Vector2(0, 3)
+	b.add_theme_stylebox_override("hover", primary(accent.lightened(0.05), radius))
+	var pr := primary(accent.darkened(0.10), radius)
+	pr.border_width_bottom = 2
+	pr.content_margin_top = 12
+	pr.content_margin_bottom = 4
+	pr.shadow_size = 2
+	pr.shadow_offset = Vector2(0, 1)
 	b.add_theme_stylebox_override("pressed", pr)
 
 ## Apply a flat surface look (normal/hover/pressed) to a secondary button.
 static func style_surface(b: Button, bg := SURFACE, border := BORDER, radius := 14) -> void:
 	b.add_theme_stylebox_override("normal", panel(bg, border, radius, 1, 8))
-	b.add_theme_stylebox_override("hover", panel(bg.lightened(0.05), PRIMARY, radius, 1, 8))
-	b.add_theme_stylebox_override("pressed", panel(bg.darkened(0.1), border, radius, 1, 8))
-	b.add_theme_stylebox_override("disabled", panel(bg.darkened(0.2), border.darkened(0.2), radius, 1, 8))
+	b.add_theme_stylebox_override("hover", panel(bg, PRIMARY, radius, 1, 8))
+	var pr := panel(bg.darkened(0.05), border, radius, 1, 8)
+	pr.border_width_bottom = 1
+	pr.content_margin_top = 11
+	pr.content_margin_bottom = 5
+	b.add_theme_stylebox_override("pressed", pr)
+	b.add_theme_stylebox_override("disabled", panel(bg.darkened(0.08), border.lightened(0.1), radius, 1, 8))
 
-# ---- NUEVO (rediseño menús · handoff Part 6) ------------------------------
+# ---- NUEVO (rediseño menús · handoff Part 6, en clave JUICY HALL) ---------
 const SECTION := PRIMARY_EDGE                      # azul de encabezados de sección
-const PANEL_DEEP := Color(0.047, 0.071, 0.165)     # #0C122A  paneles agrupadores
-const INPUT_BG := Color(0.039, 0.063, 0.125)       # #0A1020  campos de formulario
-const GROUP_BORDER := Color(0.125, 0.157, 0.267)   # borde de tarjetas agrupadoras
+const PANEL_DEEP := Color(0.968, 0.93, 0.845)      # panel agrupador crema-tan
+const INPUT_BG := Color(1.0, 1.0, 0.985)           # campos casi blancos
+const GROUP_BORDER := Color(0.88, 0.815, 0.66)     # borde de tarjetas agrupadoras
 
 ## Encabezado de sección: azul, 12px, MAYÚSCULAS, Manrope 700.
 static func section(l: Label, text := "") -> void:
@@ -178,17 +203,19 @@ static func input(bg := INPUT_BG, border := BORDER, radius := 12) -> StyleBoxFla
 	return sb
 
 ## Chip conmutable (mapa / modificador / estado / dificultad).
-## selected=false → superficie con borde; selected=true → relleno accent + borde superior claro.
+## selected=false → crema con borde tan; selected=true → relleno accent con
+## labio inferior oscuro (extruido, como los botones primarios).
 static func chip(selected: bool, accent := PRIMARY, radius := 12) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.set_corner_radius_all(radius)
 	if selected:
 		sb.bg_color = accent
-		sb.border_width_top = 2
-		sb.border_color = accent.lightened(0.35)
+		sb.border_width_bottom = 4
+		sb.border_color = accent.darkened(0.32)
 	else:
 		sb.bg_color = PANEL_DEEP
 		sb.set_border_width_all(1)
+		sb.border_width_bottom = 3
 		sb.border_color = BORDER
 	sb.set_content_margin_all(11)
 	return sb
@@ -213,7 +240,7 @@ static func icon_tile_node(emoji: String, accent := PRIMARY, size := 38, glyph :
 
 ## Popup de información (ⓘ de modificadores/estados). Reusa panel() para el marco.
 static func info_popup_box() -> StyleBoxFlat:
-	return panel(SURFACE, Color(0.17, 0.22, 0.38), 18, 1, 16)
+	return panel(SURFACE, GROUP_BORDER, 18, 1, 16)
 
 ## Banner de alerta (validación / error). tint = DANGER por defecto.
 static func alert_box(tint := DANGER) -> StyleBoxFlat:

@@ -307,9 +307,10 @@ func _build_passives(d: Dictionary) -> void:
 	for pid in ids:
 		var info: Dictionary = Roster.PASSIVES.get(pid, {})
 		var lbl := Label.new()
-		lbl.add_theme_font_size_override("font_size", 16)
 		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		lbl.text = "• %s — %s" % [String(info.get("name", pid)), String(info.get("desc", ""))]
+		# color EXPLÍCITO: el default de Godot es blanco (invisible sobre crema)
+		UITheme.label(lbl, 16, UITheme.TEXT, false, 600)
 		_passives_box.add_child(lbl)
 	# Resistencias a estados (inmunidades de esta figura)
 	var res: Array = d.get("resists", [])
@@ -320,10 +321,9 @@ func _build_passives(d: Dictionary) -> void:
 				if String(GameState.FX_STATUS[label]) == String(sid):
 					names.append(String(label))
 		var rl := Label.new()
-		rl.add_theme_font_size_override("font_size", 16)
 		rl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		rl.text = "🛡 Resiste: " + ", ".join(names)
-		rl.modulate = Color(0.6, 0.9, 1.0)
+		UITheme.label(rl, 16, UITheme.ENERGY, false, 700)
 		_passives_box.add_child(rl)
 
 func _build_evolutions(d: Dictionary) -> void:
@@ -345,9 +345,9 @@ func _build_evolutions(d: Dictionary) -> void:
 
 func _evo_row(text: String) -> void:
 	var lbl := Label.new()
-	lbl.add_theme_font_size_override("font_size", 16)
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lbl.text = "• " + text
+	UITheme.label(lbl, 16, UITheme.TEXT, false, 600)
 	_evos_box.add_child(lbl)
 
 ## Show/hide the info card. Hidden -> the toggle drops to the bottom, next to nav.

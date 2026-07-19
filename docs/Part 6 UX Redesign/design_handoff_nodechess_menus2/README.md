@@ -1,5 +1,12 @@
 # NodeChess — Handoff de Menús/Interfaz (UI/UX)
 
+> ⚠️ **PALETA SUPERSEDIDA (2026-07-19).** El LOOK de este handoff (tema oscuro
+> azul) fue reemplazado por el tema claro **"JUICY HALL"** — reglas canónicas
+> en **`docs/UIUX_Juicy_Hall.md`** (fondo amarillo cálido, tarjetas crema con
+> labio 3D, botones extruidos, texto tinta). La ESTRUCTURA de este handoff
+> (jerarquía, secciones, scroll, helpers de UITheme, tamaños táctiles) SIGUE
+> VIGENTE. Ante cualquier conflicto de color/estilo, gana `UIUX_Juicy_Hall.md`.
+
 > **Handoff NUEVO y SEPARADO.** No mezclar con los anteriores (`_ui...` y `_shop_profile`).
 > Cubre SOLO pantallas de **menú / interfaz / configuración**. **NO** toca combate, batalla, ni modelos 3D.
 > Referencia visual: **`NodeChess Menus.dc.html`** (ábrelo en un navegador — es la fuente de verdad del look).

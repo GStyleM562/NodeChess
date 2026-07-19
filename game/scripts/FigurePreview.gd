@@ -40,7 +40,7 @@ func _build_environment() -> void:
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.07, 0.08, 0.12)
+	env.background_color = Color(0.972, 0.925, 0.72)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.55, 0.6, 0.8)
 	env.ambient_light_energy = 0.7

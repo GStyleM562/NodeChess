@@ -133,6 +133,19 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- 🎨🌍 TEMA "JUICY HALL" EN TODO EL JUEGO: la piel del Home se volvió el tema
+  GLOBAL vía `UITheme.gd` (paleta clara cálida + labio 3D en panel/primary/
+  surface/chip/pill + sombra cálida + pressed que "baja"). Barrido de hardcodes
+  oscuros/claros en DeckBuilder, Dex, Inventario, Tienda, Perfil, Creador,
+  FigureCard, FigurePreview, RewardPopup y el HUD del tablero (banners, banca,
+  barra de modificadores — que usaba el panel gris default de Godot). Fixes
+  globales: `font_disabled_color` correcto en button_font (los 🔒 eran
+  ilegibles), labels de la Dex sin color (default blanco invisible), SpinBox
+  del Creador con LineEdit oscuro. EXCEPCIONES deliberadas: overlay de combate
+  (cinemático oscuro) y materiales del tablero 3D (arte; su HUD sí es claro).
+  REGLAS CANÓNICAS en `docs/UIUX_Juicy_Hall.md` (6 principios + checklist +
+  trampas de Godot); notas de supersede en Part 5 y en el handoff Part 6.
+  Las 10 pantallas verificadas con captura real 540×960. Suite en verde.
 - 🎨 HOME REDISEÑADO (estilo TCG Pocket, "hall luminoso"): cielo amarillo→crema,
   tarjetas blancas FLOTANTES con sombra en dos carriles (izq: Colección/Crear/
   Cómo jugar con punto rojo de pendientes · der: 🎁 Recompensas/Tienda), identidad
