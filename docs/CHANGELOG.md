@@ -133,6 +133,20 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- 🎨 HOME REDISEÑADO (estilo TCG Pocket, "hall luminoso"): cielo amarillo→crema,
+  tarjetas blancas FLOTANTES con sombra en dos carriles (izq: Colección/Crear/
+  Cómo jugar con punto rojo de pendientes · der: 🎁 Recompensas/Tienda), identidad
+  arriba-izq (avatar+Nv+XP; TOCARLA abre el Perfil), píldoras 🪙/💎 + ⚙, líder 3D
+  al centro con peana dorada y píldora-cabecera "★ Nombre · Rareza", y TRÍO de
+  modos abajo: 🎲 Probar (azul) · ⚔ BATALLA (dorado central más grande, con halo
+  y brillo; dentro va el Deck Builder) · 🌐 Online (morado). SIN duplicados:
+  desapareció la nav inferior (Tienda/Perfil reubicados), el botón Mazos (BATALLA
+  es esa ruta) y el atajo Cómo jugar de Configuración. Los 3 cofres del lobby se
+  AGRUPARON en el popup 🎁 Recompensas (pre-construido oculto: mismos estados en
+  vivo + acceso al Inventario; punto rojo si hay algo que abrir). Trampas Godot
+  documentadas en el código: PanelContainer estira a TODOS sus hijos (el punto
+  rojo era una tarjeta roja) y CanvasLayer NO hereda `visible` del Control padre
+  (el popup era el CanvasLayer mismo). Suite 47/47; test_menu_smoke intacto.
 - 🐛🎯 CAUSA RAÍZ REAL del online roto: **Render corría el server.js del 1-jul**,
   que solo aceptaba mazos ARRAY (`Array.isArray(msg.deck)`); desde el 4-jul el
   cliente manda `{team, lib}` (Dictionary) → el server viejo guardaba `[]` → el

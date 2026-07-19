@@ -1,17 +1,31 @@
 extends Node3D
-## HOME screen — Claude Design hi-fi (Pokémon Duel × Clash Royale). Top bar
-## (avatar + currency pills + energy), 3D deck-leader centerpiece with a gold glow,
-## reward/gift slots, a juicy PLAY button, secondary buttons and a bottom nav.
-## Style only — scene routes and the 3D model are unchanged.
+## HOME screen — "hall luminoso" estilo TCG Pocket: cielo cálido, tarjetas
+## blancas FLOTANTES en dos carriles laterales (con puntos rojos de aviso),
+## identidad + monedas arriba, el líder 3D al centro y TRES modos de juego
+## abajo (el central, dorado y más grande). Cada sección aparece UNA sola vez:
+## Perfil vive en la identidad, los cofres en 🎁 Recompensas (popup) y los
+## mazos dentro de ⚔ BATALLA (el Deck Builder ES la antesala de jugar).
 
 ## Cofres REALES del lobby: caja gratis + TUS COFRES ganados (se descifran en
 ## el Inventario) + cofre de nivel. Los t5/t10/t15 ya NO son de reloj: se GANAN
 ## venciendo partidas (modo usuario) y viven en el inventario de cofres.
 const CHEST_LOBBY := {
-	"free": {"icon": "🎁", "col": Color(0.35, 0.6, 1.0), "name": "Gratis"},
-	"won": {"icon": "📦", "col": Color(0.212, 0.82, 0.498), "name": "Cofres"},
-	"level": {"icon": "🏅", "col": Color(0.95, 0.5, 0.2), "name": "Nivel"},
+	"free": {"icon": "🎁", "col": Color(0.30, 0.55, 0.98), "name": "Gratis"},
+	"won": {"icon": "📦", "col": Color(0.13, 0.62, 0.36), "name": "Cofres"},
+	"level": {"icon": "🏅", "col": Color(0.88, 0.44, 0.12), "name": "Nivel"},
 }
+
+# --- TEMA CLARO del Home (solo esta pantalla; el resto del juego conserva el
+# tema oscuro de UITheme). Texto TINTA sobre tarjetas blancas con sombra.
+const INK := Color(0.24, 0.21, 0.13)          # texto principal sobre claro
+const INK_SOFT := Color(0.52, 0.47, 0.36)     # texto secundario
+const SUN := Color(1.0, 0.84, 0.33)           # amarillo del cielo
+const CARD_BG := Color(1, 1, 1, 0.97)         # tarjeta flotante
+const DOT_RED := Color(0.94, 0.26, 0.30)      # punto de aviso
+const GREEN_OK := Color(0.10, 0.55, 0.28)     # "listo" legible sobre blanco
+const MODE_BLUE := Color(0.36, 0.63, 0.98)    # 🎲 Probar
+const MODE_GOLD := Color(1.0, 0.76, 0.16)     # ⚔ BATALLA (central)
+const MODE_PURPLE := Color(0.63, 0.48, 0.95)  # 🌐 Online (sala privada)
 
 var _pivot: Node3D
 var _leader: Figure3D
@@ -19,6 +33,9 @@ var _toast: Label
 var _chest_states := {}   # id -> Label del estado (timer / ¡LISTO!)
 var _chest_tick := 0.0
 var _level_slot: Control   # slot del cofre de NIVEL (oculto sin pendientes)
+var _reward_modal: CanvasLayer # popup 🎁 Recompensas (pre-construido, oculto)
+var _reward_state: Label   # estado en vivo bajo la tarjeta 🎁
+var _reward_dot: Control   # punto rojo de la tarjeta 🎁
 
 func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
@@ -132,6 +149,15 @@ func _process(delta: float) -> void:
 func _refresh_chest_states() -> void:
 	if _level_slot != null and is_instance_valid(_level_slot):
 		_level_slot.visible = Inventory.level_chests > 0
+	# estado compartido: ¿algún cofre ganado listo? ¿alguno descifrándose?
+	var ready := false
+	var left := -1
+	for i in Inventory.chest_inv.size():
+		var info: Dictionary = Inventory.chest_info(i)
+		if String(info.get("state", "")) == "ready":
+			ready = true
+		elif String(info.get("state", "")) == "unlocking":
+			left = int(info["left"])
 	for id in _chest_states.keys():
 		var lbl: Label = _chest_states[id]
 		if not is_instance_valid(lbl):
@@ -141,35 +167,43 @@ func _refresh_chest_states() -> void:
 			continue
 		if id == "level":
 			lbl.text = "×%d" % Inventory.level_chests
-			lbl.add_theme_color_override("font_color", UITheme.SUCCESS)
+			lbl.add_theme_color_override("font_color", GREEN_OK)
 			continue
 		if id == "won":
 			# ¿algún cofre listo? → ¡ABRIR! · ¿descifrando? → cuenta atrás · si no → ×N
-			var ready := false
-			var left := -1
-			for i in Inventory.chest_inv.size():
-				var info: Dictionary = Inventory.chest_info(i)
-				if String(info.get("state", "")) == "ready":
-					ready = true
-				elif String(info.get("state", "")) == "unlocking":
-					left = int(info["left"])
 			if ready:
 				lbl.text = "¡ABRIR!"
-				lbl.add_theme_color_override("font_color", UITheme.SUCCESS)
+				lbl.add_theme_color_override("font_color", GREEN_OK)
 			elif left >= 0:
 				lbl.text = "%d:%02d" % [left / 60, left % 60]
-				lbl.add_theme_color_override("font_color", UITheme.TEXT2)
+				lbl.add_theme_color_override("font_color", INK_SOFT)
 			else:
 				lbl.text = "×%d" % Inventory.chest_inv.size()
 				lbl.add_theme_color_override("font_color",
-					UITheme.SUCCESS if Inventory.chest_inv.size() > 0 else UITheme.MUTED)
+					GREEN_OK if Inventory.chest_inv.size() > 0 else INK_SOFT)
+	# resumen EN la tarjeta 🎁 Recompensas: punto rojo si hay algo que abrir
+	if _reward_state != null and is_instance_valid(_reward_state):
+		var claim := ready or Inventory.level_chests > 0
+		if _reward_dot != null and is_instance_valid(_reward_dot):
+			_reward_dot.visible = claim
+		if claim:
+			_reward_state.text = "¡ABRIR!"
+			_reward_state.add_theme_color_override("font_color", GREEN_OK)
+		elif left >= 0:
+			_reward_state.text = "%d:%02d" % [left / 60, left % 60]
+			_reward_state.add_theme_color_override("font_color", INK_SOFT)
+		else:
+			_reward_state.text = "Gratis 🎁"
+			_reward_state.add_theme_color_override("font_color", INK_SOFT)
 
 # ----------------------------------------------------------------- 3D centerpiece
 func _build_env() -> void:
 	var cam := Camera3D.new()
 	cam.keep_aspect = Camera3D.KEEP_WIDTH
 	cam.fov = 26.0
-	cam.look_at_from_position(Vector3(0.0, 1.5, 4.0), Vector3(0.0, 1.15, 0.0), Vector3.UP)
+	# Más lejos y un pelín más alto que antes: el líder debe caber ENTERO entre
+	# la barra superior y el trío de botones (ya no hay paneles que lo tapen).
+	cam.look_at_from_position(Vector3(0.0, 1.75, 6.2), Vector3(0.0, 1.05, 0.0), Vector3.UP)
 	add_child(cam)
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-45, -35, 0)
@@ -178,10 +212,10 @@ func _build_env() -> void:
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = UITheme.BG_DEEP
+	env.background_color = Color(0.982, 0.952, 0.878)   # crema cálido (hall luminoso)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.45, 0.5, 0.8)
-	env.ambient_light_energy = 0.85
+	env.ambient_light_color = Color(1.0, 0.98, 0.92)
+	env.ambient_light_energy = 1.1
 	we.environment = env
 	add_child(we)
 	var base := MeshInstance3D.new()
@@ -192,9 +226,9 @@ func _build_env() -> void:
 	base.mesh = disc
 	base.position = Vector3(0, -0.06, 0)
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.14, 0.17, 0.3)
-	mat.metallic = 0.5
-	mat.roughness = 0.4
+	mat.albedo_color = Color(0.95, 0.85, 0.55)   # peana dorada clara
+	mat.metallic = 0.35
+	mat.roughness = 0.45
 	base.material_override = mat
 	add_child(base)
 	_pivot = Node3D.new()
@@ -214,16 +248,21 @@ func _lead() -> int:
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
-	var bg := ColorRect.new()              # vignette so the 3D blends into the UI
-	bg.color = Color(UITheme.BG.r, UITheme.BG.g, UITheme.BG.b, 0.0)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.add_child(bg)
+	# CIELO: banda amarilla arriba que se funde con el crema del fondo, y un
+	# "suelo" blanco suave abajo que asienta los botones (como la referencia).
+	var sky := _vgrad(Color(SUN.r, SUN.g, SUN.b, 0.85), Color(SUN.r, SUN.g, SUN.b, 0.0))
+	sky.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	sky.offset_bottom = 300
+	layer.add_child(sky)
+	var ground := _vgrad(Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.8))
+	ground.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	ground.offset_top = -280
+	layer.add_child(ground)
 
 	_build_bg_particles(layer)
 
 	# gold glow behind the leader (con pulso suave para que respire)
-	var glow := _radial(UITheme.GOLD, 0.22)
+	var glow := _radial(UITheme.GOLD, 0.30)
 	glow.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	glow.offset_left = -190
 	glow.offset_right = 190
@@ -236,9 +275,9 @@ func _build_ui() -> void:
 
 	_build_topbar(layer)
 	_build_centerpiece(layer)
-	_build_gifts(layer)
+	_build_rails(layer)
 	_build_buttons(layer)
-	_build_nav(layer)
+	_build_reward_modal()
 
 	var ts := PanelContainer.new()
 	ts.set_anchors_preset(Control.PRESET_CENTER)
@@ -246,116 +285,216 @@ func _build_ui() -> void:
 	ts.offset_right = 150
 	ts.offset_top = 50
 	ts.offset_bottom = 92
-	ts.add_theme_stylebox_override("panel", UITheme.panel(Color(0.08, 0.09, 0.16, 0.96), UITheme.GOLD.darkened(0.2), 12, 1, 8))
+	ts.add_theme_stylebox_override("panel", _card_style(UITheme.GOLD.darkened(0.1), 14))
 	ts.visible = false
-	_toast = _lbl("", 18, UITheme.GOLD, true, 700)
+	_toast = _lbl("", 16, INK, true, 700)
 	ts.add_child(_toast)
 	layer.add_child(ts)
 	_toast.set_meta("box", ts)
 
+## Barra superior de PÍLDORAS flotantes: identidad (tocar = Perfil) + saldos + ⚙.
 func _build_topbar(layer: CanvasLayer) -> void:
-	var top := PanelContainer.new()
-	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	top.offset_top = 6
-	top.offset_left = 6
-	top.offset_right = -6
-	top.offset_bottom = 70
-	top.add_theme_stylebox_override("panel", UITheme.panel(Color(0.09, 0.10, 0.18, 0.97), UITheme.BORDER, 16, 1, 6))
-	layer.add_child(top)
 	var tb := HBoxContainer.new()
+	tb.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	tb.offset_left = 10
+	tb.offset_right = -10
+	tb.offset_top = 8
+	tb.offset_bottom = 64
 	tb.add_theme_constant_override("separation", 7)
-	top.add_child(tb)
-	tb.add_child(_avatar())
+	layer.add_child(tb)
+
+	# --- identidad: avatar + nombre + Nv + barra XP → toca para abrir tu PERFIL
+	var idp := PanelContainer.new()
+	idp.add_theme_stylebox_override("panel", _card_style(UITheme.GOLD.darkened(0.05), 16))
+	tb.add_child(idp)
+	var ih := HBoxContainer.new()
+	ih.add_theme_constant_override("separation", 7)
+	idp.add_child(ih)
+	ih.add_child(_avatar())
 	var who := VBoxContainer.new()
-	who.add_theme_constant_override("separation", 0)
-	who.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	who.add_theme_constant_override("separation", 1)
 	who.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var nm := _lbl("Jugador", 17, UITheme.TEXT, true, 700)
+	ih.add_child(who)
+	var nm := _lbl("Jugador", 14, INK, true, 800)
 	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	who.add_child(nm)
-	# barra fina de XP (6px, relleno PRIMARY) — §6.1 del handoff
+	var lvrow := HBoxContainer.new()
+	lvrow.add_theme_constant_override("separation", 5)
+	who.add_child(lvrow)
+	var lvpill := PanelContainer.new()
+	var lsb := StyleBoxFlat.new()
+	lsb.bg_color = MODE_GOLD
+	lsb.set_corner_radius_all(7)
+	lsb.set_content_margin_all(0)
+	lsb.content_margin_left = 6
+	lsb.content_margin_right = 6
+	lvpill.add_theme_stylebox_override("panel", lsb)
+	lvpill.add_child(_lbl("Nv %d" % Inventory.level, 10, Color(0.28, 0.19, 0.02), true, 800))
+	lvrow.add_child(lvpill)
 	var xpbar := ProgressBar.new()
-	xpbar.custom_minimum_size = Vector2(0, 6)
+	xpbar.custom_minimum_size = Vector2(74, 8)
+	xpbar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	xpbar.show_percentage = false
 	xpbar.max_value = maxf(1.0, float(Inventory.xp_needed()))
 	xpbar.value = clampf(float(Inventory.xp), 0.0, xpbar.max_value)
-	var xbg := StyleBoxFlat.new(); xbg.bg_color = Color(0.10, 0.13, 0.22); xbg.set_corner_radius_all(3)
-	var xfg := StyleBoxFlat.new(); xfg.bg_color = UITheme.PRIMARY; xfg.set_corner_radius_all(3)
+	var xbg := StyleBoxFlat.new(); xbg.bg_color = Color(0.88, 0.85, 0.76); xbg.set_corner_radius_all(4)
+	var xfg := StyleBoxFlat.new(); xfg.bg_color = MODE_GOLD.darkened(0.06); xfg.set_corner_radius_all(4)
 	xpbar.add_theme_stylebox_override("background", xbg)
 	xpbar.add_theme_stylebox_override("fill", xfg)
-	who.add_child(xpbar)
-	var lv := _lbl("Nv %d  ·  %d/%d" % [Inventory.level, Inventory.xp, Inventory.xp_needed()], 11, UITheme.MUTED, false, 700)
-	lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	who.add_child(lv)
-	tb.add_child(who)
+	lvrow.add_child(xpbar)
+	var idbtn := Button.new()
+	idbtn.flat = true
+	idbtn.set_anchors_preset(Control.PRESET_FULL_RECT)
+	idbtn.pressed.connect(func():
+		Sfx.play("ui_click")
+		get_tree().change_scene_to_file("res://scenes/profile.tscn"))
+	idp.add_child(idbtn)
+
+	var sp := Control.new()
+	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tb.add_child(sp)
 	# saldos REALES (🪙 por subir de nivel · 💎 cada 5 niveles y en cofres)
-	tb.add_child(_chip("🪙", str(Inventory.coins), UITheme.GOLD))
-	tb.add_child(_chip("💎", str(Inventory.gems), Color(0.5, 0.85, 1.0)))
+	tb.add_child(_chip("🪙", str(Inventory.coins)))
+	tb.add_child(_chip("💎", str(Inventory.gems)))
 	var gear := _icon_btn("⚙")
-	gear.pressed.disconnect(_soon)
 	gear.pressed.connect(_toggle_settings)
 	tb.add_child(gear)
 
 func _build_centerpiece(layer: CanvasLayer) -> void:
 	var d: Dictionary = Roster.FIGURES[_lead()]
-	var title := _lbl("NodeChess", 34, Color(0.92, 0.94, 1.0), true, 800)
-	title.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	title.offset_top = 86
-	layer.add_child(title)
-	# leader name + rarity pill (anchored mid)
-	var box := VBoxContainer.new()
+	# UNA píldora-cabecera centrada bajo la barra (el nombre encima del líder
+	# le atravesaba el torso): "★ Nombre · RAREZA" con borde de su rareza.
+	var box := HBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	box.offset_left = -180
 	box.offset_right = 180
-	box.offset_top = 470
+	box.offset_top = 74
+	box.offset_bottom = 108
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 4)
 	layer.add_child(box)
-	box.add_child(_lbl(String(d["name"]), 25, UITheme.TEXT, true, 800))
 	var rar := FigureCard.rarity_color(d)
 	var pill := PanelContainer.new()
-	pill.add_theme_stylebox_override("panel", UITheme.pill(Color(0.14, 0.11, 0.05), rar.darkened(0.3), 10))
-	pill.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var pl := _lbl("★ LÍDER · " + FigureCard.rarity_name(d), 12, rar.lightened(0.2), true, 700)
+	pill.add_theme_stylebox_override("panel", _card_style(rar.darkened(0.05), 14))
+	pill.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var pl := _lbl("★ %s · %s" % [String(d["name"]), FigureCard.rarity_name(d)], 12, INK, true, 800)
 	pill.add_child(pl)
-	box.add_child(_center(pill))
+	box.add_child(pill)
 
-func _build_gifts(layer: CanvasLayer) -> void:
-	var hdr := _lbl("COFRES  ·  toca uno para abrirlo", 11, UITheme.MUTED, true, 700)
-	hdr.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	hdr.offset_top = -420
-	hdr.offset_bottom = -402
-	layer.add_child(hdr)
-	var gifts := HBoxContainer.new()
-	gifts.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	gifts.offset_top = -398
-	gifts.offset_bottom = -300
-	gifts.alignment = BoxContainer.ALIGNMENT_CENTER
-	gifts.add_theme_constant_override("separation", 10)
-	layer.add_child(gifts)
+## CARRILES de tarjetas flotantes (estilo TCG Pocket): izquierda = tu taller
+## (Colección / Crear / Cómo jugar), derecha = premios (Recompensas / Tienda).
+func _build_rails(layer: CanvasLayer) -> void:
+	var left := VBoxContainer.new()
+	left.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	left.offset_left = 10
+	left.offset_right = 108
+	left.offset_top = 118
+	left.add_theme_constant_override("separation", 12)
+	layer.add_child(left)
+	left.add_child(_rail_card("📖", "Colección", UITheme.R_EPIC,
+		func(): get_tree().change_scene_to_file("res://scenes/dex.tscn")))
+	left.add_child(_rail_card("🛠", "Crear", Color(0.13, 0.62, 0.36),
+		func(): get_tree().change_scene_to_file("res://scenes/character_creator.tscn")))
+	var tut := _rail_card("🎓", "Cómo jugar", MODE_GOLD.darkened(0.1),
+		func(): get_tree().change_scene_to_file("res://scenes/tutorials.tscn"))
+	(tut.get_meta("dot") as Control).visible = TutorialLib.pending_total() > 0
+	left.add_child(tut)
+
+	var right := VBoxContainer.new()
+	right.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	right.offset_left = -108
+	right.offset_right = -10
+	right.offset_top = 118
+	right.add_theme_constant_override("separation", 12)
+	layer.add_child(right)
+	# 🎁 Recompensas AGRUPA los cofres (gratis + ganados + nivel) en un popup,
+	# con estado en vivo bajo el icono y punto rojo cuando hay algo que abrir.
+	var rew := _rail_card("🎁", "Recompensas", MODE_GOLD.darkened(0.05), _open_rewards, "…")
+	_reward_state = rew.get_meta("sub")
+	_reward_dot = rew.get_meta("dot")
+	right.add_child(rew)
+	right.add_child(_rail_card("🛍", "Tienda", MODE_PURPLE.darkened(0.05),
+		func(): get_tree().change_scene_to_file("res://scenes/shop.tscn")))
+
+func _open_rewards() -> void:
+	Sfx.play("ui_click")
+	if _reward_modal != null and is_instance_valid(_reward_modal):
+		_reward_modal.visible = true
+
+## Popup 🎁 Recompensas: los 3 cofres del lobby + acceso al Inventario. Se
+## PRE-construye oculto para que sus estados vivan desde el arranque (los
+## refresca _refresh_chest_states y los valida test_menu_smoke).
+func _build_reward_modal() -> void:
+	# OJO: un CanvasLayer NO hereda el `visible` de un Control padre (se dibuja
+	# aparte) — por eso el modal ES el CanvasLayer y ocultamos ESE.
+	_reward_modal = CanvasLayer.new()
+	_reward_modal.name = "RewardModal"
+	_reward_modal.layer = 26
+	_reward_modal.visible = false
+	add_child(_reward_modal)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	dim.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed:
+			_reward_modal.visible = false)
+	_reward_modal.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_reward_modal.add_child(cc)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(minf(400.0, get_viewport().get_visible_rect().size.x - 28.0), 0)
+	panel.add_theme_stylebox_override("panel", _card_style(MODE_GOLD.darkened(0.05), 22))
+	cc.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	panel.add_child(vb)
+	vb.add_child(_lbl("🎁 Recompensas", 19, INK, true, 800))
+	var hint := _lbl("Toca un cofre para abrirlo", 11, INK_SOFT, true, 700)
+	vb.add_child(hint)
+	var slots := HBoxContainer.new()
+	slots.alignment = BoxContainer.ALIGNMENT_CENTER
+	slots.add_theme_constant_override("separation", 10)
+	vb.add_child(slots)
 	for id in ["free", "won", "level"]:
 		var slot := _chest_slot(id)
-		gifts.add_child(slot)
+		slots.add_child(slot)
 		if id == "level":
 			_level_slot = slot   # visible solo si hay cofres de nivel pendientes
+	var inv := Button.new()
+	inv.text = "📦 Inventario y descifrado"
+	inv.custom_minimum_size = Vector2(0, 48)
+	UITheme.button_font(inv, 15, Color(0.28, 0.19, 0.02), true, 800)
+	UITheme.style_primary(inv, MODE_GOLD, 14)
+	inv.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/inventory.tscn"))
+	vb.add_child(inv)
+	var tiny := _lbl("Los cofres ganados se DESCIFRAN en el Inventario", 10, INK_SOFT, false, 600)
+	vb.add_child(tiny)
+	var close := Button.new()
+	close.text = "Cerrar"
+	close.custom_minimum_size = Vector2(0, 40)
+	UITheme.button_font(close, 13, INK_SOFT, true, 700)
+	UITheme.style_surface(close, Color(0.95, 0.93, 0.88), Color(0, 0, 0, 0.10), 12)
+	close.pressed.connect(func(): _reward_modal.visible = false)
+	vb.add_child(close)
 	_refresh_chest_states()
 
-## Slot de cofre del lobby: icono + nombre + estado en vivo; toca para abrir.
+## Slot de cofre del popup 🎁: tarjeta blanca con borde de color + estado en vivo.
 func _chest_slot(id: String) -> Control:
 	var st: Dictionary = CHEST_LOBBY[id]
 	var col: Color = st["col"]
 	var p := PanelContainer.new()
-	p.custom_minimum_size = Vector2(96, 96)   # caben 5 slots (incluye Nivel)
-	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.PANEL_DEEP, col, 14, 2, 6))
+	p.custom_minimum_size = Vector2(104, 100)
+	p.add_theme_stylebox_override("panel", _card_style(col, 16))
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 3)
 	p.add_child(v)
-	var tile := UITheme.icon_tile_node(String(st["icon"]), col, 38, 22)   # emoji enmarcado (§5)
-	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_child(_center(tile))
-	v.add_child(_lbl(String(st["name"]), 11, col, true, 700))
-	var state := _lbl("…", 12, UITheme.TEXT2, true, 700)
+	var icon := _lbl(String(st["icon"]), 26, col, false, 700)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(icon)
+	v.add_child(_lbl(String(st["name"]), 11, col.darkened(0.15), true, 800))
+	var state := _lbl("…", 12, INK_SOFT, true, 700)
 	v.add_child(state)
 	_chest_states[id] = state
 	var b := Button.new()
@@ -513,25 +652,50 @@ func _open_chest_anim(id: String, lines: Array) -> void:
 	create_tween().tween_property(take, "modulate:a", 1.0, 0.3)
 	_refresh_chest_states()
 
+## TRÍO de modos (como la referencia): 🎲 Probar (azul) · ⚔ BATALLA (dorado,
+## central y MÁS grande — dentro va el Deck Builder: mazos + dificultad + CPU) ·
+## 🌐 Online (morado, salas privadas por código).
 func _build_buttons(layer: CanvasLayer) -> void:
-	# Halo pulsante DETRÁS del botón (se añade antes para quedar por debajo).
-	var halo := _radial(UITheme.PRIMARY, 0.5)
-	halo.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	halo.offset_top = -308
-	halo.offset_bottom = -192
-	halo.offset_left = 2
-	halo.offset_right = -2
+	# Halo pulsante DETRÁS del botón central (se añade antes para quedar debajo).
+	var halo := _radial(MODE_GOLD, 0.55)
+	halo.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	halo.offset_left = -150
+	halo.offset_right = 150
+	halo.offset_top = -330
+	halo.offset_bottom = -120
 	layer.add_child(halo)
 	var hp := create_tween().set_loops()
-	hp.tween_property(halo, "modulate:a", 0.72, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	hp.tween_property(halo, "modulate:a", 0.3, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	hp.tween_property(halo, "modulate:a", 0.75, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	hp.tween_property(halo, "modulate:a", 0.35, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
-	var play := _big_button("JUGAR", "Partida rápida")
-	play.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	play.offset_top = -288
-	play.offset_bottom = -212
-	play.offset_left = 22
-	play.offset_right = -22
+	var probar := _mode_button("🎲", "Probar", "sala de pruebas", MODE_BLUE, false)
+	probar.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	probar.offset_left = 12
+	probar.offset_right = 162
+	probar.offset_top = -244
+	probar.offset_bottom = -148
+	probar.pressed.connect(func():
+		Sfx.play("ui_click")
+		get_tree().change_scene_to_file("res://scenes/attack_tester.tscn"))
+	layer.add_child(probar)
+
+	var online := _mode_button("🌐", "Online", "sala privada", MODE_PURPLE, false)
+	online.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	online.offset_left = -162
+	online.offset_right = -12
+	online.offset_top = -244
+	online.offset_bottom = -148
+	online.pressed.connect(func():
+		Sfx.play("ui_click")
+		get_tree().change_scene_to_file("res://scenes/online_lobby.tscn"))
+	layer.add_child(online)
+
+	var play := _mode_button("⚔", "BATALLA", "mazos · dificultad · CPU", MODE_GOLD, true)
+	play.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	play.offset_left = -102
+	play.offset_right = 102
+	play.offset_top = -298
+	play.offset_bottom = -142
 	play.pressed.connect(func():
 		# Primera vez: tutorial guiado directo al tablero (mapa 0, CPU pasiva).
 		if not Settings.tutorial_done:
@@ -541,26 +705,6 @@ func _build_buttons(layer: CanvasLayer) -> void:
 			get_tree().change_scene_to_file("res://scenes/deck_builder.tscn"))
 	layer.add_child(play)
 	_juice_play(play)
-
-	# UNA sola parrilla grande (4×2: 7 accesos + Cómo jugar) — antes había dos
-	# barras con botones duplicados y todo se veía chiquito.
-	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	grid.offset_top = -204
-	grid.offset_bottom = -72
-	grid.offset_left = 12
-	grid.offset_right = -12
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	layer.add_child(grid)
-	grid.add_child(_menu_button("🃏", "Mazos", UITheme.PRIMARY_EDGE, func(): get_tree().change_scene_to_file("res://scenes/deck_builder.tscn")))
-	grid.add_child(_menu_button("📖", "Colección", UITheme.R_EPIC, func(): get_tree().change_scene_to_file("res://scenes/dex.tscn")))
-	grid.add_child(_menu_button("📦", "Inventario", UITheme.GOLD, func(): get_tree().change_scene_to_file("res://scenes/inventory.tscn")))
-	grid.add_child(_menu_button("🌐", "Online", UITheme.ENERGY, func(): get_tree().change_scene_to_file("res://scenes/online_lobby.tscn")))
-	grid.add_child(_menu_button("🛠", "Crear", UITheme.SUCCESS, func(): get_tree().change_scene_to_file("res://scenes/character_creator.tscn")))
-	grid.add_child(_menu_button("🎓", "Cómo jugar", UITheme.GOLD, func(): get_tree().change_scene_to_file("res://scenes/tutorials.tscn")))
-	grid.add_child(_menu_button("🎲", "Probar", UITheme.ORANGE, func(): get_tree().change_scene_to_file("res://scenes/attack_tester.tscn")))
 
 ## Botón JUGAR "hipnótico": respiración + barrido de brillo diagonal. NO toca `pressed`.
 func _juice_play(play: Button) -> void:
@@ -593,34 +737,11 @@ func _juice_play(play: Button) -> void:
 	sw.tween_property(shine, "position:x", play.size.x + 90.0, 0.75).set_trans(Tween.TRANS_SINE)
 	sw.tween_callback(func(): shine.position.x = -90.0)
 
-func _build_nav(layer: CanvasLayer) -> void:
-	var nav := PanelContainer.new()
-	nav.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	nav.offset_top = -62
-	nav.add_theme_stylebox_override("panel", UITheme.panel(Color(0.07, 0.08, 0.14, 0.99), UITheme.BORDER, 0, 1, 4))
-	layer.add_child(nav)
-	var nb := HBoxContainer.new()
-	nb.alignment = BoxContainer.ALIGNMENT_CENTER
-	nb.add_theme_constant_override("separation", 26)
-	nav.add_child(nb)
-	nb.add_child(_nav_btn("🏠", "Home", true, func(): pass))
-	nb.add_child(_nav_btn("🛍", "Tienda", false, func(): get_tree().change_scene_to_file("res://scenes/shop.tscn")))
-	nb.add_child(_nav_btn("👤", "Perfil", false, func(): get_tree().change_scene_to_file("res://scenes/profile.tscn")))
-
-func _soon() -> void:
-	var box = _toast.get_meta("box") if _toast != null and _toast.has_meta("box") else null
-	if box == null:
-		return
-	_toast.text = "Próximamente (base de diseño)"
-	box.visible = true
-	var t := get_tree().create_timer(1.4)
-	t.timeout.connect(func(): if is_instance_valid(box): box.visible = false)
-
-## Partículas suaves de fondo: puntos de luz que flotan lentamente (el menú
+## Partículas suaves de fondo: puntos de color que flotan lentamente (el menú
 ## deja de verse estático/triste sin costar nada de rendimiento).
 func _build_bg_particles(layer: CanvasLayer) -> void:
 	var vw := get_viewport().get_visible_rect().size
-	var cols := [UITheme.PRIMARY, UITheme.GOLD, Color(0.72, 0.45, 1.0), UITheme.ENERGY]
+	var cols := [MODE_BLUE, MODE_GOLD, MODE_PURPLE, Color(0.3, 0.8, 0.5)]
 	for i in 12:
 		var d := _radial(cols[i % cols.size()], 0.16 + randf() * 0.12)
 		var size := 26.0 + randf() * 64.0
@@ -657,28 +778,153 @@ func _radial(col: Color, alpha: float) -> TextureRect:
 
 func _avatar() -> Control:
 	var p := Panel.new()
-	p.custom_minimum_size = Vector2(52, 52)
+	p.custom_minimum_size = Vector2(40, 40)
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = UITheme.PRIMARY.darkened(0.1)
-	sb.set_corner_radius_all(26)
+	sb.set_corner_radius_all(20)
 	sb.set_border_width_all(3)
-	sb.border_color = UITheme.GOLD
+	sb.border_color = MODE_GOLD
 	p.add_theme_stylebox_override("panel", sb)
-	var l := _lbl("P1", 17, Color.WHITE, true, 800)
+	var l := _lbl("P1", 14, Color.WHITE, true, 800)
 	l.set_anchors_preset(Control.PRESET_FULL_RECT)
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	p.add_child(l)
 	return p
 
-func _chip(icon: String, value: String, col: Color) -> Control:
+## Píldora blanca de saldo (🪙/💎) — flotante, texto tinta.
+func _chip(icon: String, value: String) -> Control:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UITheme.pill(Color(0.07, 0.09, 0.16), UITheme.BORDER, 8))
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var sb := _card_style(Color(0, 0, 0, 0.06), 15)
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	p.add_theme_stylebox_override("panel", sb)
 	var h := HBoxContainer.new()
-	h.add_theme_constant_override("separation", 3)
+	h.add_theme_constant_override("separation", 4)
 	p.add_child(h)
-	h.add_child(_lbl(icon, 15, col, false, 600))
-	h.add_child(_lbl(value, 14, UITheme.TEXT, true, 700))
+	h.add_child(_lbl(icon, 14, INK, false, 600))
+	h.add_child(_lbl(value, 14, INK, true, 800))
 	return p
+
+# --------------------------------------------------- widgets del tema claro
+## Tarjeta flotante: blanca, borde tintado suave y sombra cálida.
+func _card_style(border: Color, radius := 18) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = CARD_BG
+	sb.set_corner_radius_all(radius)
+	sb.set_border_width_all(2)
+	sb.border_color = Color(border.r, border.g, border.b, 0.35)
+	sb.shadow_color = Color(0.36, 0.28, 0.05, 0.16)
+	sb.shadow_size = 9
+	sb.shadow_offset = Vector2(0, 4)
+	sb.set_content_margin_all(8)
+	return sb
+
+## Gradiente vertical (cielo/suelo).
+func _vgrad(top: Color, bottom: Color) -> TextureRect:
+	var tr := TextureRect.new()
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var g := Gradient.new()
+	g.set_color(0, top)
+	g.set_color(1, bottom)
+	var gt := GradientTexture2D.new()
+	gt.gradient = g
+	gt.fill_from = Vector2(0.5, 0.0)
+	gt.fill_to = Vector2(0.5, 1.0)
+	tr.texture = gt
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_SCALE
+	return tr
+
+## Tarjeta de carril: icono + nombre (+ sub-estado opcional) + punto rojo de
+## aviso (meta "dot"; el sub-Label queda en meta "sub"). La raíz es un Control
+## plano (NO PanelContainer: ese estira a TODOS los hijos y el punto rojo
+## acabaría tapando la tarjeta completa).
+func _rail_card(icon: String, caption: String, accent: Color, cb: Callable, sub := "") -> Control:
+	var p := Control.new()
+	p.custom_minimum_size = Vector2(98, 92)
+	var bg := Panel.new()
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.add_theme_stylebox_override("panel", _card_style(accent, 18))
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(bg)
+	var v := VBoxContainer.new()
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 1)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(v)
+	var ic := _lbl(icon, 27, accent, false, 700)
+	v.add_child(ic)
+	var cap := _lbl(caption, 11, INK, true, 800)
+	cap.clip_text = true
+	v.add_child(cap)
+	if sub != "":
+		var sl := _lbl(sub, 10, INK_SOFT, true, 700)
+		v.add_child(sl)
+		p.set_meta("sub", sl)
+	var b := Button.new()
+	b.flat = true
+	b.set_anchors_preset(Control.PRESET_FULL_RECT)
+	b.pressed.connect(func():
+		Sfx.play("ui_click")
+		cb.call())
+	p.add_child(b)
+	# punto rojo de aviso (arriba-derecha), oculto por defecto
+	var dot := Panel.new()
+	var ds := StyleBoxFlat.new()
+	ds.bg_color = DOT_RED
+	ds.set_corner_radius_all(7)
+	ds.set_border_width_all(2)
+	ds.border_color = Color.WHITE
+	dot.add_theme_stylebox_override("panel", ds)
+	dot.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	dot.offset_left = -17
+	dot.offset_right = -3
+	dot.offset_top = 3
+	dot.offset_bottom = 17
+	dot.visible = false
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(dot)
+	p.set_meta("dot", dot)
+	return p
+
+## Botón de MODO de juego: color vivo, bisel claro arriba y sombra profunda.
+## El central (big) lleva texto tinta sobre dorado y tipografía mayor.
+func _mode_button(icon: String, title: String, sub: String, col: Color, big: bool) -> Button:
+	var b := Button.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = col
+	sb.set_corner_radius_all(22)
+	sb.set_border_width_all(3)
+	sb.border_color = Color(1, 1, 1, 0.55)
+	sb.shadow_color = Color(col.r * 0.5, col.g * 0.5, col.b * 0.5, 0.45)
+	sb.shadow_size = 10
+	sb.shadow_offset = Vector2(0, 6)
+	b.add_theme_stylebox_override("normal", sb)
+	b.add_theme_stylebox_override("hover", sb)
+	var pr: StyleBoxFlat = sb.duplicate()
+	pr.bg_color = col.darkened(0.12)
+	pr.shadow_size = 4
+	pr.shadow_offset = Vector2(0, 2)
+	b.add_theme_stylebox_override("pressed", pr)
+	b.add_theme_stylebox_override("focus", sb)
+	var fg := Color(0.28, 0.19, 0.02) if big else Color.WHITE
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_theme_constant_override("separation", -2)
+	b.add_child(v)
+	v.add_child(_lbl(icon, 36 if big else 26, fg, false, 700))
+	v.add_child(_lbl(title, 21 if big else 15, fg, true, 900))
+	var s := _lbl(sub, 10, Color(fg.r, fg.g, fg.b, 0.82), true, 700)
+	s.clip_text = true
+	v.add_child(s)
+	return b
 
 # ---------------------------------------------------------------- settings
 ## ATRÁS (Android) en el menú: abre/cierra la Configuración en vez de salir.
@@ -798,14 +1044,6 @@ func _show_settings() -> void:
 	spd.pressed.connect(func(): Settings.set_combat_speed(3 - Settings.combat_speed); cstyle.call())
 	cbb.pressed.connect(func(): Settings.set_colorblind(not Settings.colorblind); cstyle.call())
 	cstyle.call()
-	var tut := Button.new()
-	tut.text = "🎓 Cómo jugar (tutoriales por capítulos)"
-	tut.custom_minimum_size = Vector2(0, 42)
-	UITheme.button_font(tut, 14, UITheme.TEXT, true, 700)
-	UITheme.style_surface(tut, UITheme.SURFACE2, UITheme.BORDER, 10)
-	tut.pressed.connect(func():
-		get_tree().change_scene_to_file("res://scenes/tutorials.tscn"))
-	vb.add_child(tut)
 
 	# --- vista Admin / Usuario (progresión e inventario) ---
 	var mh := Label.new()
@@ -1028,69 +1266,18 @@ func _volume_row(caption: String, val: float, on_change: Callable) -> Control:
 	row.add_child(s)
 	return row
 
+## Botón redondo blanco (⚙): flotante, texto tinta.
 func _icon_btn(icon: String) -> Button:
 	var b := Button.new()
 	b.text = icon
-	b.custom_minimum_size = Vector2(40, 40)
-	UITheme.button_font(b, 18, UITheme.TEXT2, false, 600)
-	UITheme.style_surface(b, UITheme.SURFACE2, UITheme.BORDER, 11)
-	b.pressed.connect(_soon)
-	return b
-
-func _big_button(text: String, subtitle: String) -> Button:
-	var b := Button.new()
-	b.custom_minimum_size = Vector2(0, 70)
-	UITheme.style_primary(b, UITheme.PRIMARY, 18)
-	var v := VBoxContainer.new()
-	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.set_anchors_preset(Control.PRESET_FULL_RECT)
-	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_theme_constant_override("separation", -2)
-	b.add_child(v)
-	v.add_child(_lbl("▶  " + text, 24, Color.WHITE, true, 800))
-	v.add_child(_lbl(subtitle, 12, Color(1, 1, 1, 0.82), false, 600))
-	return b
-
-func _menu_button(icon: String, text: String, accent: Color, cb: Callable) -> Button:
-	var b := Button.new()
-	b.custom_minimum_size = Vector2(0, 66)
-	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UITheme.style_surface(b, UITheme.SURFACE.lerp(accent, 0.06), Color(accent.r, accent.g, accent.b, 0.33), 14)
-	var v := VBoxContainer.new()
-	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.set_anchors_preset(Control.PRESET_FULL_RECT)
-	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_theme_constant_override("separation", 4)
-	b.add_child(v)
-	var tile := UITheme.icon_tile_node(icon, accent, 32, 17)   # emoji enmarcado (§5)
-	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_child(_center(tile))
-	var tl := _lbl(text, 12, UITheme.TEXT2, true, 700)
-	tl.clip_text = true
-	v.add_child(tl)
-	b.pressed.connect(cb)
-	return b
-
-func _nav_btn(icon: String, text: String, active: bool, cb: Callable) -> Button:
-	var b := Button.new()
-	b.flat = true
-	b.custom_minimum_size = Vector2(70, 52)
-	var col := UITheme.PRIMARY_EDGE if active else UITheme.MUTED
-	var v := VBoxContainer.new()
-	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.set_anchors_preset(Control.PRESET_FULL_RECT)
-	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_theme_constant_override("separation", -1)
-	b.add_child(v)
-	if active:
-		var bar := ColorRect.new()
-		bar.color = UITheme.PRIMARY_EDGE
-		bar.custom_minimum_size = Vector2(26, 3)
-		bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		v.add_child(bar)
-	v.add_child(_lbl(icon, 18, col, false, 600))
-	v.add_child(_lbl(text, 11, col, true, 700))
-	b.pressed.connect(cb)
+	b.custom_minimum_size = Vector2(44, 44)
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	UITheme.button_font(b, 19, INK_SOFT, false, 600)
+	b.add_theme_stylebox_override("normal", _card_style(Color(0, 0, 0, 0.06), 22))
+	b.add_theme_stylebox_override("hover", _card_style(Color(0, 0, 0, 0.12), 22))
+	var pr := _card_style(Color(0, 0, 0, 0.10), 22)
+	pr.bg_color = Color(0.94, 0.92, 0.86)
+	b.add_theme_stylebox_override("pressed", pr)
 	return b
 
 func _center(c: Control) -> CenterContainer:
