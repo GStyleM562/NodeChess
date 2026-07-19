@@ -975,6 +975,13 @@ func _show_settings() -> void:
 	scr.add_child(vb)
 	var t := _lbl("⚙ Configuración", 20, UITheme.GOLD, true, 800)
 	vb.add_child(t)
+	# VERSIÓN visible: para comprobar en el teléfono que el build instalado es
+	# el esperado. `config/version` la sincroniza el script del .aab con el
+	# versionCode; "red vN" es el protocolo online (debe coincidir en ambos).
+	var vlbl := _lbl("Versión %s  ·  red v%d" % [
+		String(ProjectSettings.get_setting("application/config/version", "?")),
+		NetSession.NET_BUILD], 12, UITheme.MUTED, false, 600)
+	vb.add_child(vlbl)
 
 	vb.add_child(_volume_row("Música", Settings.music_vol, func(v: float): Settings.set_music(v)))
 	vb.add_child(_volume_row("Sonidos (SFX)", Settings.sfx_vol, func(v: float):
