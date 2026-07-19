@@ -16,16 +16,19 @@ const CHEST_LOBBY := {
 }
 
 # --- TEMA CLARO del Home (solo esta pantalla; el resto del juego conserva el
-# tema oscuro de UITheme). Texto TINTA sobre tarjetas blancas con sombra.
+# tema oscuro de UITheme). Estilo "juicy" tipo TCG Pocket: fondo amarillo
+# cálido, tarjetas CREMA con LABIO inferior 3D (borde grueso abajo = botón
+# físico presionable) y brillo superior en los botones de modo.
 const INK := Color(0.24, 0.21, 0.13)          # texto principal sobre claro
 const INK_SOFT := Color(0.52, 0.47, 0.36)     # texto secundario
-const SUN := Color(1.0, 0.84, 0.33)           # amarillo del cielo
-const CARD_BG := Color(1, 1, 1, 0.97)         # tarjeta flotante
+const SUN := Color(1.0, 0.83, 0.30)           # amarillo del cielo
+const CARD_BG := Color(1.0, 0.985, 0.94)      # tarjeta crema
+const CARD_LIP := Color(0.86, 0.78, 0.56)     # labio inferior neutro (tarjetas)
 const DOT_RED := Color(0.94, 0.26, 0.30)      # punto de aviso
-const GREEN_OK := Color(0.10, 0.55, 0.28)     # "listo" legible sobre blanco
-const MODE_BLUE := Color(0.36, 0.63, 0.98)    # 🎲 Probar
-const MODE_GOLD := Color(1.0, 0.76, 0.16)     # ⚔ BATALLA (central)
-const MODE_PURPLE := Color(0.63, 0.48, 0.95)  # 🌐 Online (sala privada)
+const GREEN_OK := Color(0.10, 0.55, 0.28)     # "listo" legible sobre claro
+const MODE_BLUE := Color(0.30, 0.62, 0.97)    # 🎲 Probar
+const MODE_GOLD := Color(1.0, 0.74, 0.12)     # ⚔ BATALLA (central)
+const MODE_PURPLE := Color(0.62, 0.47, 0.95)  # 🌐 Online (sala privada)
 
 var _pivot: Node3D
 var _leader: Figure3D
@@ -212,7 +215,7 @@ func _build_env() -> void:
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.982, 0.952, 0.878)   # crema cálido (hall luminoso)
+	env.background_color = Color(0.972, 0.925, 0.72)   # amarillo cálido (mockup)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(1.0, 0.98, 0.92)
 	env.ambient_light_energy = 1.1
@@ -248,13 +251,13 @@ func _lead() -> int:
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
-	# CIELO: banda amarilla arriba que se funde con el crema del fondo, y un
-	# "suelo" blanco suave abajo que asienta los botones (como la referencia).
-	var sky := _vgrad(Color(SUN.r, SUN.g, SUN.b, 0.85), Color(SUN.r, SUN.g, SUN.b, 0.0))
+	# CIELO: banda amarilla intensa arriba que se funde con el fondo, y un
+	# "suelo" crema suave abajo que asienta los botones (como el mockup).
+	var sky := _vgrad(Color(SUN.r, SUN.g, SUN.b, 0.9), Color(SUN.r, SUN.g, SUN.b, 0.0))
 	sky.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	sky.offset_bottom = 300
+	sky.offset_bottom = 320
 	layer.add_child(sky)
-	var ground := _vgrad(Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.8))
+	var ground := _vgrad(Color(1.0, 0.97, 0.85, 0.0), Color(1.0, 0.97, 0.85, 0.9))
 	ground.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	ground.offset_top = -280
 	layer.add_child(ground)
@@ -810,18 +813,35 @@ func _chip(icon: String, value: String) -> Control:
 	return p
 
 # --------------------------------------------------- widgets del tema claro
-## Tarjeta flotante: blanca, borde tintado suave y sombra cálida.
-func _card_style(border: Color, radius := 18) -> StyleBoxFlat:
+## Tarjeta "chunky": crema con LABIO inferior 3D (borde grueso abajo, fino a
+## los lados) tintado con el acento — el look presionable del mockup.
+func _card_style(accent: Color, radius := 18) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = CARD_BG
 	sb.set_corner_radius_all(radius)
-	sb.set_border_width_all(2)
-	sb.border_color = Color(border.r, border.g, border.b, 0.35)
-	sb.shadow_color = Color(0.36, 0.28, 0.05, 0.16)
-	sb.shadow_size = 9
-	sb.shadow_offset = Vector2(0, 4)
+	sb.border_color = accent.lerp(CARD_LIP, 0.45)
+	sb.border_width_left = 2
+	sb.border_width_right = 2
+	sb.border_width_top = 2
+	sb.border_width_bottom = 7
+	sb.shadow_color = Color(0.45, 0.34, 0.06, 0.16)
+	sb.shadow_size = 6
+	sb.shadow_offset = Vector2(0, 3)
 	sb.set_content_margin_all(8)
+	sb.content_margin_bottom = 12
 	return sb
+
+## Brillo superior (gloss) que se FUNDE hacia abajo — da volumen sin verse
+## como una banda pegada (degradado blanco→transparente, insetado del borde).
+func _gloss(target: Control, _radius: int) -> void:
+	var g := _vgrad(Color(1, 1, 1, 0.30), Color(1, 1, 1, 0.0))
+	g.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	g.anchor_bottom = 0.55
+	g.offset_left = 7
+	g.offset_right = -7
+	g.offset_top = 5
+	g.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	target.add_child(g)
 
 ## Gradiente vertical (cielo/suelo).
 func _vgrad(top: Color, bottom: Color) -> TextureRect:
@@ -857,7 +877,7 @@ func _rail_card(icon: String, caption: String, accent: Color, cb: Callable, sub 
 	v.add_theme_constant_override("separation", 1)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(v)
-	var ic := _lbl(icon, 27, accent, false, 700)
+	var ic := _lbl(icon, 30, accent, false, 700)
 	v.add_child(ic)
 	var cap := _lbl(caption, 11, INK, true, 800)
 	cap.clip_text = true
@@ -872,6 +892,11 @@ func _rail_card(icon: String, caption: String, accent: Color, cb: Callable, sub 
 	b.pressed.connect(func():
 		Sfx.play("ui_click")
 		cb.call())
+	# se HUNDE al tocarla (botón físico, como los modos de abajo)
+	b.button_down.connect(func():
+		p.pivot_offset = p.size * 0.5
+		p.scale = Vector2(0.94, 0.94))
+	b.button_up.connect(func(): p.scale = Vector2.ONE)
 	p.add_child(b)
 	# punto rojo de aviso (arriba-derecha), oculto por defecto
 	var dot := Panel.new()
@@ -892,26 +917,33 @@ func _rail_card(icon: String, caption: String, accent: Color, cb: Callable, sub 
 	p.set_meta("dot", dot)
 	return p
 
-## Botón de MODO de juego: color vivo, bisel claro arriba y sombra profunda.
-## El central (big) lleva texto tinta sobre dorado y tipografía mayor.
+## Botón de MODO de juego EXTRUIDO (mockup): cara de color con brillo arriba y
+## LABIO inferior oscuro grueso; al presionar, el labio se encoge y la cara
+## baja — se siente un botón físico. El central (big) es mayor.
 func _mode_button(icon: String, title: String, sub: String, col: Color, big: bool) -> Button:
 	var b := Button.new()
+	var lip := col.darkened(0.32)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = col
 	sb.set_corner_radius_all(22)
-	sb.set_border_width_all(3)
-	sb.border_color = Color(1, 1, 1, 0.55)
-	sb.shadow_color = Color(col.r * 0.5, col.g * 0.5, col.b * 0.5, 0.45)
-	sb.shadow_size = 10
-	sb.shadow_offset = Vector2(0, 6)
+	sb.border_color = lip
+	sb.border_width_bottom = 9
+	sb.shadow_color = Color(lip.r, lip.g, lip.b, 0.35)
+	sb.shadow_size = 7
+	sb.shadow_offset = Vector2(0, 4)
+	sb.content_margin_bottom = 9
 	b.add_theme_stylebox_override("normal", sb)
 	b.add_theme_stylebox_override("hover", sb)
-	var pr: StyleBoxFlat = sb.duplicate()
-	pr.bg_color = col.darkened(0.12)
-	pr.shadow_size = 4
-	pr.shadow_offset = Vector2(0, 2)
-	b.add_theme_stylebox_override("pressed", pr)
 	b.add_theme_stylebox_override("focus", sb)
+	var pr: StyleBoxFlat = sb.duplicate()
+	pr.bg_color = col.darkened(0.10)
+	pr.border_width_bottom = 2
+	pr.content_margin_top = 7
+	pr.content_margin_bottom = 2
+	pr.shadow_size = 2
+	pr.shadow_offset = Vector2(0, 1)
+	b.add_theme_stylebox_override("pressed", pr)
+	_gloss(b, 22)
 	var fg := Color(0.28, 0.19, 0.02) if big else Color.WHITE
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
