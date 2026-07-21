@@ -39,6 +39,9 @@ var _level_slot: Control   # slot del cofre de NIVEL (oculto sin pendientes)
 var _reward_modal: CanvasLayer # popup 🎁 Recompensas (pre-construido, oculto)
 var _reward_state: Label   # estado en vivo bajo la tarjeta 🎁
 var _reward_dot: Control   # punto rojo de la tarjeta 🎁
+var _ad_cards := {}        # kind -> tarjeta de anuncio (para refrescar usos)
+var _coin_lbl: Label       # chip 🪙 de la barra superior (refresco tras anuncios)
+var _gem_lbl: Label        # chip 💎 de la barra superior
 
 func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
@@ -421,6 +424,7 @@ func _build_rails(layer: CanvasLayer) -> void:
 func _open_rewards() -> void:
 	Sfx.play("ui_click")
 	if _reward_modal != null and is_instance_valid(_reward_modal):
+		_refresh_ad_cards()
 		_reward_modal.visible = true
 
 ## Popup 🎁 Recompensas: los 3 cofres del lobby + acceso al Inventario. Se
@@ -449,12 +453,19 @@ func _build_reward_modal() -> void:
 	panel.custom_minimum_size = Vector2(minf(400.0, get_viewport().get_visible_rect().size.x - 28.0), 0)
 	panel.add_theme_stylebox_override("panel", _card_style(MODE_GOLD.darkened(0.05), 22))
 	cc.add_child(panel)
+	# Scroll: con cofres + anuncios + cajas por tipo el popup no cabe en pantallas
+	# bajas -> se desliza (arriba→abajo), como el resto de la UI.
+	var scr := ScrollContainer.new()
+	scr.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scr.custom_minimum_size = Vector2(0, minf(get_viewport().get_visible_rect().size.y * 0.8, 640.0))
+	panel.add_child(scr)
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 10)
-	panel.add_child(vb)
+	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vb.add_theme_constant_override("separation", 9)
+	scr.add_child(vb)
 	vb.add_child(_lbl("🎁 Recompensas", 19, INK, true, 800))
-	var hint := _lbl("Toca un cofre para abrirlo", 11, INK_SOFT, true, 700)
-	vb.add_child(hint)
+
+	# --- COFRES (gratis + ganados + nivel) ---
 	var slots := HBoxContainer.new()
 	slots.alignment = BoxContainer.ALIGNMENT_CENTER
 	slots.add_theme_constant_override("separation", 10)
@@ -466,13 +477,34 @@ func _build_reward_modal() -> void:
 			_level_slot = slot   # visible solo si hay cofres de nivel pendientes
 	var inv := Button.new()
 	inv.text = "📦 Inventario y descifrado"
-	inv.custom_minimum_size = Vector2(0, 48)
-	UITheme.button_font(inv, 15, Color(0.28, 0.19, 0.02), true, 800)
+	inv.custom_minimum_size = Vector2(0, 46)
+	UITheme.button_font(inv, 14, Color(0.28, 0.19, 0.02), true, 800)
 	UITheme.style_primary(inv, MODE_GOLD, 14)
 	inv.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/inventory.tscn"))
 	vb.add_child(inv)
-	var tiny := _lbl("Los cofres ganados se DESCIFRAN en el Inventario", 10, INK_SOFT, false, 600)
-	vb.add_child(tiny)
+
+	# --- 📺 ANUNCIOS (usos por día) ---
+	vb.add_child(_reward_hdr("📺 Anuncios · recursos gratis cada día"))
+	var adrow := HBoxContainer.new()
+	adrow.alignment = BoxContainer.ALIGNMENT_CENTER
+	adrow.add_theme_constant_override("separation", 8)
+	vb.add_child(adrow)
+	for kind in ["coins", "gems", "box"]:
+		adrow.add_child(_ad_card(kind))
+
+	# --- 🎁 CAJAS POR TIPO (compra + abre al momento) ---
+	vb.add_child(_reward_hdr("🎁 Cajas por tipo · consigue lo que buscas"))
+	var boxgrid := GridContainer.new()
+	boxgrid.columns = 2
+	boxgrid.add_theme_constant_override("h_separation", 8)
+	boxgrid.add_theme_constant_override("v_separation", 8)
+	vb.add_child(boxgrid)
+	for tid in ["figures", "attack", "passive", "random"]:
+		boxgrid.add_child(_buybox_card(tid))
+	var bhint := _lbl("Mejor rareza = más contenido. La Variada da de todo.", 10, INK_SOFT, false, 600)
+	bhint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(bhint)
+
 	var close := Button.new()
 	close.text = "Cerrar"
 	close.custom_minimum_size = Vector2(0, 40)
@@ -481,6 +513,147 @@ func _build_reward_modal() -> void:
 	close.pressed.connect(func(): _reward_modal.visible = false)
 	vb.add_child(close)
 	_refresh_chest_states()
+	_refresh_ad_cards()
+
+## Encabezado de sección dentro del popup de recompensas (tinta suave).
+func _reward_hdr(text: String) -> Label:
+	var l := _lbl(text, 12, INK_SOFT, true, 800)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	return l
+
+## Tarjeta de ANUNCIO: icono + nombre + "quedan N hoy"; toca para ver+reclamar.
+func _ad_card(kind: String) -> Control:
+	var spec: Dictionary = Inventory.AD_TYPES[kind]
+	var col: Color = MODE_GOLD if kind == "coins" else (Color(0.36, 0.7, 0.95) if kind == "gems" else Color(0.13, 0.62, 0.36))
+	var p := PanelContainer.new()
+	p.custom_minimum_size = Vector2(112, 92)
+	p.add_theme_stylebox_override("panel", _card_style(col, 14))
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 1)
+	p.add_child(v)
+	v.add_child(_lbl(String(spec["icon"]), 24, col, false, 700))
+	var nm := _lbl(String(spec["name"]), 10, INK, true, 800)
+	nm.clip_text = true
+	v.add_child(nm)
+	var left := _lbl("", 10, INK_SOFT, true, 700)
+	v.add_child(left)
+	p.set_meta("left", left)
+	var b := Button.new()
+	b.flat = true
+	b.set_anchors_preset(Control.PRESET_FULL_RECT)
+	b.pressed.connect(func(): _watch_ad(kind))
+	p.add_child(b)
+	_ad_cards[kind] = p
+	return p
+
+## Tarjeta de compra de CAJA por tipo: icono + nombre + precio.
+func _buybox_card(tid: String) -> Control:
+	var spec: Dictionary = Inventory.BOX_TYPES[tid]
+	var pr: Dictionary = Inventory.BOX_PRICE[tid]
+	var cc: Array = spec["col"]
+	var col := Color(cc[0], cc[1], cc[2])
+	var p := PanelContainer.new()
+	p.custom_minimum_size = Vector2(0, 62)
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	p.add_theme_stylebox_override("panel", _card_style(col, 14))
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 8)
+	p.add_child(h)
+	h.add_child(_lbl(String(spec["icon"]), 24, col, false, 700))
+	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	v.add_theme_constant_override("separation", 0)
+	h.add_child(v)
+	var nm := _lbl(String(spec["name"]).replace("Caja de ", "").replace("Caja ", ""), 12, INK, true, 800)
+	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	v.add_child(nm)
+	var cur_icon := "💎" if String(pr["cur"]) == "gems" else "🪙"
+	var price := _lbl("%s %d" % [cur_icon, int(pr["price"])], 11, INK_SOFT, true, 700)
+	price.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	v.add_child(price)
+	var b := Button.new()
+	b.flat = true
+	b.set_anchors_preset(Control.PRESET_FULL_RECT)
+	b.pressed.connect(func(): _buy_box(tid))
+	p.add_child(b)
+	return p
+
+## Ver un anuncio: breve simulación → reclama la recompensa de Inventory.
+func _watch_ad(kind: String) -> void:
+	if Inventory.ad_left(kind) <= 0:
+		_toast_msg("Sin usos hoy — vuelve mañana")
+		return
+	Sfx.play("ui_click")
+	# "reproducción" del anuncio: overlay breve, luego la recompensa
+	var layer := CanvasLayer.new()
+	layer.layer = 42
+	add_child(layer)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.8)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	layer.add_child(dim)
+	var msg := _lbl("📺 Viendo anuncio…", 20, Color.WHITE, true, 800)
+	msg.set_anchors_preset(Control.PRESET_CENTER)
+	layer.add_child(msg)
+	await get_tree().create_timer(1.4).timeout
+	layer.queue_free()
+	var res: Dictionary = Inventory.watch_ad(kind)
+	if not bool(res.get("ok", false)):
+		_toast_msg("Sin usos hoy — vuelve mañana")
+		return
+	_refresh_topbar_funds()
+	_refresh_ad_cards()
+	if kind == "box":
+		var box: Dictionary = res.get("box", {})
+		_show_box_reward("random", box)
+	elif kind == "coins":
+		_toast_msg("🪙 +%d monedas" % int(res.get("coins", 0)))
+	else:
+		_toast_msg("💎 +%d diamantes" % int(res.get("gems", 0)))
+
+## Comprar+abrir una caja por tipo.
+func _buy_box(tid: String) -> void:
+	var res: Dictionary = Inventory.buy_box(tid)
+	if not bool(res.get("ok", false)):
+		_toast_msg(String(res.get("error", "No se pudo")))
+		return
+	Sfx.play("ui_click")
+	_refresh_topbar_funds()
+	_show_box_reward(tid, res.get("box", {}))
+
+## Muestra las piezas de una caja abierta reutilizando la animación de cofre.
+func _show_box_reward(tid: String, box: Dictionary) -> void:
+	var lines: Array = []
+	for key in box.get("pieces", []):
+		lines.append("%s %s" % [_piece_icon(String(key)), Inventory.piece_name(String(key))])
+	if int(box.get("gems", 0)) > 0:
+		lines.append("💎 +%d ¡DIAMANTES!" % int(box["gems"]))
+	# reusa la animación con el color/icono del tipo (o del cofre "won" por defecto)
+	var col: Color = MODE_GOLD
+	if Inventory.BOX_TYPES.has(tid):
+		var cc: Array = Inventory.BOX_TYPES[tid]["col"]
+		col = Color(cc[0], cc[1], cc[2])
+	_open_reward_anim(String(Inventory.BOX_TYPES.get(tid, {}).get("icon", "📦")), col, lines)
+
+## Refresca los contadores "quedan N hoy" de las tarjetas de anuncio.
+func _refresh_ad_cards() -> void:
+	for kind in _ad_cards.keys():
+		var card = _ad_cards[kind]
+		if is_instance_valid(card) and card.has_meta("left"):
+			var l: Label = card.get_meta("left")
+			var n := Inventory.ad_left(kind)
+			l.text = ("quedan %d hoy" % n) if n > 0 else "agotado hoy"
+			l.add_theme_color_override("font_color", INK_SOFT if n > 0 else DOT_RED)
+
+## Refresca los chips 🪙/💎 de la barra superior tras ganar recursos.
+func _refresh_topbar_funds() -> void:
+	if _coin_lbl != null and is_instance_valid(_coin_lbl):
+		_coin_lbl.text = str(Inventory.coins)
+	if _gem_lbl != null and is_instance_valid(_gem_lbl):
+		_gem_lbl.text = str(Inventory.gems)
 
 ## Slot de cofre del popup 🎁: tarjeta blanca con borde de color + estado en vivo.
 func _chest_slot(id: String) -> Control:
@@ -571,7 +744,11 @@ func _toast_msg(text: String) -> void:
 ## recompensas van saltando una por una.
 func _open_chest_anim(id: String, lines: Array) -> void:
 	var st: Dictionary = CHEST_LOBBY[id]
-	var col: Color = st["col"]
+	_open_reward_anim(String(st["icon"]), st["col"], lines)
+
+## Animación de apertura genérica (icono + color + recompensas). La usan los
+## cofres del lobby, las cajas por tipo compradas y el anuncio de caja.
+func _open_reward_anim(icon: String, col: Color, lines: Array) -> void:
 	Sfx.play("rankup")
 	var layer := CanvasLayer.new()
 	layer.layer = 40
@@ -594,7 +771,7 @@ func _open_chest_anim(id: String, lines: Array) -> void:
 	glow.modulate.a = 0.0
 	layer.add_child(glow)
 	# el cofre
-	var chest := _lbl(String(st["icon"]), 84, col.lightened(0.15), false, 800)
+	var chest := _lbl(icon, 84, col.lightened(0.15), false, 800)
 	chest.set_anchors_preset(Control.PRESET_CENTER)
 	chest.offset_left = -80
 	chest.offset_right = 80
@@ -795,7 +972,8 @@ func _avatar() -> Control:
 	p.add_child(l)
 	return p
 
-## Píldora blanca de saldo (🪙/💎) — flotante, texto tinta.
+## Píldora blanca de saldo (🪙/💎) — flotante, texto tinta. Guarda la etiqueta
+## del valor para poder refrescarla al ganar recursos por anuncios.
 func _chip(icon: String, value: String) -> Control:
 	var p := PanelContainer.new()
 	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -809,7 +987,12 @@ func _chip(icon: String, value: String) -> Control:
 	h.add_theme_constant_override("separation", 4)
 	p.add_child(h)
 	h.add_child(_lbl(icon, 14, INK, false, 600))
-	h.add_child(_lbl(value, 14, INK, true, 800))
+	var val := _lbl(value, 14, INK, true, 800)
+	h.add_child(val)
+	if icon == "🪙":
+		_coin_lbl = val
+	elif icon == "💎":
+		_gem_lbl = val
 	return p
 
 # --------------------------------------------------- widgets del tema claro

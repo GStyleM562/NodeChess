@@ -44,6 +44,36 @@ const BOX_TYPES := {
 		"prefixes": []},   # vacío = cualquier pieza del catálogo
 }
 
+## Precio CANÓNICO de comprar+abrir una caja de un tipo (tier fijo). La UI solo
+## lo muestra; el cobro lo decide aquí (anti-trampa). Variada barata en 🪙.
+const BOX_PRICE := {
+	"figures": {"cur": "gems", "price": 25, "tier": 1},
+	"attack": {"cur": "gems", "price": 12, "tier": 1},
+	"passive": {"cur": "gems", "price": 18, "tier": 1},
+	"random": {"cur": "coins", "price": 200, "tier": 1},
+}
+
+## Compra ATÓMICA de una caja por tipo: valida fondos, cobra y la abre al momento.
+## -> {"ok", "box": {pieces,gems,type}} · {"ok": false, "error"} si faltan fondos.
+func buy_box(type_id: String) -> Dictionary:
+	_ensure_loaded()
+	if not BOX_PRICE.has(type_id):
+		return {"ok": false, "error": "Caja desconocida."}
+	var spec: Dictionary = BOX_PRICE[type_id]
+	var price := int(spec["price"])
+	var cur := String(spec["cur"])
+	if cur == "gems":
+		if gems < price:
+			return {"ok": false, "error": "Te faltan 💎 (%d/%d)." % [gems, price]}
+		gems -= price
+	else:
+		if coins < price:
+			return {"ok": false, "error": "Te faltan 🪙 (%d/%d)." % [coins, price]}
+		coins -= price
+	var box := open_box(type_id, int(spec["tier"]))   # open_box guarda
+	_log_tx({"k": "comprar_caja", "type": type_id, "price": price, "cur": cur})
+	return {"ok": true, "box": box}
+
 ## Pool del catálogo filtrado por el TIPO de caja (prefijos vacíos = todo).
 func box_pool(type_id: String) -> Array:
 	var spec: Dictionary = BOX_TYPES.get(type_id, BOX_TYPES["random"])
