@@ -90,9 +90,15 @@ func graph_dist(a: int, b: int) -> int:
 		frontier = nxt
 	return 99
 
+## Factor de SEPARACIÓN visual de los nodos (2026-07-20). Aparta todos los
+## nodos del centro para que haya MÁS camino entre ellos, sin cambiar cuántos
+## nodos/aristas hay (la topología es idéntica). La isla y el espejo se
+## reescalan solos; la cámara del tablero se aleja el mismo factor.
+const SPACING := 1.22
+
 func _add(pos: Vector3) -> int:
 	var id := nodes.size()
-	nodes.append({"id": id, "pos": pos, "role": "normal"})
+	nodes.append({"id": id, "pos": pos * SPACING, "role": "normal"})
 	adj[id] = []
 	return id
 

@@ -295,7 +295,10 @@ func _build_environment() -> void:
 	_cam.keep_aspect = Camera3D.KEEP_WIDTH
 	_cam.fov = 34.0
 	# Camera on the player's side: player sits at the BOTTOM, enemy at the top.
-	_cam.look_at_from_position(Vector3(0.0, 11.5, -11.0), Vector3.ZERO, Vector3.UP)
+	# Cámara alejada ~1.15× para encuadrar los nodos ya separados (MapData.SPACING
+	# 1.22). Menos que el factor a propósito: así el tablero llena algo más el
+	# ancho y se APRECIA la separación en pantalla, sin recortar los bordes.
+	_cam.look_at_from_position(Vector3(0.0, 13.2, -12.65), Vector3.ZERO, Vector3.UP)
 	add_child(_cam)
 	_combat_cam = Camera3D.new()
 	_combat_cam.keep_aspect = Camera3D.KEEP_WIDTH
@@ -1860,10 +1863,10 @@ func _unhandled_input(event: InputEvent) -> void:
 func _zoom(mult: float) -> void:
 	var p := _cam.position * mult
 	var d := p.length()
-	if d < 7.0:
-		p = p.normalized() * 7.0
-	elif d > 26.0:
-		p = p.normalized() * 26.0
+	if d < 8.0:
+		p = p.normalized() * 8.0
+	elif d > 30.0:
+		p = p.normalized() * 30.0
 	_cam.position = p
 
 func _node_under_cursor(mouse: Vector2) -> int:
