@@ -1,10 +1,26 @@
 # PENDIENTES — Vuelta 02 (lo que queda POR agregar)
 
 > Estado tras cerrar la Vuelta01 + economía + FULL tutorial + Modo Robot.
-> Última revisión: 2026-07-13. Cruzado contra el GDD completo
+> Última revisión: **2026-07-20**. Cruzado contra el GDD completo
 > (`GDD_Context_Summary.md` y Parts 1–5), el CHANGELOG y los docs de
 > balance/testing. Prioridades: **P0** = para la prueba pública ·
 > **P1** = para el lanzamiento · **P2** = post-lanzamiento / si hay tracción.
+
+---
+
+## ✅ CERRADO desde la última revisión (13→20 jul)
+- **Piece Points F1–F5** completo (medidor, presupuesto/candado, clases con
+  efectos, modelo innato, evolución +30%/castigo). Falta solo F6 (telemetría,
+  post-lanzamiento).
+- **Online ARREGLADO de raíz** (Render corría un server viejo que vaciaba los
+  mazos): formato de red v24 slim + rehidratación + diagnóstico visible;
+  verificado en vivo contra Render (start 6/6). Falta: prueba humana en 2
+  teléfonos (P0, ver abajo).
+- **Tema "JUICY HALL" global** (todas las pantallas + HUD del tablero) con
+  reglas canónicas en `docs/UIUX_Juicy_Hall.md`.
+- **Home rediseñado** (carriles + trío de modos), **equipo 2×3** en el Deck
+  Builder, **label de versión** en Configuración, **nodos de mapa separados**
+  1.22× (más camino, misma topología).
 
 ---
 
@@ -24,14 +40,8 @@
 - Iconografía propia para piezas/cofres/botones (hoy emojis enmarcados).
 - Clips de ataque extra por figura (el sistema de clips ya los soporta).
 
-## ⚖ P1 — Piece Points / Construcción de personajes (PLAN v2 EXHAUSTIVO listo:
-## `Balance_PiecePoints.md` — pendiente APROBAR §10 y luego codificar F1–F6)
-1. **F1 Medidor**: `pp_cost`/`pp_budget` + barra y desglose en Creador/Dex (solo informa; calibrar vs los 8 integrados).
-2. **F2 Presupuesto real**: guardar exige PC ≤ presupuesto (candado de guardado ya existe).
-3. **F3 Clases con efectos**: buffs/debuffs en partida (Ágil +1⚡/−10 daño, etc.).
-4. **F4 Modelo innato**: pasivas/resistencias ocultas gratis que superan topes.
-5. **F5 Evolución**: checkbox +30% budget + castigo (mitad de todo, sin pasivas) al usarla sin evolucionar.
-6. **F6 Telemetría** para el ajuste 55/45.
+## ⚖ Piece Points — ✅ F1–F5 HECHAS (ver `Balance_PiecePoints.md`)
+Solo queda **F6 Telemetría** (P2, post-lanzamiento) para el ajuste 55/45.
 
 ## 🧩 P1 — Contenido del GDD aún no implementado
 | Sistema | GDD | Estado hoy |
@@ -70,12 +80,17 @@
 
 ---
 
-## El orden que recomiendo para la Vuelta 02 (actualizado 2026-07-13)
-1. ~~Modo Robot + burn-in~~ ✅ HECHO.
-2. **Robot recorre las 11 lecciones del tutorial** (cierra el hueco que dejó
-   pasar el crash del 👉; media tanda).
-3. **Prueba de actualización** + checklist humana en 2 teléfonos → subir a Play.
-4. **Piece Points F1 (medidor)** — barato y le da identidad al Creador.
-5. **Puzzle Battles + 2-3 tutoriales temáticos** (contenido barato con el motor actual).
-6. **Duplicados→fragmentos + misiones diarias** (cierra el loop económico).
-7. Lo demás según feedback de los testers.
+## El orden que recomiendo para la Vuelta 02 (actualizado 2026-07-20)
+1. ~~Modo Robot + burn-in~~ ✅ · ~~Piece Points F1–F5~~ ✅ · ~~Online (raíz)~~ ✅
+   · ~~Tema/HUD global~~ ✅
+2. **Prueba ONLINE en 2 teléfonos** (P0 — pendiente de Gojan; el server ya está
+   en v24). Luego checklist humana + prueba de actualización → subir a Play.
+3. **Editar nombre/avatar del Perfil** (P1, barato): hoy es "Jugador"/"P1"
+   hardcodeado; el lápiz ✎ ya es placeholder y el nombre ya viaja al online.
+4. **Robot recorre las 11 lecciones del tutorial** (cierra el hueco donde vivió
+   el crash del 👉; media tanda).
+5. **Duplicados→fragmentos** (cierra el loop económico) + **lección de Rank-Up**.
+6. **Puzzle Battles** (contenido barato con el motor actual).
+7. Decisiones de DISEÑO de Gojan (no las toco sin su OK): qué da cada CLASE,
+   si el PvP se bloquea hasta nivel 10, y el plan de monetización (IAP/anuncios).
+8. Lo demás según feedback de los testers.

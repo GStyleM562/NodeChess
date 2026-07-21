@@ -13,6 +13,23 @@ var combat_speed := 1    # 1 = normal · 2 = combates al doble de velocidad
 var colorblind := false  # paleta alternativa + símbolos por color de ataque
 var tutorial_done := false
 var tuts_done: Array = []   # capítulos del FULL tutorial superados (ids)
+var player_name := "Jugador"   # nombre del jugador (Perfil/Home/online)
+
+## Nombre saneado (1–16 chars, sin vacíos). Fallback "Jugador".
+func name_or_default() -> String:
+	var n := player_name.strip_edges()
+	return n if n != "" else "Jugador"
+
+## Iniciales para el avatar (hasta 2 letras de las primeras palabras).
+func name_initials() -> String:
+	var parts := name_or_default().split(" ", false)
+	if parts.size() >= 2:
+		return (parts[0].substr(0, 1) + parts[1].substr(0, 1)).to_upper()
+	return name_or_default().substr(0, 2).to_upper()
+
+func set_player_name(v: String) -> void:
+	player_name = v.strip_edges().substr(0, 16)
+	_save()
 
 func _ready() -> void:
 	_load()
@@ -86,11 +103,12 @@ func _load() -> void:
 		colorblind = bool(data.get("cb", false))
 		tutorial_done = bool(data.get("tut", false))
 		tuts_done = data.get("tuts", [])
+		player_name = String(data.get("pname", "Jugador"))
 
 func _save() -> void:
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
 	if f != null:
 		f.store_string(JSON.stringify({"music": music_vol, "sfx": sfx_vol, "board": board_view,
 			"favs": favorites, "cpu": cpu_level, "speed": combat_speed, "cb": colorblind,
-			"tut": tutorial_done, "tuts": tuts_done}))
+			"tut": tutorial_done, "tuts": tuts_done, "pname": player_name}))
 		f.close()

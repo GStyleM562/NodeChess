@@ -318,7 +318,7 @@ func _build_topbar(layer: CanvasLayer) -> void:
 	who.add_theme_constant_override("separation", 1)
 	who.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	ih.add_child(who)
-	var nm := _lbl("Jugador", 14, INK, true, 800)
+	var nm := _lbl(Settings.name_or_default(), 14, INK, true, 800)
 	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	who.add_child(nm)
 	var lvrow := HBoxContainer.new()
@@ -789,7 +789,7 @@ func _avatar() -> Control:
 	sb.set_border_width_all(3)
 	sb.border_color = MODE_GOLD
 	p.add_theme_stylebox_override("panel", sb)
-	var l := _lbl("P1", 14, Color.WHITE, true, 800)
+	var l := _lbl(Settings.name_initials(), 14, Color.WHITE, true, 800)
 	l.set_anchors_preset(Control.PRESET_FULL_RECT)
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	p.add_child(l)

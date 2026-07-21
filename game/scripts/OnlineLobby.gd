@@ -65,7 +65,7 @@ func _ready() -> void:
 	_panel_connect = VBoxContainer.new()
 	_panel_connect.add_theme_constant_override("separation", 8)
 	root.add_child(_panel_connect)
-	_name = _field(_panel_connect, "Tu nombre", "Jugador")
+	_name = _field(_panel_connect, "Tu nombre", Settings.name_or_default())
 	# Servidor: campo OCULTO (el usuario no debe verlo/tocarlo). Sigue funcional
 	# con la URL guardada o la del relay por defecto.
 	_url = LineEdit.new()

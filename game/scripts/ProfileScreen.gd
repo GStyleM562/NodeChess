@@ -75,7 +75,7 @@ func _build_identity(body: VBoxContainer) -> void:
 	sb.border_color = UITheme.GOLD
 	av.add_theme_stylebox_override("panel", sb)
 	var ini := Label.new()
-	ini.text = "P1"
+	ini.text = Settings.name_initials()
 	ini.set_anchors_preset(Control.PRESET_FULL_RECT)
 	ini.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ini.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -89,7 +89,7 @@ func _build_identity(body: VBoxContainer) -> void:
 	who.add_theme_constant_override("separation", 3)
 	hb.add_child(who)
 	var nm := Label.new()
-	nm.text = "Jugador"
+	nm.text = Settings.name_or_default()
 	UITheme.label(nm, 18, UITheme.TEXT, true, 800)
 	who.add_child(nm)
 	var xpbar := ProgressBar.new()
@@ -106,15 +106,42 @@ func _build_identity(body: VBoxContainer) -> void:
 	lv.text = "Nivel %d  ·  %d/%d XP" % [Inventory.level, Inventory.xp, Inventory.xp_needed()]
 	UITheme.label(lv, 12, UITheme.MUTED, false, 600)
 	who.add_child(lv)
-	# lápiz (editar nombre: próximamente)
+	# lápiz: editar el nombre (se refleja en avatar, Home y online)
 	var pen := Button.new()
 	pen.text = "✎"
 	pen.custom_minimum_size = Vector2(44, 44)
 	pen.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	UITheme.button_font(pen, 16, UITheme.TEXT2, false, 600)
 	UITheme.style_surface(pen, UITheme.SURFACE2, UITheme.BORDER, 11)
-	pen.pressed.connect(func(): _toast_msg("✎ Editar perfil — próximamente"))
+	pen.pressed.connect(func(): _edit_name(nm, ini))
 	hb.add_child(pen)
+
+## Diálogo para editar el nombre del jugador (1–16 chars). Al aceptar, guarda
+## en Settings y refresca el nombre + iniciales del avatar en vivo.
+func _edit_name(nm: Label, ini: Label) -> void:
+	var dlg := AcceptDialog.new()
+	dlg.title = "Editar nombre"
+	dlg.ok_button_text = "Guardar"
+	dlg.add_cancel_button("Cancelar")
+	var le := LineEdit.new()
+	le.text = Settings.name_or_default()
+	le.max_length = 16
+	le.custom_minimum_size = Vector2(300, 44)
+	le.add_theme_stylebox_override("normal", UITheme.input())
+	le.add_theme_stylebox_override("focus", UITheme.input(UITheme.INPUT_BG, UITheme.PRIMARY))
+	le.add_theme_color_override("font_color", UITheme.TEXT)
+	le.add_theme_color_override("caret_color", UITheme.PRIMARY_EDGE)
+	dlg.add_child(le)
+	var apply := func():
+		Settings.set_player_name(le.text)
+		nm.text = Settings.name_or_default()
+		ini.text = Settings.name_initials()
+	dlg.confirmed.connect(apply)
+	le.text_submitted.connect(func(_t): apply.call(); dlg.hide())
+	add_child(dlg)
+	dlg.popup_centered()
+	le.grab_focus()
+	le.select_all()
 
 # ---------------------------------------------------------------- estadísticas
 func _build_stats(body: VBoxContainer) -> void:
