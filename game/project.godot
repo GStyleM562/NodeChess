@@ -25,6 +25,7 @@ Music="*res://scripts/Music.gd"
 Sfx="*res://scripts/Sfx.gd"
 Settings="*res://scripts/Settings.gd"
 Inventory="*res://scripts/Inventory.gd"
+Ads="*res://scripts/Ads.gd"
 
 [display]
 

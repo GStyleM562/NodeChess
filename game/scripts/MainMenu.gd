@@ -592,20 +592,29 @@ func _watch_ad(kind: String) -> void:
 		_toast_msg("Sin usos hoy — vuelve mañana")
 		return
 	Sfx.play("ui_click")
-	# "reproducción" del anuncio: overlay breve, luego la recompensa
-	var layer := CanvasLayer.new()
-	layer.layer = 42
-	add_child(layer)
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.8)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	layer.add_child(dim)
-	var msg := _lbl("📺 Viendo anuncio…", 20, Color.WHITE, true, 800)
-	msg.set_anchors_preset(Control.PRESET_CENTER)
-	layer.add_child(msg)
-	await get_tree().create_timer(1.4).timeout
-	layer.queue_free()
+	# ANUNCIO: si hay plugin AdMob, muestra uno REAL; si no, overlay simulado.
+	# La recompensa se da SOLO si el usuario lo completa (Ads.show_rewarded).
+	var completed := true
+	if Ads.available():
+		completed = await Ads.show_rewarded()
+	else:
+		var layer := CanvasLayer.new()
+		layer.layer = 42
+		add_child(layer)
+		var dim := ColorRect.new()
+		dim.color = Color(0, 0, 0, 0.8)
+		dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+		dim.mouse_filter = Control.MOUSE_FILTER_STOP
+		layer.add_child(dim)
+		var msg := _lbl("📺 Viendo anuncio…", 20, Color.WHITE, true, 800)
+		msg.set_anchors_preset(Control.PRESET_CENTER)
+		layer.add_child(msg)
+		completed = await Ads.show_rewarded()
+		await get_tree().create_timer(1.4).timeout
+		layer.queue_free()
+	if not completed:
+		_toast_msg("Anuncio no completado — sin recompensa")
+		return
 	var res: Dictionary = Inventory.watch_ad(kind)
 	if not bool(res.get("ok", false)):
 		_toast_msg("Sin usos hoy — vuelve mañana")
