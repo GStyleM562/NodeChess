@@ -5,7 +5,7 @@ extends Control
 var _team: Array = []
 var _map_index := 0
 var _mods: Array = []
-var _team_box: HBoxContainer
+var _team_box: GridContainer
 var _avail_box: VBoxContainer
 var _map_box: HBoxContainer
 var _modsel_box: GridContainer
@@ -96,17 +96,13 @@ func _ready() -> void:
 	# 1) TU EQUIPO primero: armar el mazo es LO principal de esta pantalla.
 	var sec_team := _panel_section(body_vb)
 	sec_team.add_child(_hdr("TU EQUIPO  ·  toca una carta para quitarla"))
-	# Scroll HORIZONTAL con barra visible: 6 cartas no caben de golpe (§9.1).
-	var team_scroll := ScrollContainer.new()
-	team_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	team_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
-	team_scroll.custom_minimum_size = Vector2(0, 84)
-	team_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sec_team.add_child(team_scroll)
-	_team_box = HBoxContainer.new()
-	_team_box.add_theme_constant_override("separation", 8)
-	team_scroll.add_child(_team_box)
-	_theme_scrollbar(team_scroll.get_h_scroll_bar())
+	# Rejilla 2×3: las 6 cartas caben ENTERAS sin scroll (§9.1 actualizado).
+	_team_box = GridContainer.new()
+	_team_box.columns = 3
+	_team_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_team_box.add_theme_constant_override("h_separation", 8)
+	_team_box.add_theme_constant_override("v_separation", 8)
+	sec_team.add_child(_team_box)
 
 	# 2) DISPONIBLES enseguida (sin scroll anidado: se desliza con el cuerpo).
 	body_vb.add_child(_hdr("DISPONIBLES  ·  toca para añadir"))
@@ -520,7 +516,8 @@ func _refresh() -> void:
 		c.queue_free()
 	for slot in Loadout.DECK_SIZE:
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(96, 66)
+		b.custom_minimum_size = Vector2(0, 72)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL   # 3 columnas iguales
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		if slot < _team.size():
 			var fd: Dictionary = Roster.FIGURES[_team[slot]]
