@@ -10,7 +10,13 @@
 - [x] **Salto**: a veces atravesaba rivales. Arreglado (move_path respeta el
       candado; arco Bézier por encima). test_jump reforzado. (commit 4c66707)
 - [ ] **Tutoriales de gameplay**: verificar que las 11 lecciones cargan y
-      avanzan sin crash EN VIVO (Board3D), no solo la data.
+      avanzan sin crash EN VIVO (Board3D), no solo la data. (PENDIENTE)
+
+### HECHO en esta vuelta
+- [x] B. Cajas por tipo (motor + tienda en Recompensas). commits 845e47d,0ce71e6
+- [x] C. Anuncios diarios (🪙/💎/caja). commit 0ce71e6
+- [x] D. Tutorial META "Progreso" (+ kit regalado). commit 6860948
+- [x] E. Matchmaking "Encontrar rival" (server v25 + cliente). ⚠ falta redeploy.
 
 ### B. Sistema de CAJAS por tipo (rediseño)  ← base de C y D
 - Agrupar para NO tener demasiados tipos, pero poder buscar lo que quieres:

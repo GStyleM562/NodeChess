@@ -133,6 +133,21 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- 🌐⚡ MATCHMAKING "Encontrar rival" (server v25): además de crear sala, botón que
+  empareja con un rival RANDOM (cola de 1 en el relay) y AUTO-INICIA la partida.
+  server.js: casos `find`/`cancel_find` + `waiting`; NetClient.find_match/
+  cancel_find + señales searching/matched; OnlineLobby con el botón y el flujo.
+  NET_BUILD=25 (mazos compatibles). Probado end-to-end vs server local
+  (test_matchmaking). ⚠ REQUIERE redeploy de Render a v25 (Manual Deploy).
+- 🎁📦📺 CAJAS POR TIPO + ANUNCIOS + TUTORIAL META: (1) cajas figures/attack/
+  passive/random × rareza (open_box), cofres ganados tipados, tienda de cajas y
+  anuncios diarios (🪙/💎/caja) en el popup Recompensas. (2) Aula gana la
+  categoría "Progreso": recursos, cajas, inventario y "Crea tu personaje" que
+  REGALA el kit de piezas cada vez. Tests test_boxes + test_full_tutorial.
+- 🦘 FIX SALTO: move_path respetaba el candado del salto solo a medias (una figura
+  sin estamina podía "cruzar" un rival); arco de salto ahora Bézier por encima
+  del rival (antes rozaba en saltos en L). test_jump reforzado con aserciones.
+  Nodos de mapa separados 1.22× (más camino). Nombre de jugador editable.
 - 🎨🌍 TEMA "JUICY HALL" EN TODO EL JUEGO: la piel del Home se volvió el tema
   GLOBAL vía `UITheme.gd` (paleta clara cálida + labio 3D en panel/primary/
   surface/chip/pill + sombra cálida + pressed que "baja"). Barrido de hardcodes

@@ -19,6 +19,9 @@ signal player_left(id: int)
 signal rejoined(code: String, you: int, map: int)
 signal peer_status(seat: int, online: bool)
 signal rematch_wait(seat: int)
+signal searching                                   # en cola de matchmaking
+signal search_cancelled                            # salió de la cola
+signal matched(code: String, you: int, players: Array)   # emparejado (antes del start)
 
 ## Ventana total de reintentos para el arranque en frio de Render free (~30-60s).
 ## Son "var" (no const) para que los tests puedan acortarlas.
@@ -207,6 +210,12 @@ func _handle(text: String) -> void:
 			peer_status.emit(int(data.get("seat", -1)), bool(data.get("online", true)))
 		"rematch_wait":
 			rematch_wait.emit(int(data.get("seat", -1)))
+		"searching":
+			searching.emit()
+		"search_cancelled":
+			search_cancelled.emit()
+		"matched":
+			matched.emit(String(data["code"]), int(data["you"]), data.get("players", []))
 		"error":
 			error_msg.emit(String(data.get("msg", "Error")))
 
@@ -232,6 +241,14 @@ func set_map(map: int) -> void:
 
 func start_match() -> void:
 	_send({"t": "start"})
+
+## MATCHMAKING: buscar un rival al azar (cola en el relay). El server empareja
+## y AUTO-INICIA (llega "matched" y enseguida "start"). `deck` opaco como create.
+func find_match(pname: String, deck, map: int) -> void:
+	_send({"t": "find", "name": pname, "deck": deck, "map": map})
+
+func cancel_find() -> void:
+	_send({"t": "cancel_find"})
 
 func send_action(action: Dictionary) -> void:
 	_send({"t": "action", "action": action})

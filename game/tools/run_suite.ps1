@@ -31,7 +31,7 @@ $fails = 0
 $tests = Get-ChildItem (Join-Path $gameDir "tools") -Filter "test_*.gd" | Sort-Object Name
 foreach ($t in $tests) {
     if (-not $IncludeLive -and $t.BaseName -eq "test_net_live") { continue }
-    if (-not $nodeCmd -and $t.BaseName -eq "test_net") {
+    if (-not $nodeCmd -and ($t.BaseName -eq "test_net" -or $t.BaseName -eq "test_matchmaking")) {
         "{0,-24} SALTADO (sin Node)" -f $t.BaseName
         continue
     }

@@ -14,12 +14,13 @@ const { WebSocketServer } = require("ws");
 const PORT = process.env.PORT || 8080;
 const rooms = new Map(); // code -> room
 let nextId = 1;
+let waiting = null; // matchmaking: {ws, player} esperando rival (cola de 1)
 
 // Version VISIBLE en el health check: permite verificar DESDE FUERA que Render
 // corre este build. (El bug historico del online fue justo este: Render se
 // quedo con el server del 1-jul que solo aceptaba mazos Array y convertia los
 // {team, lib} en [] -> el start viajaba SIN mazos -> ambos clientes abortaban.)
-const VERSION = "v24";
+const VERSION = "v25";
 
 const server = http.createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/plain" });
@@ -67,6 +68,8 @@ wss.on("connection", (ws) => {
 // Corte de socket: en partida INICIADA damos 90 s de gracia para RECONECTAR
 // (el rival ve "offline"); fuera de partida es un leave normal.
 function dropped(ws) {
+  // salir de la cola de matchmaking si estaba esperando
+  if (waiting && waiting.ws === ws) waiting = null;
   const code = ws.nc && ws.nc.room;
   if (!code) return;
   const room = rooms.get(code);
@@ -94,6 +97,41 @@ function handle(ws, msg) {
       ws.nc.room = code;
       send(ws, { t: "created", code, you: 0, map: room.map, players: playerList(room) });
       console.log(`[${code}] creada por ${p.name}`);
+      break;
+    }
+    case "find": {
+      // MATCHMAKING: empareja con quien espere; si no hay nadie, quedas en cola.
+      if (waiting && waiting.ws === ws) return; // ya en cola
+      if (waiting && waiting.ws.readyState === waiting.ws.OPEN) {
+        const host = waiting.player; // el que esperaba = anfitrion (seat 0)
+        const hostWs = waiting.ws;
+        waiting = null;
+        const guest = mkPlayer(ws, msg, 1);
+        const code = genCode();
+        const room = { code, players: [host, guest], started: false, seed: 0, map: (msg.map | 0), hostId: host.id };
+        rooms.set(code, room);
+        hostWs.nc.room = code;
+        ws.nc.room = code;
+        send(hostWs, { t: "matched", code, you: 0, players: playerList(room) });
+        send(ws, { t: "matched", code, you: 1, players: playerList(room) });
+        // AUTO-START inmediato (quickmatch: directo al tablero)
+        room.started = true;
+        room.seed = ((Math.random() * 2147483646) + 1) | 0;
+        const decks = room.players.map((p) => ({ seat: p.seat, name: p.name, deck: p.deck }));
+        broadcast(room, { t: "start", seed: room.seed, map: room.map, decks });
+        console.log(`[${code}] MATCH rapido ${host.name} vs ${guest.name}`);
+      } else {
+        waiting = { ws, player: mkPlayer(ws, msg, 0) };
+        send(ws, { t: "searching" });
+        console.log(`[cola] ${waiting.player.name} buscando rival`);
+      }
+      break;
+    }
+    case "cancel_find": {
+      if (waiting && waiting.ws === ws) {
+        waiting = null;
+        send(ws, { t: "search_cancelled" });
+      }
       break;
     }
     case "join": {

@@ -73,6 +73,15 @@ func _ready() -> void:
 	_url.visible = false
 	_panel_connect.add_child(_url)
 	_panel_connect.add_child(_deck_card())
+	# ENCONTRAR RIVAL (matchmaking): empareja con alguien al azar y arranca solo.
+	var findb := _button("⚡ ENCONTRAR RIVAL", UITheme.PRIMARY)
+	findb.pressed.connect(_on_find)
+	_panel_connect.add_child(findb)
+	var orlbl := Label.new()
+	orlbl.text = "— o juega con un amigo —"
+	orlbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(orlbl, 11, UITheme.MUTED, false, 600)
+	_panel_connect.add_child(orlbl)
 	var create := _button("CREAR SALA", UITheme.SUCCESS)
 	create.pressed.connect(_on_create)
 	_panel_connect.add_child(create)
@@ -142,6 +151,9 @@ func _wire(c) -> void:
 	c.players_updated.connect(_on_players)
 	c.room_map.connect(func(m): _map = m; _build_maps(); _refresh_players([]))
 	c.match_start.connect(_on_match_start)
+	c.searching.connect(func(): _status.text = "⚡ Buscando rival… (te empareja solo)")
+	c.search_cancelled.connect(func(): _status.text = "Búsqueda cancelada.")
+	c.matched.connect(_on_matched)
 	c.player_left.connect(func(_id): _players_lbl.text = "El rival salió…"; _start_btn.disabled = true)
 	# ANTES una caída del socket en el lobby era MUDA (la pantalla se quedaba
 	# igual y parecía que "no pasaba nada" al pulsar EMPEZAR). Ahora se ve.
@@ -200,6 +212,22 @@ func _deck_card() -> Control:
 	return p
 
 # ---------------------------------------------------------------- actions
+## ENCONTRAR RIVAL: conecta y entra a la cola de matchmaking (auto-inicio).
+func _on_find() -> void:
+	var prob := _deck_problem()
+	if prob != "":
+		_status.text = "⚠ " + prob
+		return
+	_pending = "find"
+	_save_url(_url.text)
+	if NetSession.client.is_open():
+		_on_connected()
+	elif NetSession.client.is_connecting():
+		_status.text = "Ya estoy conectando… espera, se reintenta solo."
+	else:
+		_status.text = "Conectando…"
+		NetSession.client.connect_to(_url.text.strip_edges())
+
 func _on_create() -> void:
 	var prob := _deck_problem()
 	if prob != "":
@@ -253,7 +281,18 @@ func _on_connected() -> void:
 		NetSession.client.create_room(pn, deck, _map)
 	elif _pending == "join":
 		NetSession.client.join_room(_code_in.text.strip_edges(), pn, deck)
+	elif _pending == "find":
+		NetSession.client.find_match(pn, deck, _map)
 	_pending = ""
+
+## Emparejado por matchmaking: guarda asiento/sala (para reconexión) y espera el
+## "start" que llega enseguida (lo maneja _on_match_start → tablero).
+func _on_matched(code: String, you: int, _players: Array) -> void:
+	NetSession.seat = you
+	NetSession.room_code = code
+	NetSession.server_url = _url.text.strip_edges()
+	_status.text = "✅ ¡Rival encontrado! Empezando la partida…"
+	NetSession.dlog("matchmaking: emparejado code=%s seat=%d" % [code, you])
 
 func _on_room_created(code: String, you: int, players: Array) -> void:
 	NetSession.seat = you

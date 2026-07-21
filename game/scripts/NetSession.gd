@@ -11,7 +11,7 @@ signal net_paused(paused: bool)   # true = perdimos el socket en partida (recone
 ## poder confirmar A SIMPLE VISTA que ambos teléfonos corren el mismo build
 ## (un cliente viejo emparejado con uno nuevo rompe la partida al empezar).
 ## Subirla cada vez que cambie el formato de los mensajes.
-const NET_BUILD := 24
+const NET_BUILD := 25
 
 const DEBUG_LOG := "user://logs/online_debug.txt"
 
