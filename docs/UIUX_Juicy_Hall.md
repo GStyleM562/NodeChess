@@ -29,6 +29,16 @@
 6. **Sombra CÁLIDA**: las sombras son marrón-doradas translúcidas y suaves
    (`_warm_shadow`), nunca negras duras.
 
+## 1.b Dos temas (2026-07-21): claro (Juicy Hall) + OSCURO
+La paleta de `UITheme.gd` es DINÁMICA (`static var`, no `const`): `UITheme.apply_theme(dark)`
+reescribe todos los tokens. Claro = TCG Pocket cálido; Oscuro = navy suave (no
+negro puro), fácil para la vista. Lo activa `Settings.dark_mode` (toggle en
+Configuración ⚙ → «Tema»; se guarda y se aplica al arrancar, ANTES de construir
+pantallas). Como TODAS las pantallas leen los tokens (`UITheme.BG/SURFACE/TEXT`…),
+ambos temas salen gratis. REGLA: sigue usando tokens, nunca colores claros u
+oscuros hardcodeados — si lo haces, no seguirá el tema. El Home ata sus locales
+(INK/CARD_BG/CARD_LIP/SUN) a tokens para seguir el tema también.
+
 ## 2. Paleta (tokens en UITheme.gd — usar SIEMPRE los tokens, no hex sueltos)
 
 | Token | Valor | Uso |

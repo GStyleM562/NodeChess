@@ -14,6 +14,12 @@ var colorblind := false  # paleta alternativa + símbolos por color de ataque
 var tutorial_done := false
 var tuts_done: Array = []   # capítulos del FULL tutorial superados (ids)
 var player_name := "Jugador"   # nombre del jugador (Perfil/Home/online)
+var dark_mode := false      # tema oscuro (Configuración); claro por defecto
+
+func set_dark_mode(v: bool) -> void:
+	dark_mode = v
+	UITheme.apply_theme(v)
+	_save()
 
 ## Nombre saneado (1–16 chars, sin vacíos). Fallback "Jugador".
 func name_or_default() -> String:
@@ -34,6 +40,7 @@ func set_player_name(v: String) -> void:
 func _ready() -> void:
 	_load()
 	_apply()
+	UITheme.apply_theme(dark_mode)   # fija el tema ANTES de construir pantallas
 
 func set_music(v: float) -> void:
 	music_vol = clampf(v, 0.0, 1.0)
@@ -104,11 +111,13 @@ func _load() -> void:
 		tutorial_done = bool(data.get("tut", false))
 		tuts_done = data.get("tuts", [])
 		player_name = String(data.get("pname", "Jugador"))
+		dark_mode = bool(data.get("dark", false))
 
 func _save() -> void:
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
 	if f != null:
 		f.store_string(JSON.stringify({"music": music_vol, "sfx": sfx_vol, "board": board_view,
 			"favs": favorites, "cpu": cpu_level, "speed": combat_speed, "cb": colorblind,
-			"tut": tutorial_done, "tuts": tuts_done, "pname": player_name}))
+			"tut": tutorial_done, "tuts": tuts_done, "pname": player_name,
+			"dark": dark_mode}))
 		f.close()

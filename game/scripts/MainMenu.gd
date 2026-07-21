@@ -19,13 +19,15 @@ const CHEST_LOBBY := {
 # tema oscuro de UITheme). Estilo "juicy" tipo TCG Pocket: fondo amarillo
 # cálido, tarjetas CREMA con LABIO inferior 3D (borde grueso abajo = botón
 # físico presionable) y brillo superior en los botones de modo.
-const INK := UITheme.TEXT                     # texto principal sobre claro
-const INK_SOFT := Color(0.52, 0.47, 0.36)     # texto secundario
-const SUN := Color(1.0, 0.83, 0.30)           # amarillo del cielo
-const CARD_BG := UITheme.SURFACE              # tarjeta crema
-const CARD_LIP := UITheme.BORDER              # labio inferior neutro (tarjetas)
+# Estos SIGUEN el tema (leen tokens de UITheme al instanciar el Home) para que
+# el modo oscuro también aplique al Home. Los acentos de modo son vivos en ambos.
+var INK := UITheme.TEXT                        # texto principal
+var INK_SOFT := UITheme.TEXT2                  # texto secundario
+var SUN := UITheme.SKY                         # lavado de fondo (cielo)
+var CARD_BG := UITheme.SURFACE                 # tarjeta
+var CARD_LIP := UITheme.BORDER                 # labio inferior
 const DOT_RED := Color(0.94, 0.26, 0.30)      # punto de aviso
-const GREEN_OK := Color(0.10, 0.55, 0.28)     # "listo" legible sobre claro
+var GREEN_OK := UITheme.SUCCESS               # "listo"
 const MODE_BLUE := Color(0.30, 0.62, 0.97)    # 🎲 Probar
 const MODE_GOLD := Color(1.0, 0.74, 0.12)     # ⚔ BATALLA (central)
 const MODE_PURPLE := Color(0.62, 0.47, 0.95)  # 🌐 Online (sala privada)
@@ -221,7 +223,7 @@ func _build_env() -> void:
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.972, 0.925, 0.72)   # amarillo cálido (mockup)
+	env.background_color = UITheme.BG_DEEP   # sigue el tema (claro cálido / navy)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(1.0, 0.98, 0.92)
 	env.ambient_light_energy = 1.1
@@ -263,7 +265,8 @@ func _build_ui() -> void:
 	sky.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	sky.offset_bottom = 320
 	layer.add_child(sky)
-	var ground := _vgrad(Color(1.0, 0.97, 0.85, 0.0), Color(1.0, 0.97, 0.85, 0.9))
+	var gcol := UITheme.BG   # "suelo" que asienta los botones (sigue el tema)
+	var ground := _vgrad(Color(gcol.r, gcol.g, gcol.b, 0.0), Color(gcol.r, gcol.g, gcol.b, 0.9))
 	ground.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	ground.offset_top = -280
 	layer.add_child(ground)
@@ -1150,6 +1153,13 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		_toggle_settings()
 
+## Cambia el tema y RECARGA el Home para aplicarlo de inmediato en todo.
+func _set_theme(darkv: bool) -> void:
+	if Settings.dark_mode == darkv:
+		return
+	Settings.set_dark_mode(darkv)
+	get_tree().reload_current_scene()
+
 func _toggle_settings() -> void:
 	var old := get_node_or_null("SettingsModal")
 	if old != null:
@@ -1200,6 +1210,34 @@ func _show_settings() -> void:
 		String(ProjectSettings.get_setting("application/config/version", "?")),
 		NetSession.NET_BUILD], 12, UITheme.MUTED, false, 600)
 	vb.add_child(vlbl)
+
+	# --- TEMA: claro (Juicy Hall) / oscuro (fácil para la vista) ---
+	var th := Label.new()
+	UITheme.section(th, "Tema")
+	th.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	vb.add_child(th)
+	var trow := HBoxContainer.new()
+	trow.add_theme_constant_override("separation", 8)
+	vb.add_child(trow)
+	var tlight := Button.new()
+	var tdark := Button.new()
+	var tstyle := func():
+		tlight.text = "☀ Claro" + ("  ✓" if not Settings.dark_mode else "")
+		tdark.text = "🌙 Oscuro" + ("  ✓" if Settings.dark_mode else "")
+		if Settings.dark_mode:
+			UITheme.style_surface(tlight, UITheme.SURFACE2, UITheme.BORDER, 10)
+			UITheme.style_primary(tdark, UITheme.PRIMARY, 10)
+		else:
+			UITheme.style_primary(tlight, UITheme.GOLD.darkened(0.05), 10)
+			UITheme.style_surface(tdark, UITheme.SURFACE2, UITheme.BORDER, 10)
+	for b in [tlight, tdark]:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.custom_minimum_size = Vector2(0, 42)
+		UITheme.button_font(b, 14, UITheme.TEXT, true, 700)
+		trow.add_child(b)
+	tlight.pressed.connect(func(): _set_theme(false))
+	tdark.pressed.connect(func(): _set_theme(true))
+	tstyle.call()
 
 	vb.add_child(_volume_row("Música", Settings.music_vol, func(v: float): Settings.set_music(v)))
 	vb.add_child(_volume_row("Sonidos (SFX)", Settings.sfx_vol, func(v: float):
