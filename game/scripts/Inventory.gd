@@ -524,6 +524,24 @@ func buy(key: String) -> Dictionary:
 		"currency": cur, "coins": coins, "gems": gems, "owned": int(pieces[key])}
 
 ## ADMIN: añade/quita fondos a la cuenta (clavado en ≥ 0).
+## KIT del TUTORIAL de creación: piezas para construir UNA figura básica. Se
+## re-entrega cada vez que se juega el tutorial (sube cada pieza a >= 1, sin
+## acumular), así SIEMPRE puedes construir lo que enseña sin importar tu saldo —
+## siempre es un personaje de nivel bajo, no rompe la economía.
+const TUTORIAL_KIT := [
+	"model:ironclad_knight", "rarity:common", "class:Balanced", "atype:Ruleta",
+	"stamina:2", "color:white", "color:red",
+	"pow:40", "pow:60", "prob:50", "prob:30", "prob:20",
+]
+
+func grant_tutorial_kit() -> void:
+	_ensure_loaded()
+	for key in TUTORIAL_KIT:
+		if int(pieces.get(key, 0)) < 1:
+			pieces[key] = 1
+	_log_tx({"k": "kit_tutorial", "piezas": TUTORIAL_KIT.size()})
+	_save()
+
 func adjust_funds(d_coins: int, d_gems: int) -> void:
 	_ensure_loaded()
 	coins = maxi(0, coins + d_coins)

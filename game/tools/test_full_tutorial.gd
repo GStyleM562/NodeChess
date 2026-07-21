@@ -23,7 +23,8 @@ func _initialize() -> void:
 	var kinds := ["info", "deploy", "move", "attack", "mod", "end"]
 	for c in TutorialLib.CHAPTERS:
 		var id := String(c["id"])
-		if id == "primera" or id.begins_with("menu_"):
+		# "primera"/"menu_"/"meta_" no son lecciones de tablero guionadas
+		if id == "primera" or id.begins_with("menu_") or id.begins_with("meta_"):
 			continue
 		var spec: Dictionary = TutorialLib.lesson(id)
 		ok = _expect("%s: tiene guion" % id, spec.is_empty(), false) and ok
@@ -107,6 +108,19 @@ func _initialize() -> void:
 	# conteos para la bienvenida
 	ok = _expect("pendientes de menú = 2", TutorialLib.pending_in(TutorialLib.CAT_MENU), 2) and ok
 	ok = _expect("hay XP por reclamar", TutorialLib.xp_pending() > 0, true) and ok
+
+	# --- META (Progreso): páginas informativas + kit que se regala ---
+	ok = _expect("hay capítulos meta (Progreso)", TutorialLib.pending_in(TutorialLib.CAT_META) >= 0, true) and ok
+	for mid in ["meta_resources", "meta_boxes", "meta_inventory", "meta_create"]:
+		ok = _expect("%s: páginas no vacías" % mid, (TutorialLib.meta_pages(mid) as Array).size() > 0, true) and ok
+	inv.mode = "user"
+	inv.pieces = {}
+	inv.grant_tutorial_kit()
+	ok = _expect("kit del tutorial: modelo básico dado", int(inv.pieces.get("model:ironclad_knight", 0)) >= 1, true) and ok
+	ok = _expect("kit del tutorial: varias piezas", inv.pieces.size() >= 8, true) and ok
+	# re-jugar el tutorial vuelve a garantizar el kit (top-up, no acumula infinito)
+	inv.grant_tutorial_kit()
+	ok = _expect("kit re-entregado: sigue >= 1", int(inv.pieces.get("model:ironclad_knight", 0)), 1) and ok
 
 	# restaurar settings reales
 	if _had:

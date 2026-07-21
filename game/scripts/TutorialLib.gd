@@ -21,6 +21,7 @@ static var welcomed := false
 
 const CAT_BOARD := "Tablero"
 const CAT_MENU := "Menú"
+const CAT_META := "Progreso"   # cómo conseguir/mejorar personajes (no es de partida)
 
 ## Roster: 0 = Stone Golem · 1 = Ironclad Knight · 2 = Nightblade.
 const CHAPTERS := [
@@ -46,7 +47,52 @@ const CHAPTERS := [
 		"title": "Craftea una pieza", "desc": "Convierte 10 fragmentos en una pieza completa."},
 	{"id": "menu_chest", "cat": CAT_MENU, "icon": "📦", "xp": 25,
 		"title": "Descifra un cofre", "desc": "Pon un cofre ganado a abrir desde tu inventario."},
+	# --- PROGRESO (meta): cómo conseguir y mejorar personajes (no es de partida) ---
+	{"id": "meta_resources", "cat": CAT_META, "icon": "💎", "xp": 30,
+		"title": "Tus recursos", "desc": "Monedas, diamantes y fragmentos: cómo se ganan y para qué."},
+	{"id": "meta_boxes", "cat": CAT_META, "icon": "🎁", "xp": 30,
+		"title": "Cómo funcionan las cajas", "desc": "Cajas por tipo, rarezas y anuncios diarios."},
+	{"id": "meta_inventory", "cat": CAT_META, "icon": "🎒", "xp": 30,
+		"title": "Maneja tu inventario", "desc": "Tus piezas, fragmentos y cofres ganados."},
+	{"id": "meta_create", "cat": CAT_META, "icon": "🛠", "xp": 50,
+		"title": "Crea tu primer personaje", "desc": "Te regalamos las piezas y armas una figura básica paso a paso."},
 ]
+
+## Páginas informativas de un capítulo META (título + cuerpo). Se muestran como
+## un modal paginado en la pantalla de tutoriales. El capítulo "meta_create"
+## además REGALA el kit de piezas y abre el Creador.
+static func meta_pages(id: String) -> Array:
+	match id:
+		"meta_resources":
+			return [
+				{"t": "💰 Tus recursos", "b": "En NodeChess mejoras a tus personajes con PIEZAS. Para conseguirlas usas tres recursos:\n\n🪙 MONEDAS · 💎 DIAMANTES · 🧩 FRAGMENTOS"},
+				{"t": "🪙 Monedas", "b": "Se ganan subiendo de NIVEL (jugando partidas) y viendo ANUNCIOS. Sirven para comprar en la 🛍 Tienda las piezas comunes y las Cajas Variadas."},
+				{"t": "💎 Diamantes", "b": "Más valiosos: cada 5 niveles, en cofres y por anuncios. Compran las piezas y cajas de mejor rareza (figuras, pasivas, estados)."},
+				{"t": "🧩 Fragmentos", "b": "Trozos de pieza. Junta 10 del mismo tipo y los CONVIERTES en 1 pieza completa (botón «Convertir» en el Inventario). La Caja Gratis da fragmentos."},
+				{"t": "🎯 ¿Para qué?", "b": "Con las piezas construyes y evolucionas personajes más fuertes en el 🛠 Creador. Mejores piezas → mejores figuras → mejor mazo."},
+			]
+		"meta_boxes":
+			return [
+				{"t": "🎁 Las cajas", "b": "Las cajas te dan PIEZAS. Ahora vienen POR TIPO para que consigas justo lo que buscas, sin depender de la suerte."},
+				{"t": "📦 Tipos", "b": "🧍 Figuras · 🎲 Ataques (colores, daño, estados) · ✨ Pasivas · 📦 Variada (de todo).\n\n¿Quieres una figura nueva? Abre una Caja de Figuras."},
+				{"t": "⭐ Rareza", "b": "Cada caja tiene rareza: a MEJOR rareza, MÁS y mejores piezas — pero siempre del tipo de esa caja. Una Variada legendaria da de todo."},
+				{"t": "📺 Anuncios y cofres", "b": "En 🎁 Recompensas: ve un ANUNCIO al día para 🪙/💎/caja gratis, compra Cajas por tipo, y DESCIFRA los cofres que ganas jugando."},
+			]
+		"meta_inventory":
+			return [
+				{"t": "🎒 Tu inventario", "b": "Aquí vive todo lo que tienes: tus PIEZAS completas, tus FRAGMENTOS y tus COFRES ganados."},
+				{"t": "🧩 Convertir", "b": "Cuando tengas 10 fragmentos de una pieza, el inventario te deja CONVERTIRLOS en la pieza completa, lista para usar en el Creador."},
+				{"t": "📦 Cofres ganados", "b": "Al ganar partidas consigues cofres (hasta 4). En el inventario los pones a DESCIFRAR (tardan un rato real); al abrirlos, sueltan piezas y a veces 💎."},
+				{"t": "🛠 Úsalas", "b": "Todas las piezas que posees aparecen en el 🛠 Creador (botón 📦). Con ellas construyes o editas a tus personajes."},
+			]
+		"meta_create":
+			return [
+				{"t": "🛠 Crea tu personaje", "b": "Te vamos a REGALAR las piezas necesarias para armar una figura básica. Cada vez que repitas este tutorial, te las damos de nuevo."},
+				{"t": "1 · Identidad", "b": "En el Creador eliges: NOMBRE, CLASE (Balanced para empezar) y RAREZA (Común). Arriba verás los «Puntos de Construcción»: no te pases del presupuesto."},
+				{"t": "2 · Combate", "b": "Elige la ESTAMINA (2), el TIPO de ataque (Ruleta) y el MODELO 3D. Luego arma la RULETA de ataque con colores (Blanco = daño) y sus probabilidades."},
+				{"t": "3 · Guarda", "b": "Cuando el medidor esté en verde («✓ Válido»), pulsa GUARDAR. ¡Tu figura queda en tu Colección y lista para tu mazo!\n\nToca «Ir al Creador» para empezar."},
+			]
+	return []
 
 ## Lecciones de TABLERO guionadas (mapa Rieles: metas 0/19, entradas 1-2/17-18,
 ## buff 8, candados 20-21 abren en turn_no 6, riel L: 1-4-6-20-12-14-17).
@@ -158,7 +204,7 @@ static func pending_in(cat: String) -> int:
 	return n
 
 static func pending_total() -> int:
-	return pending_in(CAT_BOARD) + pending_in(CAT_MENU)
+	return pending_in(CAT_BOARD) + pending_in(CAT_META) + pending_in(CAT_MENU)
 
 static func done_count() -> int:
 	return CHAPTERS.size() - pending_total()

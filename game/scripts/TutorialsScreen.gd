@@ -65,9 +65,9 @@ func _ready() -> void:
 	body.add_theme_constant_override("separation", 8)
 	scr.add_child(body)
 
-	for cat in [TutorialLib.CAT_BOARD, TutorialLib.CAT_MENU]:
+	for cat in [TutorialLib.CAT_BOARD, TutorialLib.CAT_META, TutorialLib.CAT_MENU]:
 		var hdr := Label.new()
-		var icon := "🎲" if cat == TutorialLib.CAT_BOARD else "📱"
+		var icon := "🎲" if cat == TutorialLib.CAT_BOARD else ("📈" if cat == TutorialLib.CAT_META else "📱")
 		UITheme.section(hdr, "%s %s  ·  %d pendientes" % [icon, cat, TutorialLib.pending_in(cat)])
 		body.add_child(hdr)
 		for c in TutorialLib.CHAPTERS:
@@ -114,11 +114,14 @@ func _chapter_row(c: Dictionary) -> Control:
 	b.pressed.connect(func(): _launch(id))
 	return b
 
-## Lanza el capítulo: lección guionada / primera partida / guía de menú.
+## Lanza el capítulo: lección guionada / primera partida / guía de menú / META.
 func _launch(id: String) -> void:
 	if id == "primera":
 		Loadout.tutorial = true
 		get_tree().change_scene_to_file("res://scenes/board.tscn")
+		return
+	if id.begins_with("meta_"):
+		_show_meta(id)
 		return
 	if id.begins_with("menu_"):
 		TutorialLib.active_guide = id
@@ -127,3 +130,81 @@ func _launch(id: String) -> void:
 	if not TutorialLib.lesson(id).is_empty():
 		Loadout.lesson = id
 		get_tree().change_scene_to_file("res://scenes/board.tscn")
+
+## Tutorial META: modal paginado con la explicación. Al terminar, marca el
+## capítulo (XP la 1ª vez). "meta_create" REGALA el kit y ofrece ir al Creador.
+func _show_meta(id: String) -> void:
+	var pages: Array = TutorialLib.meta_pages(id)
+	if pages.is_empty():
+		return
+	if id == "meta_create":
+		Inventory.grant_tutorial_kit()   # cada vez que se juega: piezas frescas
+	var modal := Control.new()
+	modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	var layer := CanvasLayer.new()
+	layer.layer = 30
+	modal.add_child(layer)
+	add_child(modal)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(cc)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(minf(420.0, get_viewport().get_visible_rect().size.x - 28.0), 0)
+	panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.GOLD, 22, 2, 18))
+	cc.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 12)
+	panel.add_child(vb)
+	var title := Label.new()
+	UITheme.label(title, 20, UITheme.GOLD, true, 800)
+	vb.add_child(title)
+	var body := Label.new()
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.custom_minimum_size = Vector2(360, 150)
+	UITheme.label(body, 14, UITheme.TEXT, false, 600)
+	vb.add_child(body)
+	var dots := Label.new()
+	dots.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(dots, 12, UITheme.TEXT2, false, 700)
+	vb.add_child(dots)
+	var nextb := Button.new()
+	nextb.custom_minimum_size = Vector2(0, 52)
+	UITheme.button_font(nextb, 16, Color.WHITE, true, 800)
+	UITheme.style_primary(nextb, UITheme.PRIMARY, 14)
+	vb.add_child(nextb)
+	var i := [0]
+	var render := func():
+		var pg: Dictionary = pages[i[0]]
+		title.text = String(pg["t"])
+		body.text = String(pg["b"])
+		dots.text = "%d / %d" % [i[0] + 1, pages.size()]
+		var last: bool = i[0] >= pages.size() - 1
+		if last:
+			nextb.text = "🛠 Ir al Creador" if id == "meta_create" else "✓ ¡Entendido!"
+		else:
+			nextb.text = "Siguiente  →"
+	render.call()
+	nextb.pressed.connect(func():
+		if i[0] < pages.size() - 1:
+			i[0] += 1
+			render.call()
+			return
+		# última página: completar capítulo (XP 1ª vez) y salir/ir al Creador
+		TutorialLib.complete(id)
+		modal.queue_free()
+		if id == "meta_create":
+			get_tree().change_scene_to_file("res://scenes/character_creator.tscn")
+		else:
+			get_tree().reload_current_scene())
+	var skip := Button.new()
+	skip.text = "Cerrar"
+	skip.custom_minimum_size = Vector2(0, 40)
+	UITheme.button_font(skip, 13, UITheme.TEXT2, true, 700)
+	UITheme.style_surface(skip)
+	skip.pressed.connect(func(): modal.queue_free())
+	vb.add_child(skip)

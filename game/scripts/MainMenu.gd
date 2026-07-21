@@ -99,6 +99,9 @@ func _show_welcome() -> void:
 	vb.add_child(body)
 	if nb > 0:
 		vb.add_child(_welcome_row("🎲", "Tablero — despliegue, combate, saltos, rodeos…", nb))
+	var nmeta := TutorialLib.pending_in(TutorialLib.CAT_META)
+	if nmeta > 0:
+		vb.add_child(_welcome_row("📈", "Progreso — crear personajes, cajas y recursos", nmeta))
 	if nm > 0:
 		vb.add_child(_welcome_row("📱", "Menú — craftear piezas y descifrar cofres", nm))
 	var juicy := Label.new()
