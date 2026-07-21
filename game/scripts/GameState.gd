@@ -289,12 +289,18 @@ func move_path(uid: int, target: int) -> Array:
 	var normal := map.path_to(u["node"], target, blocked, hover)
 	if phasing:
 		return normal                                     # walks straight through figures
+	# El salto SOLO si la figura puede saltar (>= 2 de estamina efectiva, o Parkour):
+	# antes move_path devolvía SIEMPRE la ruta-salto [enemigo, destino] aunque la
+	# figura no pudiera saltar (estamina 1) -> el bot/acción remota podía "cruzar"
+	# al rival. Ahora coincide con move_targets (que sí respeta este candado).
+	var can_jump := effective_stamina(uid) >= 2 or has_passive(uid, "parkour")
 	var jump: Array = []
-	for e in map.adj[u["node"]]:
-		var occ := int(board.get(e, -1))
-		if occ != -1 and units[occ]["team"] != u["team"] and units[occ]["alive"] and target in map.adj[e]:
-			jump = [e, target]                            # hop over the enemy
-			break
+	if can_jump:
+		for e in map.adj[u["node"]]:
+			var occ := int(board.get(e, -1))
+			if occ != -1 and units[occ]["team"] != u["team"] and units[occ]["alive"] and target in map.adj[e]:
+				jump = [e, target]                        # hop over the enemy
+				break
 	if normal.is_empty():
 		return jump
 	if jump.is_empty():

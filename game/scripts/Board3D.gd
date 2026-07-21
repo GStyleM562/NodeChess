@@ -2412,13 +2412,17 @@ func _hop_over(fig: Figure3D, over_pos: Vector3, land_pos: Vector3) -> void:
 	_face(fig, land_pos - start)
 	fig.play_clip("move_run" if fig.has_clip("move_run") else "move_walk")
 	var dur := maxf(0.45, start.distance_to(land_pos) * 0.3)
-	# Peak clears the occupant's head (relative to the lower of the two ends).
-	var arc_h := maxf(1.8, over_pos.y - minf(start.y, land_pos.y) + 1.4)
+	# Curva de Bézier cuadrática con el punto de control ENCIMA del rival: así el
+	# arco pasa SIEMPRE por encima del ocupante, aunque el salto sea en "L" (los
+	# 3 nodos no alineados) — antes el pico caía en el punto medio geométrico y a
+	# veces rozaba/atravesaba al rival. El control se eleva para librar su cabeza.
+	var arc_h := maxf(1.9, over_pos.y - minf(start.y, land_pos.y) + 1.5)
+	var ctrl := Vector3(over_pos.x, maxf(start.y, land_pos.y) + arc_h * 2.0, over_pos.z)
 	var tw := create_tween()
 	tw.tween_method(func(t: float):
-		var p := start.lerp(land_pos, t)
-		p.y += arc_h * 4.0 * t * (1.0 - t)   # 0 at ends, peak at the middle (over enemy)
-		fig.position = p
+		var a := start.lerp(ctrl, t)
+		var b := ctrl.lerp(land_pos, t)
+		fig.position = a.lerp(b, t)   # B(t) cuadrática: start → (sobre el rival) → land
 	, 0.0, 1.0, dur)
 	await tw.finished
 	fig.position = land_pos
