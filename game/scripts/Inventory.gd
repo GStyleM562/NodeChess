@@ -29,6 +29,84 @@ const CHESTS := {
 	"t15": {"name": "Cofre Legendario", "interval": 900, "pieces": 4, "tier": 2},
 }
 
+## TIPOS DE CAJA (2026-07-20). Un solo eje "tipo" + el eje "rareza" (tier) que ya
+## existía: así NO hay decenas de cajas, pero puedes buscar lo que quieres. Cada
+## tipo filtra el catálogo por sus prefijos de categoría (vacío = TODO = random).
+## Mejor rareza → más piezas y más "premium", SIEMPRE dentro del tipo.
+const BOX_TYPES := {
+	"figures": {"name": "Caja de Figuras", "icon": "🧍", "col": [0.55, 0.28, 0.85],
+		"prefixes": ["model:"]},
+	"attack": {"name": "Caja de Ataques", "icon": "🎲", "col": [0.30, 0.62, 0.97],
+		"prefixes": ["color:", "pow:", "stars:", "prob:", "atype:", "fx:"]},
+	"passive": {"name": "Caja de Pasivas", "icon": "✨", "col": [0.93, 0.65, 0.05],
+		"prefixes": ["passive:", "resist:"]},
+	"random": {"name": "Caja Variada", "icon": "📦", "col": [0.13, 0.62, 0.36],
+		"prefixes": []},   # vacío = cualquier pieza del catálogo
+}
+
+## Pool del catálogo filtrado por el TIPO de caja (prefijos vacíos = todo).
+func box_pool(type_id: String) -> Array:
+	var spec: Dictionary = BOX_TYPES.get(type_id, BOX_TYPES["random"])
+	var pfx: Array = spec["prefixes"]
+	if pfx.is_empty():
+		return catalog()
+	var out: Array = []
+	for key in catalog():
+		for p in pfx:
+			if String(key).begins_with(String(p)):
+				out.append(key)
+				break
+	return out if not out.is_empty() else catalog()
+
+## ¿La pieza es "premium" (figura/pasiva/estado/rareza alta/estamina alta/dado
+## especial/daño-estrella-prob altos)? Usado para sesgar las cajas de mejor rareza.
+func _is_premium(key: String) -> bool:
+	var k := String(key)
+	if k.begins_with("model:") or k.begins_with("passive:") or k.begins_with("fx:"):
+		return true
+	if k in ["rarity:legend", "rarity:mythic", "stamina:4", "stamina:5", "stamina:6"]:
+		return true
+	if k.begins_with("atype:") and not k.contains("Ruleta"):
+		return true
+	if k.begins_with("pow:") and int(k.trim_prefix("pow:")) >= 65:
+		return true
+	if k.begins_with("stars:") and int(k.trim_prefix("stars:")) >= 2:
+		return true
+	if k.begins_with("prob:") and int(k.trim_prefix("prob:")) >= 45:
+		return true
+	return false
+
+## Abre una caja de un TIPO y una RAREZA (tier 0/1/2): otorga piezas COMPLETAS
+## del pool de ese tipo (más y mejores a más tier) + % de 💎. Núcleo reusable
+## para cofres ganados, anuncios y la tienda de cajas.
+## -> {"pieces": [...], "gems": N, "type": id}
+func open_box(type_id: String, tier: int) -> Dictionary:
+	_ensure_loaded()
+	if not BOX_TYPES.has(type_id):
+		type_id = "random"
+	tier = clampi(tier, 0, 2)
+	var pool := box_pool(type_id)
+	var prem: Array = []
+	for key in pool:
+		if _is_premium(key):
+			prem.append(key)
+	if prem.is_empty():
+		prem = pool
+	var count: int = [2, 3, 4][tier]
+	var got: Array = []
+	for i in count:
+		var use_prem := tier == 2 or (tier == 1 and randi() % 2 == 0)
+		var src: Array = prem if use_prem else pool
+		got.append(String(src[randi() % src.size()]))
+	for key in got:
+		pieces[key] = int(pieces.get(key, 0)) + 1
+	var gem_kind: String = ["t5", "t10", "t15"][tier]
+	var g := _roll_gems(gem_kind)
+	gems += g
+	_log_tx({"k": "abrir_caja", "type": type_id, "tier": tier, "piezas": got.duplicate(), "gems": g})
+	_save()
+	return {"pieces": got, "gems": g, "type": type_id}
+
 var mode := "admin"
 var pieces := {}       # key -> int (piezas completas)
 var fragments := {}    # key -> int
@@ -245,14 +323,21 @@ func open_level_chest() -> Dictionary:
 # ------------------------------------------------------- cofres GANADOS 📦
 ## Cofre ganado al VENCER (modo usuario): entra al inventario de cofres cerrado.
 ## Peor→mejor: 60% común · 30% épico · 10% legendario. "" si no hay ranura.
-func grant_won_chest() -> String:
+## `box_type` fija el tipo (figures/attack/passive/random); "" = tipo al azar
+## (ponderado hacia "random"). Peor→mejor tier: 60% común · 30% épico · 10% leg.
+func grant_won_chest(box_type := "") -> String:
 	_ensure_loaded()
 	if chest_inv.size() >= CHEST_SLOTS:
 		return ""
 	var r := randf()
 	var tier := "t5" if r < 0.6 else ("t10" if r < 0.9 else "t15")
-	chest_inv.append({"tier": tier, "state": "locked", "ready_at": 0})
-	_log_tx({"k": "cofre_ganado", "tier": tier})
+	var typ := box_type
+	if typ == "" or not BOX_TYPES.has(typ):
+		# al azar, con sesgo a "Variada"; a veces una caja específica (sorpresa)
+		var tr := randf()
+		typ = "random" if tr < 0.55 else ["figures", "attack", "passive"][randi() % 3]
+	chest_inv.append({"tier": tier, "type": typ, "state": "locked", "ready_at": 0})
+	_log_tx({"k": "cofre_ganado", "tier": tier, "type": typ})
 	_save()
 	return tier
 
@@ -266,6 +351,7 @@ func chest_info(i: int) -> Dictionary:
 	if state == "unlocking" and _now() >= int(c.get("ready_at", 0)):
 		state = "ready"
 	return {"tier": String(c["tier"]), "state": state,
+		"type": String(c.get("type", "random")),   # cofres viejos = Variada
 		"left": maxi(0, int(c.get("ready_at", 0)) - _now()),
 		"secs": int((CHESTS[String(c["tier"])] as Dictionary)["interval"])}
 
@@ -299,22 +385,18 @@ func open_won_chest(i: int) -> Dictionary:
 	if info.is_empty() or String(info["state"]) != "ready":
 		return {}
 	var tier_id := String(info["tier"])
-	var c: Dictionary = CHESTS[tier_id]
-	var tier := int(c["tier"])
-	var got: Array = []
-	for k in int(c["pieces"]):
-		var premium := tier == 2 or (tier == 1 and randi() % 2 == 0)
-		got.append(_random_piece(premium))
-	if tier == 2:
-		got[0] = _random_from_prefix("model:")   # legendario: figura garantizada
-	for key in got:
-		pieces[key] = int(pieces.get(key, 0)) + 1
-	var g := _roll_gems(tier_id)
-	gems += g
+	var tier := int((CHESTS[tier_id] as Dictionary)["tier"])
+	var type_id := String(info.get("type", "random"))
+	# el TIPO decide de qué pool salen las piezas (open_box); el legendario random
+	# garantiza además una figura. Las cajas de figuras ya son todas figuras.
+	var res := open_box(type_id, tier)
+	if tier == 2 and type_id == "random":
+		var extra := _random_from_prefix("model:")
+		pieces[extra] = int(pieces.get(extra, 0)) + 1
+		(res["pieces"] as Array).append(extra)
 	chest_inv.remove_at(i)
-	_log_tx({"k": "abrir_cofre", "tier": tier_id, "piezas": got.duplicate(), "gems": g})
 	_save()
-	return {"pieces": got, "gems": g}
+	return res
 
 ## Tirada de DIAMANTES al abrir una caja (más % y cantidad en cofres mejores).
 func _roll_gems(kind: String) -> int:
@@ -418,6 +500,61 @@ func adjust_funds(d_coins: int, d_gems: int) -> void:
 	gems = maxi(0, gems + d_gems)
 	_log_tx({"k": "fondos_admin", "coins": d_coins, "gems": d_gems})
 	_save()
+
+# ------------------------------------------------------- 📺 anuncios (usos/día)
+## Ver un anuncio da un recurso, con TOPE diario que se reinicia cada día real.
+## Sin SDK de anuncios: el "ver anuncio" lo simula la UI (espera breve). 3 tipos.
+const AD_TYPES := {
+	"coins": {"name": "Monedas gratis", "icon": "🪙", "daily": 5, "amount": 250},
+	"gems": {"name": "Diamantes gratis", "icon": "💎", "daily": 3, "amount": 8},
+	"box": {"name": "Caja sorpresa", "icon": "📦", "daily": 2},   # abre una Variada al momento
+}
+var ads := {"day": "", "used": {}}   # used: kind -> veces hoy
+
+func _ad_today() -> String:
+	var d := Time.get_datetime_dict_from_system()
+	return "%04d-%02d-%02d" % [int(d["year"]), int(d["month"]), int(d["day"])]
+
+func _ad_roll_day() -> void:
+	if String(ads.get("day", "")) != _ad_today():
+		ads = {"day": _ad_today(), "used": {}}
+
+## Usos que quedan HOY de un tipo de anuncio.
+func ad_left(kind: String) -> int:
+	_ensure_loaded()
+	_ad_roll_day()
+	if not AD_TYPES.has(kind):
+		return 0
+	var used := int((ads["used"] as Dictionary).get(kind, 0))
+	return maxi(0, int((AD_TYPES[kind] as Dictionary)["daily"]) - used)
+
+## Reclama la recompensa de un anuncio (la UI ya "reprodujo" el anuncio).
+## -> {"ok", "kind", "coins"?, "gems"?, "box"?} · {"ok": false} si no quedan usos.
+func watch_ad(kind: String) -> Dictionary:
+	_ensure_loaded()
+	_ad_roll_day()
+	if ad_left(kind) <= 0:
+		return {"ok": false}
+	(ads["used"] as Dictionary)[kind] = int((ads["used"] as Dictionary).get(kind, 0)) + 1
+	var out := {"ok": true, "kind": kind}
+	match kind:
+		"coins":
+			var c: int = int((AD_TYPES["coins"] as Dictionary)["amount"])
+			coins += c
+			out["coins"] = c
+		"gems":
+			var g: int = int((AD_TYPES["gems"] as Dictionary)["amount"])
+			gems += g
+			out["gems"] = g
+		"box":
+			var tier := 0 if randf() < 0.75 else 1   # casi siempre común, a veces épica
+			var r := open_box("random", tier)   # open_box ya hace _save
+			out["box"] = r
+			_log_tx({"k": "anuncio", "kind": kind})
+			return out
+	_log_tx({"k": "anuncio", "kind": kind})
+	_save()
+	return out
 
 # ------------------------------------------------------- 🧾 log de movimientos
 ## Recibo persistente de CADA transacción de consumibles (compras, crafteos,
@@ -742,6 +879,7 @@ func _ensure_loaded() -> void:
 		chest_inv = data.get("chest_inv", [])
 		tx_log = data.get("tx", [])
 		_starter = bool(data.get("starter", false))
+		ads = data.get("ads", {"day": "", "used": {}})
 
 func _save() -> void:
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
@@ -752,5 +890,6 @@ func _save() -> void:
 			"lvl_chests": level_chests, "starter": _starter,
 			"wins": wins, "losses": losses, "streak": streak, "best_streak": best_streak,
 			"coins": coins, "gems": gems, "chest_inv": chest_inv, "tx": tx_log,
+			"ads": ads,
 		}))
 		f.close()
