@@ -34,29 +34,31 @@ static var dark := false   # tema oscuro activo
 static func apply_theme(is_dark: bool) -> void:
 	dark = is_dark
 	if is_dark:
-		BG = Color(0.086, 0.098, 0.137)         # navy screen
-		BG_DEEP = Color(0.063, 0.071, 0.106)     # navy más hondo (fondo raíz/3D)
-		SURFACE = Color(0.129, 0.145, 0.196)     # tarjeta
-		SURFACE2 = Color(0.169, 0.188, 0.251)    # botón secundario
-		BORDER = Color(0.243, 0.278, 0.376)      # borde/labio
-		PRIMARY = Color(0.30, 0.55, 1.0)
-		PRIMARY_EDGE = Color(0.45, 0.66, 1.0)
-		ORANGE = Color(1.0, 0.58, 0.28)
-		GOLD = Color(1.0, 0.80, 0.30)
-		SUCCESS = Color(0.30, 0.82, 0.52)
-		DANGER = Color(1.0, 0.45, 0.42)
-		ENERGY = Color(0.36, 0.78, 0.98)
-		TEXT = Color(0.90, 0.92, 0.98)
-		TEXT2 = Color(0.66, 0.70, 0.82)
-		MUTED = Color(0.47, 0.52, 0.64)
-		SKY = Color(0.20, 0.24, 0.42)
-		R_COMMON = Color(0.55, 0.60, 0.70)
-		R_RARE = Color(0.40, 0.62, 1.0)
-		R_EPIC = Color(0.72, 0.50, 1.0)
-		R_LEGEND = Color(1.0, 0.80, 0.30)
-		PANEL_DEEP = Color(0.106, 0.122, 0.169)
-		INPUT_BG = Color(0.075, 0.086, 0.125)
-		GROUP_BORDER = Color(0.204, 0.235, 0.322)
+		# Oscuro SUAVE (2026-07-23): pizarra azulada, NO negro; acentos apagados
+		# (nada de dorado neón) para que el contraste no canse la vista.
+		BG = Color(0.145, 0.161, 0.208)          # pizarra
+		BG_DEEP = Color(0.118, 0.133, 0.176)     # pizarra honda (fondo raíz/3D)
+		SURFACE = Color(0.192, 0.212, 0.267)     # tarjeta
+		SURFACE2 = Color(0.235, 0.258, 0.318)    # botón secundario
+		BORDER = Color(0.318, 0.349, 0.427)      # borde/labio
+		PRIMARY = Color(0.38, 0.58, 0.95)
+		PRIMARY_EDGE = Color(0.52, 0.69, 1.0)
+		ORANGE = Color(0.93, 0.60, 0.38)
+		GOLD = Color(0.87, 0.73, 0.45)           # ámbar apagado (no brillante)
+		SUCCESS = Color(0.42, 0.78, 0.56)
+		DANGER = Color(0.92, 0.52, 0.50)
+		ENERGY = Color(0.46, 0.75, 0.92)
+		TEXT = Color(0.87, 0.89, 0.93)           # blanco suave (no puro)
+		TEXT2 = Color(0.69, 0.72, 0.80)
+		MUTED = Color(0.53, 0.57, 0.66)
+		SKY = Color(0.22, 0.25, 0.36)
+		R_COMMON = Color(0.62, 0.66, 0.73)
+		R_RARE = Color(0.50, 0.68, 0.97)
+		R_EPIC = Color(0.72, 0.57, 0.95)
+		R_LEGEND = Color(0.89, 0.75, 0.47)
+		PANEL_DEEP = Color(0.165, 0.184, 0.235)
+		INPUT_BG = Color(0.133, 0.149, 0.196)
+		GROUP_BORDER = Color(0.275, 0.302, 0.376)
 	else:
 		BG = Color(0.976, 0.937, 0.76)
 		BG_DEEP = Color(0.972, 0.925, 0.72)
@@ -99,15 +101,21 @@ static func _ensure() -> void:
 	if _manrope == null and ResourceLoader.exists("res://assets/fonts/Manrope.ttf"):
 		_manrope = load("res://assets/fonts/Manrope.ttf")
 
+## CUERPO extra (2026-07-23): la letra se veía muy delgada, así que TODOS los
+## pesos suben un escalón (500→600, 600→700, 700→800…). Un solo punto de cambio
+## en vez de tocar cientos de llamadas.
+const WEIGHT_BOOST := 100
+
 static func _weighted(base: Font, weight: int) -> Font:
 	if base == null:
 		return null
-	var key := str(base.get_instance_id()) + ":" + str(weight)
+	var w := clampi(weight + WEIGHT_BOOST, 100, 900)
+	var key := str(base.get_instance_id()) + ":" + str(w)
 	if _cache.has(key):
 		return _cache[key]
 	var fv := FontVariation.new()
 	fv.base_font = base
-	fv.variation_opentype = {"wght": weight}
+	fv.variation_opentype = {"wght": w}
 	_cache[key] = fv
 	return fv
 

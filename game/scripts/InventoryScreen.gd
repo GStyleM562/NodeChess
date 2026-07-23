@@ -69,7 +69,7 @@ func _ready() -> void:
 	top.add_child(mode_pill)
 
 	var chint := Label.new()
-	chint.text = "Los COFRES se abren desde el menú principal; aquí ves tus piezas y conviertes fragmentos."
+	chint.text = "Aquí controlas TU COLA DE CAJAS (descífralas y ábrelas), ves tus piezas y conviertes fragmentos."
 	chint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	UITheme.label(chint, 11, UITheme.MUTED, false, 600)
 	root.add_child(chint)
@@ -226,28 +226,45 @@ func _chest_row(i: int) -> Control:
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 10)
 	p.add_child(hb)
-	var tile := UITheme.icon_tile_node(String(ui["icon"]), col, 40, 20)
+	# icono/nombre del TIPO de caja (Figuras/Ataques/Pasivas/Variada) + su rareza
+	var tid := String(info.get("type", "random"))
+	var bspec: Dictionary = Inventory.BOX_TYPES.get(tid, Inventory.BOX_TYPES["random"])
+	var tile := UITheme.icon_tile_node(String(bspec["icon"]), col, 40, 20)
 	hb.add_child(tile)
 	var vb := VBoxContainer.new()
 	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	vb.add_theme_constant_override("separation", 0)
+	vb.add_theme_constant_override("separation", 1)
 	hb.add_child(vb)
 	var nm := Label.new()
-	nm.text = "Cofre %s" % String(ui["name"])
+	nm.text = "%s · %s" % [String(bspec["name"]), String(ui["name"])]
 	UITheme.label(nm, 14, col, true, 700)
 	vb.add_child(nm)
 	var sub := Label.new()
 	var state := String(info["state"])
 	match state:
 		"locked":
-			sub.text = "Cerrado · tarda %d min" % (int(info["secs"]) / 60)
+			sub.text = "Cerrada · tarda %d min en descifrarse" % (int(info["secs"]) / 60)
 		"unlocking":
-			sub.text = "Descifrando… %d:%02d" % [int(info["left"]) / 60, int(info["left"]) % 60]
+			sub.text = "⏳ Descifrando… faltan %d:%02d" % [int(info["left"]) / 60, int(info["left"]) % 60]
 		"ready":
-			sub.text = "¡Listo para abrir!"
+			sub.text = "✓ ¡Lista para abrir!"
 	UITheme.label(sub, 11, UITheme.SUCCESS if state == "ready" else UITheme.TEXT2, false, 600)
 	vb.add_child(sub)
+	# barra de PROGRESO del descifrado (control visual de la cola)
+	if state == "unlocking":
+		var total := maxf(1.0, float(info["secs"]))
+		var done := clampf((total - float(info["left"])) / total, 0.0, 1.0)
+		var pb := ProgressBar.new()
+		pb.custom_minimum_size = Vector2(0, 8)
+		pb.show_percentage = false
+		pb.max_value = 1.0
+		pb.value = done
+		var pbg := StyleBoxFlat.new(); pbg.bg_color = UITheme.SURFACE2; pbg.set_corner_radius_all(4)
+		var pfg := StyleBoxFlat.new(); pfg.bg_color = col; pfg.set_corner_radius_all(4)
+		pb.add_theme_stylebox_override("background", pbg)
+		pb.add_theme_stylebox_override("fill", pfg)
+		vb.add_child(pb)
 	var act := Button.new()
 	act.custom_minimum_size = Vector2(120, 44)
 	act.size_flags_vertical = Control.SIZE_SHRINK_CENTER

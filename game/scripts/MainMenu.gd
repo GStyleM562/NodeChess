@@ -26,11 +26,12 @@ var INK_SOFT := UITheme.TEXT2                  # texto secundario
 var SUN := UITheme.SKY                         # lavado de fondo (cielo)
 var CARD_BG := UITheme.SURFACE                 # tarjeta
 var CARD_LIP := UITheme.BORDER                 # labio inferior
-const DOT_RED := Color(0.94, 0.26, 0.30)      # punto de aviso
+const DOT_RED := Color(0.88, 0.35, 0.36)      # punto de aviso (menos chillón)
 var GREEN_OK := UITheme.SUCCESS               # "listo"
-const MODE_BLUE := Color(0.30, 0.62, 0.97)    # 🎲 Probar
-const MODE_GOLD := Color(1.0, 0.74, 0.12)     # ⚔ BATALLA (central)
-const MODE_PURPLE := Color(0.62, 0.47, 0.95)  # 🌐 Online (sala privada)
+# Acentos de modo SUAVIZADOS: nada de dorado neón; contraste amable en ambos temas.
+const MODE_BLUE := Color(0.42, 0.63, 0.90)    # 🛠 Crear
+const MODE_GOLD := Color(0.93, 0.73, 0.33)    # ⚔ BATALLA (central)
+const MODE_PURPLE := Color(0.63, 0.53, 0.88)  # 🌐 Online (sala privada)
 
 var _pivot: Node3D
 var _leader: Figure3D
@@ -891,7 +892,7 @@ func _build_buttons(layer: CanvasLayer) -> void:
 	# con degradado que se veía cuadrado).
 	var halo := Panel.new()
 	var hsb := StyleBoxFlat.new()
-	hsb.bg_color = Color(MODE_GOLD.r, MODE_GOLD.g, MODE_GOLD.b, 0.30)
+	hsb.bg_color = Color(MODE_GOLD.r, MODE_GOLD.g, MODE_GOLD.b, 0.17)   # halo tenue
 	hsb.set_corner_radius_all(170)
 	hsb.anti_aliasing = true
 	halo.add_theme_stylebox_override("panel", hsb)
@@ -917,6 +918,7 @@ func _build_buttons(layer: CanvasLayer) -> void:
 		Sfx.play("ui_click")
 		get_tree().change_scene_to_file("res://scenes/character_creator.tscn"))
 	layer.add_child(crear)
+	_shine_sweep(crear, 2.3, 0.22)   # desfasado del central
 
 	var online := _mode_button("🌐", "Online", "sala privada", MODE_PURPLE, false)
 	online.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -928,6 +930,7 @@ func _build_buttons(layer: CanvasLayer) -> void:
 		Sfx.play("ui_click")
 		get_tree().change_scene_to_file("res://scenes/online_lobby.tscn"))
 	layer.add_child(online)
+	_shine_sweep(online, 3.1, 0.22)   # otro desfase: nunca brillan a la vez
 
 	var play := _mode_button("⚔", "BATALLA", "mazos · dificultad · CPU", MODE_GOLD, true)
 	play.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
@@ -955,26 +958,39 @@ func _juice_play(play: Button) -> void:
 	var br := create_tween().set_loops()
 	br.tween_property(play, "scale", Vector2(1.02, 1.02), 2.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	br.tween_property(play, "scale", Vector2.ONE, 2.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	# barrido de brillo: banda diagonal blanca que cruza el botón
+	_shine_sweep(play, 1.1, 0.34)
+
+## BARRIDO DE BRILLO mejorado: banda diagonal con doble borde suave (entra y sale
+## fundida, no un corte duro) que cruza el botón cada `pause` segundos. Se aplica
+## a los 3 botones de modo con desfases distintos para que no brillen a la vez.
+func _shine_sweep(btn: Button, pause: float, peak: float) -> void:
+	btn.clip_contents = true
+	await get_tree().process_frame
 	var shine := TextureRect.new()
 	shine.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var g := Gradient.new()
-	g.set_color(0, Color(1, 1, 1, 0.0)); g.set_color(1, Color(1, 1, 1, 0.0))
-	g.add_point(0.5, Color(1, 1, 1, 0.35))
+	# perfil suave: 0 → tenue → PICO → tenue → 0 (sin bordes duros)
+	g.set_color(0, Color(1, 1, 1, 0.0))
+	g.set_color(1, Color(1, 1, 1, 0.0))
+	g.add_point(0.30, Color(1, 1, 1, peak * 0.35))
+	g.add_point(0.50, Color(1, 1, 1, peak))
+	g.add_point(0.70, Color(1, 1, 1, peak * 0.35))
 	var gt := GradientTexture2D.new()
 	gt.gradient = g
-	gt.fill_from = Vector2(0, 0); gt.fill_to = Vector2(1, 0)
+	gt.fill_from = Vector2(0, 0)
+	gt.fill_to = Vector2(1, 0)
 	shine.texture = gt
 	shine.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	shine.stretch_mode = TextureRect.STRETCH_SCALE
-	shine.rotation_degrees = 18.0
-	shine.size = Vector2(70, play.size.y * 2.4)
-	shine.position = Vector2(-90, -play.size.y * 0.7)
-	play.add_child(shine)
+	shine.rotation_degrees = 20.0
+	var w := maxf(64.0, btn.size.x * 0.42)
+	shine.size = Vector2(w, maxf(120.0, btn.size.y * 2.6))
+	shine.position = Vector2(-w - 30.0, -btn.size.y * 0.8)
+	btn.add_child(shine)
 	var sw := create_tween().set_loops()
-	sw.tween_interval(1.1)
-	sw.tween_property(shine, "position:x", play.size.x + 90.0, 0.75).set_trans(Tween.TRANS_SINE)
-	sw.tween_callback(func(): shine.position.x = -90.0)
+	sw.tween_interval(pause)
+	sw.tween_property(shine, "position:x", btn.size.x + w, 0.85).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	sw.tween_callback(func(): shine.position.x = -w - 30.0)
 
 ## Partículas suaves de fondo: puntos de color que flotan lentamente (el menú
 ## deja de verse estático/triste sin costar nada de rendimiento).
