@@ -72,6 +72,14 @@ const FX_DESC := {
 static var edit_figure := {}
 
 var _scroll: ScrollContainer
+# --- Creador POR PASOS (2026-07-23): en vez de un scroll largo, una sección a
+# la vez con navegación ◄/► (menos abrumador, secuencial).
+var _step := 0
+var _pages: Array = []          # VBox de cada paso
+const _STEP_NAMES := ["Identidad", "Combate", "Pasivas y resistencias", "Ataque"]
+var _step_lbl: Label
+var _prev_btn: Button
+var _next_btn: Button
 var _name: LineEdit
 var _desc: LineEdit
 var _class: OptionButton
@@ -124,10 +132,24 @@ func _ready() -> void:
 
 	_build_topbar()
 
+	# Medidor de PC (Puntos de Construcción) SIEMPRE visible, bajo la barra.
+	var pcbox := VBoxContainer.new()
+	pcbox.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	pcbox.offset_top = 58
+	pcbox.offset_left = 14
+	pcbox.offset_right = -14
+	add_child(pcbox)
+	_build_pc_meter(pcbox)
+
+	# Navegador de PASOS (◄ Anterior · "Paso X/4: Nombre" · Siguiente ►).
+	_build_step_nav()
+
+	# Área de páginas (una sección por paso). Cada página es scrolleable por si
+	# es alta (Ataque). Se construyen todas y se muestra solo la del paso actual.
 	var scroll := ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.offset_top = 60
-	scroll.offset_bottom = -112   # deja libre el footer fijo (banner + Guardar)
+	scroll.offset_top = 174   # bajo el medidor de PC (2 líneas de ayuda)
+	scroll.offset_bottom = -166   # navegador (encima del footer) + footer
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	add_child(scroll)
 	_scroll = scroll
@@ -135,28 +157,79 @@ func _ready() -> void:
 	var pad := MarginContainer.new()
 	pad.add_theme_constant_override("margin_left", 14)
 	pad.add_theme_constant_override("margin_right", 14)
-	pad.add_theme_constant_override("margin_top", 10)
-	pad.add_theme_constant_override("margin_bottom", 28)
+	pad.add_theme_constant_override("margin_top", 6)
+	pad.add_theme_constant_override("margin_bottom", 20)
 	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(pad)
-	var form := VBoxContainer.new()
-	form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	form.add_theme_constant_override("separation", 18)
-	pad.add_child(form)
+	var holder := VBoxContainer.new()
+	holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pad.add_child(holder)
 
-	_build_pc_meter(form)
-	_build_identity(form)
-	_build_combat(form)
-	_build_passives(form)
-	_build_resists(form)
-	_build_pool(form)
+	_pages = []
+	for i in _STEP_NAMES.size():
+		var page := VBoxContainer.new()
+		page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		page.add_theme_constant_override("separation", 18)
+		holder.add_child(page)
+		_pages.append(page)
+	_build_identity(_pages[0])
+	_build_combat(_pages[1])
+	_build_passives(_pages[2])
+	_build_resists(_pages[2])
+	_build_pool(_pages[3])
 
 	_build_footer()
 	_seed_default_pool()
 	if not edit_figure.is_empty():
 		_load_figure(edit_figure)
 		edit_figure = {}
+	_show_step(0)
 	_revalidate()
+
+## Barra de navegación de pasos (fija, encima del footer).
+func _build_step_nav() -> void:
+	var nav := HBoxContainer.new()
+	nav.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	nav.offset_top = -162
+	nav.offset_bottom = -118
+	nav.offset_left = 12
+	nav.offset_right = -12
+	nav.add_theme_constant_override("separation", 8)
+	add_child(nav)
+	_prev_btn = Button.new()
+	_prev_btn.text = "◄"
+	_prev_btn.custom_minimum_size = Vector2(60, 44)
+	UITheme.button_font(_prev_btn, 18, UITheme.TEXT, true, 700)
+	UITheme.style_surface(_prev_btn, UITheme.SURFACE, UITheme.BORDER, 12)
+	_prev_btn.pressed.connect(func(): _show_step(_step - 1))
+	nav.add_child(_prev_btn)
+	_step_lbl = Label.new()
+	_step_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_step_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_step_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	UITheme.label(_step_lbl, 14, UITheme.PRIMARY_EDGE, true, 800)
+	nav.add_child(_step_lbl)
+	_next_btn = Button.new()
+	_next_btn.text = "►"
+	_next_btn.custom_minimum_size = Vector2(60, 44)
+	UITheme.button_font(_next_btn, 18, UITheme.TEXT, true, 700)
+	UITheme.style_surface(_next_btn, UITheme.SURFACE, UITheme.BORDER, 12)
+	_next_btn.pressed.connect(func(): _show_step(_step + 1))
+	nav.add_child(_next_btn)
+
+## Muestra el paso i (oculta el resto). Actualiza etiqueta y flechas.
+func _show_step(i: int) -> void:
+	_step = clampi(i, 0, _pages.size() - 1)
+	for p in _pages.size():
+		_pages[p].visible = p == _step
+	if _step_lbl != null:
+		_step_lbl.text = "Paso %d/%d · %s" % [_step + 1, _STEP_NAMES.size(), _STEP_NAMES[_step]]
+	if _prev_btn != null:
+		_prev_btn.disabled = _step == 0
+	if _next_btn != null:
+		_next_btn.disabled = _step == _pages.size() - 1
+	if _scroll != null:
+		_scroll.scroll_vertical = 0
 
 # ---------------------------------------------------------------- top / footer
 func _build_topbar() -> void:
