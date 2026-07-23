@@ -25,9 +25,13 @@ func _ready() -> void:
 	root.offset_left = 14
 	root.offset_right = -14
 	root.offset_top = 12
-	root.offset_bottom = -12
+	root.offset_bottom = -92   # deja sitio a la barra de navegación inferior
 	root.add_theme_constant_override("separation", 10)
 	add_child(root)
+	# barra de navegación inferior compartida (Inventario resaltada)
+	var nl := CanvasLayer.new()
+	nl.add_child(UITheme.bottom_nav(self, "inv"))
+	add_child(nl)
 
 	# --- top bar ---
 	var top := HBoxContainer.new()

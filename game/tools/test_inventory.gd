@@ -201,19 +201,19 @@ func _initialize() -> void:
 	ok = _expect("victoria con ranuras llenas: sin cofre", String(rfull["chest"]), "") and ok
 	ok = _expect("victoria avisa chest_full", bool(rfull["chest_full"]), true) and ok
 
-	# --- TIENDA validada: precio CANÓNICO, compra atómica con recibo ---
+	# --- TIENDA validada: precio CANÓNICO (/10), compra atómica con recibo ---
 	inv.coins = 700
-	inv.gems = 5
+	inv.gems = 2
 	var pw: Dictionary = inv.price_of("color:white")
-	ok = _expect("precio canónico blanco 200🪙", int(pw.get("price", 0)) == 200 and String(pw.get("currency", "")) == "coins", true) and ok
+	ok = _expect("precio canónico blanco 20🪙", int(pw.get("price", 0)) == 20 and String(pw.get("currency", "")) == "coins", true) and ok
 	ok = _expect("precio de pieza inexistente: {}", inv.price_of("model:hackx").is_empty(), true) and ok
 	var w_shop: int = int(inv.pieces.get("color:white", 0))
 	var br: Dictionary = inv.buy("color:white")
 	ok = _expect("compra con monedas", bool(br.get("ok", false)), true) and ok
 	ok = _expect("pieza añadida al inventario", int(inv.pieces.get("color:white", 0)), w_shop + 1) and ok
-	ok = _expect("monedas descontadas", inv.coins, 500) and ok
-	ok = _expect("recibo trae saldo real", int(br.get("coins", -1)), 500) and ok
-	var bg: Dictionary = inv.buy("passive:lunge")   # épica → 💎30, solo hay 5
+	ok = _expect("monedas descontadas", inv.coins, 680) and ok
+	ok = _expect("recibo trae saldo real", int(br.get("coins", -1)), 680) and ok
+	var bg: Dictionary = inv.buy("passive:lunge")   # épica → 💎3, solo hay 2
 	ok = _expect("sin diamantes: falla y explica", bool(bg.get("ok", false)) == false and String(bg.get("error", "")) != "", true) and ok
 	ok = _expect("pieza inexistente: falla", bool(inv.buy("model:hackx").get("ok", false)), false) and ok
 	ok = _expect("🧾 log registra movimientos", inv.tx_log.size() > 3, true) and ok

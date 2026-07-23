@@ -152,7 +152,7 @@ func _build_ui() -> void:
 	var panel := PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	panel.offset_top = -468
-	panel.offset_bottom = -72
+	panel.offset_bottom = -150   # deja sitio a las flechas + barra de navegación
 	panel.offset_left = 10
 	panel.offset_right = -10
 	panel.add_theme_stylebox_override("panel", UITheme.group_panel(16, 12))
@@ -193,36 +193,34 @@ func _build_ui() -> void:
 	_attacks_box.add_theme_constant_override("separation", 4)
 	vb.add_child(_attacks_box)
 
+	# flechas para navegar figuras (encima de la barra de navegación inferior)
 	var nav := HBoxContainer.new()
 	nav.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	nav.offset_top = -60
-	nav.offset_bottom = -14
+	nav.offset_top = -140
+	nav.offset_bottom = -94
 	nav.offset_left = 10
 	nav.offset_right = -10
 	nav.alignment = BoxContainer.ALIGNMENT_CENTER
 	nav.add_theme_constant_override("separation", 16)
 	layer.add_child(nav)
 	var prev := Button.new()
-	prev.text = "◀"
-	prev.custom_minimum_size = Vector2(64, 48)
-	UITheme.button_font(prev, 20, UITheme.TEXT, true, 700)
+	prev.text = "◀  Anterior"
+	prev.custom_minimum_size = Vector2(160, 46)
+	UITheme.button_font(prev, 16, UITheme.TEXT, true, 700)
 	UITheme.style_surface(prev, UITheme.SURFACE, UITheme.BORDER, 12)
 	prev.pressed.connect(func(): _switch(-1))
 	nav.add_child(prev)
-	var menu := Button.new()
-	menu.text = "Menú"
-	menu.custom_minimum_size = Vector2(140, 48)
-	UITheme.button_font(menu, 20, UITheme.TEXT2, true, 700)
-	UITheme.style_surface(menu, UITheme.SURFACE, UITheme.BORDER, 12)
-	menu.pressed.connect(_to_menu)
-	nav.add_child(menu)
 	var nxt := Button.new()
-	nxt.text = "▶"
-	nxt.custom_minimum_size = Vector2(64, 48)
-	UITheme.button_font(nxt, 20, UITheme.TEXT, true, 700)
+	nxt.text = "Siguiente  ▶"
+	nxt.custom_minimum_size = Vector2(160, 46)
+	UITheme.button_font(nxt, 16, UITheme.TEXT, true, 700)
 	UITheme.style_surface(nxt, UITheme.SURFACE, UITheme.BORDER, 12)
 	nxt.pressed.connect(func(): _switch(1))
 	nav.add_child(nxt)
+	# barra de navegación inferior compartida (Colección resaltada)
+	var nl := CanvasLayer.new()
+	nl.add_child(UITheme.bottom_nav(self, "dex"))
+	add_child(nl)
 
 func _dex_hdr(text: String) -> Label:
 	var l := Label.new()
@@ -354,8 +352,8 @@ func _evo_row(text: String) -> void:
 func _toggle_info() -> void:
 	_info_panel.visible = not _info_panel.visible
 	_info_toggle.text = "▼ Ocultar info" if _info_panel.visible else "▲ Ver info"
-	_info_toggle.offset_top = -506 if _info_panel.visible else -110
-	_info_toggle.offset_bottom = -472 if _info_panel.visible else -76
+	_info_toggle.offset_top = -506 if _info_panel.visible else -188
+	_info_toggle.offset_bottom = -472 if _info_panel.visible else -154
 
 ## Índices del roster que pasan búsqueda + filtro. Nunca vacío (cae a "Todas").
 func _rebuild_filter() -> void:

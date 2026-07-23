@@ -281,6 +281,68 @@ static func chip(selected: bool, accent := PRIMARY, radius := 12) -> StyleBoxFla
 static func group_panel(radius := 18, pad := 14) -> StyleBoxFlat:
 	return panel(PANEL_DEEP, GROUP_BORDER, radius, 1, pad)
 
+## BARRA DE NAVEGACIÓN INFERIOR compartida (2026-07-23). Misma en Inicio /
+## Colección / Tienda / Inventario, con la sección ACTUAL resaltada (así queda
+## claro dónde estás sin flecha de "atrás"). `host` es la pantalla (para navegar
+## con su get_tree()); `current` = "home"|"dex"|"shop"|"inv". Devuelve el panel
+## anclado abajo, listo para añadir a un CanvasLayer.
+static func bottom_nav(host: Node, current: String) -> PanelContainer:
+	var items := [
+		{"id": "home", "icon": "🏠", "label": "Inicio", "scene": "res://scenes/main_menu.tscn"},
+		{"id": "dex", "icon": "📖", "label": "Colección", "scene": "res://scenes/dex.tscn"},
+		{"id": "shop", "icon": "🛍", "label": "Tienda", "scene": "res://scenes/shop.tscn"},
+		{"id": "inv", "icon": "📦", "label": "Inventario", "scene": "res://scenes/inventory.tscn"},
+	]
+	var bar := PanelContainer.new()
+	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	bar.offset_top = -84
+	bar.add_theme_stylebox_override("panel", panel(SURFACE, BORDER, 0, 1, 4))
+	var hb := HBoxContainer.new()
+	hb.alignment = BoxContainer.ALIGNMENT_CENTER
+	hb.add_theme_constant_override("separation", 0)
+	bar.add_child(hb)
+	for it in items:
+		var active: bool = String(it["id"]) == current
+		var col: Color = PRIMARY_EDGE if active else MUTED
+		var b := Button.new()
+		b.flat = true
+		b.custom_minimum_size = Vector2(78, 72)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var v := VBoxContainer.new()
+		v.set_anchors_preset(Control.PRESET_FULL_RECT)
+		v.alignment = BoxContainer.ALIGNMENT_CENTER
+		v.add_theme_constant_override("separation", 1)
+		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(v)
+		# barrita superior indicadora de la sección ACTIVA
+		var mark := ColorRect.new()
+		mark.color = PRIMARY_EDGE if active else Color(0, 0, 0, 0)
+		mark.custom_minimum_size = Vector2(30, 4)
+		mark.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		v.add_child(mark)
+		var ic := Label.new()
+		ic.text = String(it["icon"])
+		ic.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ic.add_theme_font_size_override("font_size", 28)
+		ic.modulate = Color.WHITE if active else Color(1, 1, 1, 0.65)
+		v.add_child(ic)
+		var lb := Label.new()
+		lb.text = String(it["label"])
+		lb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lb.clip_text = true
+		label(lb, 12, col, active, 800 if active else 700)
+		v.add_child(lb)
+		if active:
+			var sel := StyleBoxFlat.new()
+			sel.bg_color = Color(PRIMARY_EDGE.r, PRIMARY_EDGE.g, PRIMARY_EDGE.b, 0.12)
+			sel.set_corner_radius_all(12)
+			b.add_theme_stylebox_override("normal", sel)
+		else:
+			var scene := String(it["scene"])
+			b.pressed.connect(func(): host.get_tree().change_scene_to_file(scene))
+		hb.add_child(b)
+	return bar
+
 ## Marco cuadrado (38×38) con un emoji centrado adentro. Sube la calidad de los
 ## iconos-emoji sin sustituirlos por texturas (§5 del handoff).
 static func icon_tile_node(emoji: String, accent := PRIMARY, size := 38, glyph := 19) -> PanelContainer:

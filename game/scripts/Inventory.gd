@@ -481,12 +481,14 @@ func piece_rarity(key: String) -> String:
 		return "common" if k.trim_prefix("class:") == "Balanced" else "rare"
 	return "common"
 
+# Precios /10 (2026-07-23): solo compras 1 PARTE de las ~10 que necesita una
+# figura, así que una parte suelta cuesta poco. (Las CAJAS mantienen su precio.)
 const PRICE_BY_RARITY := {
-	"common": {"price": 200, "currency": "coins"},
-	"rare": {"price": 500, "currency": "coins"},
-	"epic": {"price": 30, "currency": "gems"},
-	"legend": {"price": 80, "currency": "gems"},
-	"mythic": {"price": 150, "currency": "gems"},
+	"common": {"price": 20, "currency": "coins"},
+	"rare": {"price": 50, "currency": "coins"},
+	"epic": {"price": 3, "currency": "gems"},
+	"legend": {"price": 8, "currency": "gems"},
+	"mythic": {"price": 15, "currency": "gems"},
 }
 
 ## Precio CANÓNICO de una pieza. La UI solo lo MUESTRA — jamás lo decide

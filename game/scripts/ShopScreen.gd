@@ -26,7 +26,7 @@ func _ready() -> void:
 	root.offset_left = 16
 	root.offset_right = -16
 	root.offset_top = 12
-	root.offset_bottom = -8
+	root.offset_bottom = -92   # deja sitio a la barra de navegación inferior
 	root.add_theme_constant_override("separation", 12)
 	add_child(root)
 
@@ -75,7 +75,10 @@ func _ready() -> void:
 	scr.add_child(_grid)
 	_build_items()
 
-	_build_nav(root)
+	# barra de navegación inferior compartida (Tienda resaltada)
+	var nl := CanvasLayer.new()
+	nl.add_child(UITheme.bottom_nav(self, "shop"))
+	add_child(nl)
 
 	# toast
 	var ts := PanelContainer.new()
