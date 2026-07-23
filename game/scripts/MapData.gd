@@ -90,15 +90,24 @@ func graph_dist(a: int, b: int) -> int:
 		frontier = nxt
 	return 99
 
-## Factor de SEPARACIÓN visual de los nodos (2026-07-20). Aparta todos los
-## nodos del centro para que haya MÁS camino entre ellos, sin cambiar cuántos
-## nodos/aristas hay (la topología es idéntica). La isla y el espejo se
-## reescalan solos; la cámara del tablero se aleja el mismo factor.
+## SEPARACIÓN visual de los nodos (sin cambiar la topología). SPACING escala
+## TODO; CENTER_PUSH además EMPUJA cada nodo hacia afuera una cantidad FIJA, lo
+## que abre sobre todo el CENTRO (los nodos internos, que estaban muy pegados al
+## nodo central, se separan más). El nodo central exacto (r=0) no se mueve. El
+## espejo 180° se conserva (la transformación es radial). La isla se re-dimensiona
+## sola; la cámara está ajustada a mano.
 const SPACING := 1.55
+const CENTER_PUSH := 0.9
 
 func _add(pos: Vector3) -> int:
 	var id := nodes.size()
-	nodes.append({"id": id, "pos": pos * SPACING, "role": "normal"})
+	var p := pos * SPACING
+	var r := Vector2(p.x, p.z).length()
+	if r > 0.01:
+		var dir := Vector2(p.x, p.z) / r
+		p.x += dir.x * CENTER_PUSH
+		p.z += dir.y * CENTER_PUSH
+	nodes.append({"id": id, "pos": p, "role": "normal"})
 	adj[id] = []
 	return id
 

@@ -232,6 +232,112 @@ func _net_send(action: Dictionary) -> void:
 	if _online:
 		NetSession.client.send_action(action)
 
+## ATRÁS (Android) EN PARTIDA: abre/cierra el menú de PAUSA — NUNCA sale de golpe.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		var m := get_node_or_null("PauseMenu")
+		if m != null:
+			m.queue_free()
+		else:
+			_show_pause_menu()
+
+## Menú de PAUSA: Continuar · Volúmenes · RENDIRSE (con confirmación). Sustituye
+## a "salir de golpe": ni ☰ ni Atrás terminan la partida sin confirmar.
+func _show_pause_menu() -> void:
+	if get_node_or_null("PauseMenu") != null:
+		return
+	var modal := CanvasLayer.new()
+	modal.name = "PauseMenu"
+	modal.layer = 50
+	add_child(modal)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	dim.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed:
+			modal.queue_free())
+	modal.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal.add_child(cc)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(minf(400.0, get_viewport().get_visible_rect().size.x - 40.0), 0)
+	panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, UITheme.GOLD, 22, 2, 18))
+	cc.add_child(panel)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 12)
+	panel.add_child(vb)
+	var t := Label.new()
+	t.text = "⏸ Pausa"
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(t, 22, UITheme.GOLD, true, 800)
+	vb.add_child(t)
+	# volúmenes
+	vb.add_child(_pause_volume("🎵 Música", Settings.music_vol, func(v): Settings.set_music(v)))
+	vb.add_child(_pause_volume("🔊 Sonidos", Settings.sfx_vol, func(v): Settings.set_sfx(v); Sfx.play("ui_click")))
+	# continuar
+	var cont := Button.new()
+	cont.text = "▶  Continuar"
+	cont.custom_minimum_size = Vector2(0, 52)
+	UITheme.button_font(cont, 17, Color.WHITE, true, 800)
+	UITheme.style_primary(cont, UITheme.PRIMARY, 14)
+	cont.pressed.connect(func(): modal.queue_free())
+	vb.add_child(cont)
+	# rendirse / salir (con confirmación)
+	var surr := Button.new()
+	surr.text = "🏳  Rendirse y salir"
+	surr.custom_minimum_size = Vector2(0, 48)
+	UITheme.button_font(surr, 15, UITheme.DANGER, true, 700)
+	UITheme.style_surface(surr, UITheme.SURFACE2, UITheme.DANGER.darkened(0.2), 12)
+	surr.pressed.connect(func(): _confirm_surrender(modal))
+	vb.add_child(surr)
+	var hint := Label.new()
+	hint.text = "Rendirse cuenta como derrota" + ("" if _lesson_id == "" else " (vuelves al aula)")
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(hint, 10, UITheme.MUTED, false, 600)
+	vb.add_child(hint)
+
+## Fila de volumen del menú de pausa (etiqueta + slider 0–100 + %).
+func _pause_volume(cap: String, val: float, on_change: Callable) -> Control:
+	var row := VBoxContainer.new()
+	row.add_theme_constant_override("separation", 2)
+	var hb := HBoxContainer.new()
+	row.add_child(hb)
+	var l := Label.new()
+	l.text = cap
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UITheme.label(l, 14, UITheme.TEXT, true, 700)
+	hb.add_child(l)
+	var pct := Label.new()
+	pct.text = "%d%%" % roundi(val * 100.0)
+	UITheme.label(pct, 14, UITheme.GOLD, true, 700)
+	hb.add_child(pct)
+	var s := HSlider.new()
+	s.min_value = 0; s.max_value = 100; s.step = 5; s.value = val * 100.0
+	s.custom_minimum_size = Vector2(0, 32)
+	s.value_changed.connect(func(v: float): pct.text = "%d%%" % int(v); on_change.call(v / 100.0))
+	row.add_child(s)
+	return row
+
+## Confirmación de rendición: solo tras aceptar se sale (derrota/abandono).
+func _confirm_surrender(pause_modal: CanvasLayer) -> void:
+	var dlg := ConfirmationDialog.new()
+	dlg.dialog_text = "¿Rendirte? Se cuenta como derrota."
+	dlg.ok_button_text = "Rendirse"
+	dlg.cancel_button_text = "Seguir jugando"
+	dlg.confirmed.connect(func():
+		# Rendirse cuenta como DERROTA (salvo en lecciones del aula). En online,
+		# avisar al rival del abandono (gana por abandono).
+		if not _over and _lesson_id == "":
+			Inventory.add_match_xp(false, _online)   # derrota real (stats/XP)
+			_over = true                              # _leave_to_menu ya avisa al rival
+		if pause_modal != null and is_instance_valid(pause_modal):
+			pause_modal.queue_free()
+		_leave_to_menu())
+	add_child(dlg)
+	dlg.popup_centered()
+
 func _leave_to_menu() -> void:
 	Engine.time_scale = 1.0
 	Loadout.tutorial = false
@@ -298,7 +404,7 @@ func _build_environment() -> void:
 	# Cámara: se aleja MENOS que el factor de separación (MapData.SPACING 1.55) a
 	# propósito, para que el tablero llene el ancho y los CAMINOS se vean largos
 	# (antes se veían muy pegados). Ajustada con capturas de los 5 mapas.
-	_cam.look_at_from_position(Vector3(0.0, 14.4, -13.8), Vector3.ZERO, Vector3.UP)
+	_cam.look_at_from_position(Vector3(0.0, 15.7, -15.05), Vector3.ZERO, Vector3.UP)
 	add_child(_cam)
 	_combat_cam = Camera3D.new()
 	_combat_cam.keep_aspect = Camera3D.KEEP_WIDTH
@@ -1184,7 +1290,7 @@ func _build_ui() -> void:
 	menu_btn.offset_bottom = 48
 	UITheme.button_font(menu_btn, 20, UITheme.TEXT2, false, 700)
 	UITheme.style_surface(menu_btn, UITheme.SURFACE, UITheme.BORDER, 11)
-	menu_btn.pressed.connect(_leave_to_menu)
+	menu_btn.pressed.connect(_show_pause_menu)   # ☰ = PAUSA (no sale de golpe)
 	layer.add_child(menu_btn)
 
 	_end_btn = Button.new()
