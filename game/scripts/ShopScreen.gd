@@ -7,8 +7,12 @@ const CATS := ["Modelos", "Ataques", "Potencia", "Pasivas", "Tipos de ataque", "
 const CAT_ICON := {"Modelos": "🧍", "Ataques": "🎯", "Potencia": "💥", "Pasivas": "✨", "Tipos de ataque": "🎲", "Partes": "🧩"}
 
 var _cat := 0
+var _mode := "pieces"   # "pieces" (partes por categoría) | "boxes" (cajas por tipo)
 var _grid: GridContainer
 var _chip_row: HBoxContainer
+var _chip_scroll: ScrollContainer   # las categorías se ocultan en modo Cajas
+var _mode_pieces: Button
+var _mode_boxes: Button
 var _toast: Label
 var _coin_lbl: Label
 var _gem_lbl: Label
@@ -46,20 +50,29 @@ func _ready() -> void:
 	_gem_lbl = gp.get_meta("value")
 	top.add_child(gp)
 
+	# --- pestaña PIEZAS | CAJAS (división principal, para no llenar de pestañas) ---
+	var seg := HBoxContainer.new()
+	seg.add_theme_constant_override("separation", 8)
+	root.add_child(seg)
+	_mode_pieces = _seg_btn("🧩  Piezas", "pieces")
+	_mode_boxes = _seg_btn("🎁  Cajas", "boxes")
+	seg.add_child(_mode_pieces)
+	seg.add_child(_mode_boxes)
+
 	var note := Label.new()
-	note.text = "Compra piezas para el Creador: 🪙 subes de nivel jugando · 💎 cada 5 niveles y en cofres."
+	note.text = "🪙 subes de nivel jugando · 💎 cada 5 niveles y en cofres. Compra 1 PARTE (necesitas ~10 por figura) o una CAJA del tipo que buscas."
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	UITheme.label(note, 11, UITheme.MUTED, false, 600)
 	root.add_child(note)
 
-	# --- chips de categoría (scroll horizontal) ---
-	var chip_scroll := ScrollContainer.new()
-	chip_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	chip_scroll.custom_minimum_size = Vector2(0, 52)
-	root.add_child(chip_scroll)
+	# --- chips de categoría (scroll horizontal) — solo en modo Piezas ---
+	_chip_scroll = ScrollContainer.new()
+	_chip_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_chip_scroll.custom_minimum_size = Vector2(0, 52)
+	root.add_child(_chip_scroll)
 	_chip_row = HBoxContainer.new()
 	_chip_row.add_theme_constant_override("separation", 8)
-	chip_scroll.add_child(_chip_row)
+	_chip_scroll.add_child(_chip_row)
 	_build_chips()
 
 	# --- rejilla 2-col scrolleable ---
@@ -74,6 +87,7 @@ func _ready() -> void:
 	_grid.add_theme_constant_override("v_separation", 9)
 	scr.add_child(_grid)
 	_build_items()
+	_refresh_seg()   # estilo inicial de la pestaña Piezas/Cajas
 
 	# barra de navegación inferior compartida (Tienda resaltada)
 	var nl := CanvasLayer.new()
@@ -197,8 +211,86 @@ func _rarity_es(r: String) -> String:
 func _build_items() -> void:
 	for c in _grid.get_children():
 		c.queue_free()
+	if _mode == "boxes":
+		for tid in ["figures", "attack", "passive", "random"]:
+			_grid.add_child(_box_card(tid))
+		return
 	for it in _items_for(CATS[_cat]):
 		_grid.add_child(_item_card(it))
+
+## Botón de la pestaña Piezas/Cajas.
+func _seg_btn(text: String, mode: String) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.custom_minimum_size = Vector2(0, 46)
+	b.pressed.connect(func(): _set_mode(mode))
+	return b
+
+func _refresh_seg() -> void:
+	for pair in [[_mode_pieces, "pieces"], [_mode_boxes, "boxes"]]:
+		var b: Button = pair[0]
+		var active: bool = _mode == String(pair[1])
+		UITheme.button_font(b, 15, UITheme.TEXT if active else UITheme.TEXT2, true, 800)
+		if active:
+			UITheme.style_primary(b, UITheme.PRIMARY, 12)
+		else:
+			UITheme.style_surface(b, UITheme.SURFACE2, UITheme.BORDER, 12)
+
+func _set_mode(mode: String) -> void:
+	_mode = mode
+	_chip_scroll.visible = mode == "pieces"
+	_refresh_seg()
+	_build_items()
+
+## Tarjeta de CAJA por tipo (comprar+abrir al momento, con recompensa vistosa).
+func _box_card(tid: String) -> Control:
+	var spec: Dictionary = Inventory.BOX_TYPES[tid]
+	var pr: Dictionary = Inventory.BOX_PRICE[tid]
+	var cc: Array = spec["col"]
+	var col := Color(cc[0], cc[1], cc[2])
+	var p := PanelContainer.new()
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	p.add_theme_stylebox_override("panel", UITheme.panel(UITheme.SURFACE, Color(col.r, col.g, col.b, 0.6), 14, 1, 10))
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 5)
+	p.add_child(v)
+	var cn := CenterContainer.new()
+	cn.add_child(UITheme.icon_tile_node(String(spec["icon"]), col, 44, 24))
+	v.add_child(cn)
+	var nm := Label.new()
+	nm.text = String(spec["name"])
+	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(nm, 13, UITheme.TEXT, true, 800)
+	v.add_child(nm)
+	var sub := Label.new()
+	sub.text = "piezas del tipo · rareza épica"
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.label(sub, 10, col, true, 700)
+	v.add_child(sub)
+	var cur := String(pr["cur"])
+	var buy := Button.new()
+	buy.text = "%s %d" % ["💎" if cur == "gems" else "🪙", int(pr["price"])]
+	buy.custom_minimum_size = Vector2(0, 38)
+	UITheme.button_font(buy, 13, UITheme.TEXT, true, 800)
+	UITheme.style_surface(buy, UITheme.SURFACE2, UITheme.BORDER, 10)
+	buy.pressed.connect(func():
+		var r: Dictionary = Inventory.buy_box(tid)
+		if not bool(r.get("ok", false)):
+			_toast_msg(String(r.get("error", "No se pudo")))
+			return
+		_refresh_balances()
+		var box: Dictionary = r.get("box", {})
+		var lines: Array = []
+		for key in box.get("pieces", []):
+			lines.append({"icon": String(spec["icon"]), "text": Inventory.piece_name(String(key)), "sub": "", "col": col})
+		if int(box.get("gems", 0)) > 0:
+			lines.append({"icon": "💎", "text": "+%d diamantes" % int(box["gems"]), "sub": "", "col": col})
+		RewardPopup.show(self, "%s ¡%s!" % [String(spec["icon"]), String(spec["name"])], col, lines,
+			"Saldo: 🪙 %d · 💎 %d" % [Inventory.coins, Inventory.gems]))
+	v.add_child(buy)
+	return p
 
 func _item_card(it: Dictionary) -> Control:
 	var inv := get_node("/root/Inventory")
