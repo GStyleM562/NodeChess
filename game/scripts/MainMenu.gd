@@ -273,22 +273,13 @@ func _build_ui() -> void:
 
 	_build_bg_particles(layer)
 
-	# gold glow behind the leader (con pulso suave para que respire)
-	var glow := _radial(UITheme.GOLD, 0.30)
-	glow.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	glow.offset_left = -190
-	glow.offset_right = 190
-	glow.offset_top = 150
-	glow.offset_bottom = 560
-	layer.add_child(glow)
-	var gp := create_tween().set_loops()
-	gp.tween_property(glow, "modulate:a", 0.65, 1.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	gp.tween_property(glow, "modulate:a", 1.0, 1.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# (Se quitó el "cuadro de luz" sobre la figura: se veía translúcido y no
+	# ayudaba. El líder se acompaña solo con el halo cálido bajo el botón BATALLA.)
 
 	_build_topbar(layer)
 	_build_centerpiece(layer)
-	_build_rails(layer)
 	_build_buttons(layer)
+	_build_nav(layer)
 	_build_reward_modal()
 
 	var ts := PanelContainer.new()
@@ -392,40 +383,83 @@ func _build_centerpiece(layer: CanvasLayer) -> void:
 	pill.add_child(pl)
 	box.add_child(pill)
 
-## CARRILES de tarjetas flotantes (estilo TCG Pocket): izquierda = tu taller
-## (Colección / Crear / Cómo jugar), derecha = premios (Recompensas / Tienda).
-func _build_rails(layer: CanvasLayer) -> void:
-	var left := VBoxContainer.new()
-	left.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	left.offset_left = 10
-	left.offset_right = 108
-	left.offset_top = 118
-	left.add_theme_constant_override("separation", 12)
-	layer.add_child(left)
-	left.add_child(_rail_card("📖", "Colección", UITheme.R_EPIC,
+## BARRA DE NAVEGACIÓN INFERIOR (antes eran carriles a los lados): Colección /
+## Crear / 🎁 Recompensas (cofres+cajas, con punto rojo y estado) / Tienda /
+## Cómo jugar. Los espacios de las cajas se abren desde 🎁 Recompensas.
+func _build_nav(layer: CanvasLayer) -> void:
+	var bar := PanelContainer.new()
+	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	bar.offset_top = -78
+	bar.offset_left = 6
+	bar.offset_right = -6
+	bar.offset_bottom = -6
+	bar.add_theme_stylebox_override("panel", _card_style(UITheme.BORDER, 20))
+	layer.add_child(bar)
+	var hb := HBoxContainer.new()
+	hb.alignment = BoxContainer.ALIGNMENT_CENTER
+	hb.add_theme_constant_override("separation", 2)
+	bar.add_child(hb)
+	hb.add_child(_nav_item("📖", "Colección", UITheme.R_EPIC, false, "",
 		func(): get_tree().change_scene_to_file("res://scenes/dex.tscn")))
-	left.add_child(_rail_card("🛠", "Crear", Color(0.13, 0.62, 0.36),
+	hb.add_child(_nav_item("🛠", "Crear", UITheme.SUCCESS, false, "",
 		func(): get_tree().change_scene_to_file("res://scenes/character_creator.tscn")))
-	var tut := _rail_card("🎓", "Cómo jugar", MODE_GOLD.darkened(0.1),
-		func(): get_tree().change_scene_to_file("res://scenes/tutorials.tscn"))
-	(tut.get_meta("dot") as Control).visible = TutorialLib.pending_total() > 0
-	left.add_child(tut)
-
-	var right := VBoxContainer.new()
-	right.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	right.offset_left = -108
-	right.offset_right = -10
-	right.offset_top = 118
-	right.add_theme_constant_override("separation", 12)
-	layer.add_child(right)
-	# 🎁 Recompensas AGRUPA los cofres (gratis + ganados + nivel) en un popup,
-	# con estado en vivo bajo el icono y punto rojo cuando hay algo que abrir.
-	var rew := _rail_card("🎁", "Recompensas", MODE_GOLD.darkened(0.05), _open_rewards, "…")
+	# 🎁 Recompensas: cofres + cajas por tipo + anuncios (aquí se ABREN las cajas)
+	var rew := _nav_item("🎁", "Recompensas", MODE_GOLD, true, "…", _open_rewards)
 	_reward_state = rew.get_meta("sub")
 	_reward_dot = rew.get_meta("dot")
-	right.add_child(rew)
-	right.add_child(_rail_card("🛍", "Tienda", MODE_PURPLE.darkened(0.05),
+	hb.add_child(rew)
+	hb.add_child(_nav_item("🛍", "Tienda", MODE_PURPLE, false, "",
 		func(): get_tree().change_scene_to_file("res://scenes/shop.tscn")))
+	var tut := _nav_item("🎓", "Cómo jugar", MODE_GOLD.darkened(0.1), false, "",
+		func(): get_tree().change_scene_to_file("res://scenes/tutorials.tscn"))
+	(tut.get_meta("dot") as Control).visible = TutorialLib.pending_total() > 0
+	hb.add_child(tut)
+
+## Un ítem de la barra inferior: icono + etiqueta corta, punto rojo de aviso
+## (meta "dot") y sub-estado opcional (meta "sub", p. ej. estado de cofres).
+func _nav_item(icon: String, caption: String, accent: Color, want_sub: bool, sub: String, cb: Callable) -> Control:
+	var p := Control.new()
+	p.custom_minimum_size = Vector2(60, 64)
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var v := VBoxContainer.new()
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 0)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(v)
+	v.add_child(_lbl(icon, 22, accent, false, 700))
+	var cap := _lbl(caption, 9, INK, true, 700)
+	cap.clip_text = true
+	v.add_child(cap)
+	if want_sub:
+		var sl := _lbl(sub, 8, INK_SOFT, true, 700)
+		sl.clip_text = true
+		v.add_child(sl)
+		p.set_meta("sub", sl)
+	var b := Button.new()
+	b.flat = true
+	b.set_anchors_preset(Control.PRESET_FULL_RECT)
+	b.pressed.connect(func(): Sfx.play("ui_click"); cb.call())
+	b.button_down.connect(func(): p.pivot_offset = p.size * 0.5; p.scale = Vector2(0.9, 0.9))
+	b.button_up.connect(func(): p.scale = Vector2.ONE)
+	p.add_child(b)
+	var dot := Panel.new()
+	var ds := StyleBoxFlat.new()
+	ds.bg_color = DOT_RED
+	ds.set_corner_radius_all(6)
+	ds.set_border_width_all(2)
+	ds.border_color = UITheme.SURFACE
+	dot.add_theme_stylebox_override("panel", ds)
+	dot.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	dot.offset_left = -16
+	dot.offset_right = -4
+	dot.offset_top = 2
+	dot.offset_bottom = 14
+	dot.visible = false
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(dot)
+	p.set_meta("dot", dot)
+	return p
 
 func _open_rewards() -> void:
 	Sfx.play("ui_click")
@@ -851,17 +885,24 @@ func _open_reward_anim(icon: String, col: Color, lines: Array) -> void:
 ## central y MÁS grande — dentro va el Deck Builder: mazos + dificultad + CPU) ·
 ## 🌐 Online (morado, salas privadas por código).
 func _build_buttons(layer: CanvasLayer) -> void:
-	# Halo pulsante DETRÁS del botón central (se añade antes para quedar debajo).
-	var halo := _radial(MODE_GOLD, 0.55)
+	# Halo pulsante CIRCULAR detrás del botón central (círculo real, no un rect
+	# con degradado que se veía cuadrado).
+	var halo := Panel.new()
+	var hsb := StyleBoxFlat.new()
+	hsb.bg_color = Color(MODE_GOLD.r, MODE_GOLD.g, MODE_GOLD.b, 0.30)
+	hsb.set_corner_radius_all(170)
+	hsb.anti_aliasing = true
+	halo.add_theme_stylebox_override("panel", hsb)
 	halo.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	halo.offset_left = -150
-	halo.offset_right = 150
-	halo.offset_top = -330
+	halo.offset_left = -170
+	halo.offset_right = 170
+	halo.offset_top = -300
 	halo.offset_bottom = -120
+	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(halo)
 	var hp := create_tween().set_loops()
-	hp.tween_property(halo, "modulate:a", 0.75, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	hp.tween_property(halo, "modulate:a", 0.35, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	hp.tween_property(halo, "modulate:a", 0.7, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	hp.tween_property(halo, "modulate:a", 0.3, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 	var probar := _mode_button("🎲", "Probar", "sala de pruebas", MODE_BLUE, false)
 	probar.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
@@ -934,32 +975,41 @@ func _juice_play(play: Button) -> void:
 
 ## Partículas suaves de fondo: puntos de color que flotan lentamente (el menú
 ## deja de verse estático/triste sin costar nada de rendimiento).
+## Partículas de fondo: motas CIRCULARES pequeñas, tenues y lentas (antes eran
+## degradados en rect que se veían CUADRADOS). Círculo real = Panel con esquinas
+## totalmente redondeadas; suben flotando suave. Solo ambiente, muy sutil.
 func _build_bg_particles(layer: CanvasLayer) -> void:
 	var vw := get_viewport().get_visible_rect().size
 	var cols := [MODE_BLUE, MODE_GOLD, MODE_PURPLE, Color(0.3, 0.8, 0.5)]
-	for i in 12:
-		var d := _radial(cols[i % cols.size()], 0.16 + randf() * 0.12)
-		var size := 26.0 + randf() * 64.0
-		d.position = Vector2(randf() * vw.x, randf() * vw.y)
-		d.size = Vector2(size, size)
-		d.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		layer.add_child(d)
+	for i in 10:
+		var col: Color = cols[i % cols.size()]
+		var size := 8.0 + randf() * 12.0
+		var dot := Panel.new()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(col.r, col.g, col.b, 0.14 + randf() * 0.10)
+		sb.set_corner_radius_all(int(size))   # esquinas = radio -> círculo perfecto
+		sb.anti_aliasing = true
+		dot.add_theme_stylebox_override("panel", sb)
+		dot.custom_minimum_size = Vector2(size, size)
+		dot.size = Vector2(size, size)
+		dot.position = Vector2(randf() * vw.x, randf() * vw.y)
+		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		layer.add_child(dot)
 		var tw := create_tween().set_loops()
-		var dur := 2.2 + randf() * 2.6
-		var rise := 40.0 + randf() * 70.0
-		tw.tween_property(d, "position:y", d.position.y - rise, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		tw.tween_property(d, "position:y", d.position.y, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		var tx := create_tween().set_loops()
-		var sway := 18.0 + randf() * 26.0
-		tx.tween_property(d, "position:x", d.position.x + sway, dur * 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		tx.tween_property(d, "position:x", d.position.x, dur * 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		var dur := 3.6 + randf() * 3.6
+		var rise := 30.0 + randf() * 55.0
+		tw.tween_property(dot, "position:y", dot.position.y - rise, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(dot, "position:y", dot.position.y, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 # ----------------------------------------------------------------- widgets
 func _radial(col: Color, alpha: float) -> TextureRect:
 	var tr := TextureRect.new()
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var g := Gradient.new()
+	# Falloff que llega a 0 ANTES del borde (por ~0.72 del radio) para que no
+	# quede alpha en los lados del rect y no se vea un cuadro translúcido.
 	g.set_color(0, Color(col.r, col.g, col.b, alpha))
+	g.add_point(0.72, Color(col.r, col.g, col.b, 0.0))
 	g.set_color(1, Color(col.r, col.g, col.b, 0.0))
 	var gt := GradientTexture2D.new()
 	gt.gradient = g

@@ -94,7 +94,7 @@ func graph_dist(a: int, b: int) -> int:
 ## nodos del centro para que haya MÁS camino entre ellos, sin cambiar cuántos
 ## nodos/aristas hay (la topología es idéntica). La isla y el espejo se
 ## reescalan solos; la cámara del tablero se aleja el mismo factor.
-const SPACING := 1.22
+const SPACING := 1.55
 
 func _add(pos: Vector3) -> int:
 	var id := nodes.size()
