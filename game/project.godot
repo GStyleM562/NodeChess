@@ -13,8 +13,10 @@ config_version=5
 config/name="NodeChess"
 config/description="Tactical board battler — MVP scaffold (board + figures)"
 config/version="0.27"
-run/main_scene="res://scenes/main_menu.tscn"
+run/main_scene="res://scenes/splash.tscn"
 config/features=PackedStringArray("4.6", "Mobile")
+boot_splash/bg_color=Color(0.055, 0.067, 0.114, 1)
+boot_splash/show_image=false
 config/icon="res://icon.svg"
 
 [autoload]
