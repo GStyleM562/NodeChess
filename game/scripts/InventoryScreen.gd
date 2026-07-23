@@ -11,6 +11,12 @@ var _chest_hdr: Label           # "Tus cofres (N/4)"
 var _chest_tick := 0.0
 var _guide := ""                # guía "pícale aquí" activa (menu_craft/menu_chest)
 var _guide_banner: PanelContainer
+# Inventario POR PESTAÑAS (como el Creador): más limpio visualmente.
+var _tab := "chests"            # "chests" | "pieces"
+var _tab_chests: Button
+var _tab_pieces: Button
+var _page_chests: VBoxContainer
+var _page_pieces: VBoxContainer
 
 func _ready() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
@@ -68,27 +74,52 @@ func _ready() -> void:
 	mode_pill.add_child(_mode_lbl)
 	top.add_child(mode_pill)
 
-	var chint := Label.new()
-	chint.text = "Aquí controlas TU COLA DE CAJAS (descífralas y ábrelas), ves tus piezas y conviertes fragmentos."
-	chint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	UITheme.label(chint, 11, UITheme.MUTED, false, 600)
-	root.add_child(chint)
-
 	_result = Label.new()
 	_result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	UITheme.label(_result, 13, UITheme.SUCCESS, false, 700)
 	root.add_child(_result)
 
-	# --- TUS COFRES: los GANAS venciendo partidas; aquí los DESCIFRAS y abres ---
+	# --- PESTAÑAS: 📦 Cofres | 🧩 Piezas (división para más limpieza visual) ---
+	var seg := HBoxContainer.new()
+	seg.add_theme_constant_override("separation", 8)
+	root.add_child(seg)
+	_tab_chests = _seg_btn("📦  Cofres", "chests")
+	_tab_pieces = _seg_btn("🧩  Piezas", "pieces")
+	seg.add_child(_tab_chests)
+	seg.add_child(_tab_pieces)
+
+	# --- PÁGINA COFRES: la cola (descifrar / abrir) ---
+	_page_chests = VBoxContainer.new()
+	_page_chests.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_page_chests.add_theme_constant_override("separation", 8)
+	root.add_child(_page_chests)
+	var chint := Label.new()
+	chint.text = "Tu COLA DE CAJAS: los cofres se ganan jugando; aquí los descifras (tardan un rato) y los abres."
+	chint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.label(chint, 11, UITheme.MUTED, false, 600)
+	_page_chests.add_child(chint)
 	_chest_hdr = Label.new()
 	UITheme.section(_chest_hdr, "Tus cofres (0/%d)" % Inventory.CHEST_SLOTS)
-	root.add_child(_chest_hdr)
+	_page_chests.add_child(_chest_hdr)
+	var chest_scroll := ScrollContainer.new()
+	chest_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	chest_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_page_chests.add_child(chest_scroll)
 	_chest_box = VBoxContainer.new()
+	_chest_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_chest_box.add_theme_constant_override("separation", 6)
-	root.add_child(_chest_box)
+	chest_scroll.add_child(_chest_box)
 	_rebuild_chests()
 
-	# --- admin: regalo de prueba ---
+	# --- PÁGINA PIEZAS: inventario + conversión de fragmentos ---
+	_page_pieces = VBoxContainer.new()
+	_page_pieces.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_page_pieces.add_theme_constant_override("separation", 8)
+	root.add_child(_page_pieces)
+	var hdr := Label.new()
+	UITheme.section(hdr, "Tus piezas  ·  10 fragmentos = 1 pieza")
+	_page_pieces.add_child(hdr)
+	# admin: regalo de prueba
 	if Inventory.is_admin():
 		var gift := Button.new()
 		gift.text = "🎁 Regalar 3 de CADA pieza (prueba admin)"
@@ -99,16 +130,11 @@ func _ready() -> void:
 			var n: int = Inventory.gift_all(3)
 			_result.text = "✓ Regaladas 3 piezas de cada una (%d tipos)." % n
 			_rebuild_inventory())
-		root.add_child(gift)
-
-	# --- inventario ---
-	var hdr := Label.new()
-	UITheme.section(hdr, "Tu inventario  ·  10 fragmentos = 1 pieza")
-	root.add_child(hdr)
+		_page_pieces.add_child(gift)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	root.add_child(scroll)
+	_page_pieces.add_child(scroll)
 	_inv_box = VBoxContainer.new()
 	_inv_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_inv_box.add_theme_constant_override("separation", 4)
@@ -116,7 +142,34 @@ func _ready() -> void:
 
 	_refresh_mode()
 	_rebuild_inventory()
+	_set_tab("chests")
 	_guide_setup()
+
+## Botón de pestaña 📦/🧩.
+func _seg_btn(text: String, tab: String) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.custom_minimum_size = Vector2(0, 46)
+	b.pressed.connect(func(): _set_tab(tab))
+	return b
+
+func _set_tab(tab: String) -> void:
+	_tab = tab
+	if _page_chests != null:
+		_page_chests.visible = tab == "chests"
+	if _page_pieces != null:
+		_page_pieces.visible = tab == "pieces"
+	for pair in [[_tab_chests, "chests"], [_tab_pieces, "pieces"]]:
+		var b: Button = pair[0]
+		if b == null:
+			continue
+		var active: bool = tab == String(pair[1])
+		UITheme.button_font(b, 15, UITheme.TEXT if active else UITheme.TEXT2, true, 800)
+		if active:
+			UITheme.style_primary(b, UITheme.PRIMARY, 12)
+		else:
+			UITheme.style_surface(b, UITheme.SURFACE2, UITheme.BORDER, 12)
 
 # ---------------------------------------------------------------- guías 🎓
 ## Guía "PÍCALE AQUÍ" del FULL tutorial: resalta el botón objetivo y completa
@@ -125,6 +178,8 @@ func _guide_setup() -> void:
 	_guide = TutorialLib.active_guide
 	if _guide == "":
 		return
+	# abrir la pestaña correcta según la guía (craftear = Piezas · descifrar = Cofres)
+	_set_tab("pieces" if _guide == "menu_craft" else "chests")
 	if _guide == "menu_craft":
 		# que siempre haya algo crafteable: 10 fragmentos de regalo si faltan
 		var has_ten := false
