@@ -15,6 +15,16 @@ var tutorial_done := false
 var tuts_done: Array = []   # capítulos del FULL tutorial superados (ids)
 var player_name := "Jugador"   # nombre del jugador (Perfil/Home/online)
 var dark_mode := false      # tema oscuro (Configuración); claro por defecto
+var legal_accepted := 0     # versión de Términos/Aviso aceptada (0 = ninguna)
+var ads_consent := "non_personalized"   # "non_personalized" | "personalized" | "denied"
+
+func set_legal_accepted(v: int) -> void:
+	legal_accepted = v
+	_save()
+
+func set_ads_consent(v: String) -> void:
+	ads_consent = v
+	_save()
 
 func set_dark_mode(v: bool) -> void:
 	dark_mode = v
@@ -112,6 +122,8 @@ func _load() -> void:
 		tuts_done = data.get("tuts", [])
 		player_name = String(data.get("pname", "Jugador"))
 		dark_mode = bool(data.get("dark", false))
+		legal_accepted = int(data.get("legal", 0))
+		ads_consent = String(data.get("ads_consent", "non_personalized"))
 
 func _save() -> void:
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
@@ -119,5 +131,5 @@ func _save() -> void:
 		f.store_string(JSON.stringify({"music": music_vol, "sfx": sfx_vol, "board": board_view,
 			"favs": favorites, "cpu": cpu_level, "speed": combat_speed, "cb": colorblind,
 			"tut": tutorial_done, "tuts": tuts_done, "pname": player_name,
-			"dark": dark_mode}))
+			"dark": dark_mode, "legal": legal_accepted, "ads_consent": ads_consent}))
 		f.close()

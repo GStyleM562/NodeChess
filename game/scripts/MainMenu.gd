@@ -61,8 +61,16 @@ func _ready() -> void:
 		NetSession.abort_reason = ""
 		add_child(dlg)
 		dlg.popup_centered.call_deferred()
-	# BIENVENIDA (1 vez por sesión): si hay tutoriales pendientes, invitarlos —
-	# con las categorías, cuántos por cada una y las recompensas jugosas.
+	# LEGAL: en el primer inicio hay que ACEPTAR Términos + Aviso de Privacidad
+	# (México LFPDPPP 2025 / Google Play). Bloquea hasta aceptar; la bienvenida va
+	# después. Si ya se aceptó esta versión, se salta directo a la bienvenida.
+	if not Legal.accepted():
+		Legal.show_gate.call_deferred(self, _after_legal)
+	else:
+		_after_legal()
+
+## Tras aceptar (o si ya estaba aceptado): mostrar la bienvenida de tutoriales.
+func _after_legal() -> void:
 	if not TutorialLib.welcomed and TutorialLib.pending_total() > 0:
 		TutorialLib.welcomed = true
 		_show_welcome.call_deferred()
@@ -1288,6 +1296,49 @@ func _show_settings() -> void:
 		String(ProjectSettings.get_setting("application/config/version", "?")),
 		NetSession.NET_BUILD], 12, UITheme.MUTED, false, 600)
 	vb.add_child(vlbl)
+
+	# --- LEGAL Y PRIVACIDAD (México LFPDPPP / Google Play) ---
+	var lh := Label.new()
+	UITheme.section(lh, "Legal y privacidad")
+	lh.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	vb.add_child(lh)
+	var lrow := HBoxContainer.new()
+	lrow.add_theme_constant_override("separation", 8)
+	vb.add_child(lrow)
+	var tbtn := Button.new()
+	tbtn.text = "📜 Términos"
+	tbtn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tbtn.custom_minimum_size = Vector2(0, 42)
+	UITheme.button_font(tbtn, 13, UITheme.TEXT, true, 700)
+	UITheme.style_surface(tbtn, UITheme.SURFACE2, UITheme.BORDER, 10)
+	tbtn.pressed.connect(func(): Legal.show_document(self, "terms"))
+	lrow.add_child(tbtn)
+	var pbtn := Button.new()
+	pbtn.text = "🔒 Privacidad"
+	pbtn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pbtn.custom_minimum_size = Vector2(0, 42)
+	UITheme.button_font(pbtn, 13, UITheme.TEXT, true, 700)
+	UITheme.style_surface(pbtn, UITheme.SURFACE2, UITheme.BORDER, 10)
+	pbtn.pressed.connect(func(): Legal.show_document(self, "privacy"))
+	lrow.add_child(pbtn)
+	# consentimiento de anuncios (personalizado / no personalizado)
+	var acb := Button.new()
+	var _acstyle := func():
+		acb.text = "📺 Anuncios: %s" % ("personalizados" if Settings.ads_consent == "personalized" else "NO personalizados")
+	acb.custom_minimum_size = Vector2(0, 42)
+	UITheme.button_font(acb, 13, UITheme.TEXT, true, 700)
+	UITheme.style_surface(acb, UITheme.SURFACE2, UITheme.BORDER, 10)
+	_acstyle.call()
+	acb.pressed.connect(func():
+		Settings.set_ads_consent("personalized" if Settings.ads_consent != "personalized" else "non_personalized")
+		_acstyle.call())
+	vb.add_child(acb)
+	var lhint := Label.new()
+	lhint.text = "Sin compras · anuncios opcionales · datos guardados en tu dispositivo. Escríbenos a %s para ejercer tus derechos." % Legal.CONTACT
+	lhint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lhint.custom_minimum_size = Vector2(430, 0)
+	UITheme.label(lhint, 10, UITheme.MUTED, false, 600)
+	vb.add_child(lhint)
 
 	# --- TEMA: claro (Juicy Hall) / oscuro (fácil para la vista) ---
 	var th := Label.new()
