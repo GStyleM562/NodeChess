@@ -162,6 +162,10 @@ func _ready() -> void:
 		for ri in ([0] if Loadout.tutorial else Loadout.enemy_team):
 			_gs.add_to_bench("enemy", int(ri))
 	_build_board()
+	# FIGURAS YA COLOCADAS (lecciones guionadas): existían en el estado pero nadie
+	# les creaba el modelo 3D (solo se creaba al DESPLEGAR) -> se veían vacías y la
+	# lección se quedaba atorada porque no había nada que tocar. Se crean aquí.
+	_spawn_preplaced()
 	_overlay = CombatOverlay.new()
 	add_child(_overlay)
 	_build_ui()
@@ -399,7 +403,10 @@ func _build_environment() -> void:
 	# Lock the HORIZONTAL fov (KEEP_WIDTH) so the board's width is always fully
 	# visible on a tall portrait screen (no cut-off edges); height gets extra room.
 	_cam.keep_aspect = Camera3D.KEEP_WIDTH
-	_cam.fov = 34.0
+	# 37 (antes 34): deja ~30 px de margen a cada lado para que las FIGURAS de
+	# los nodos del borde y sus nombres no se recorten (se veía en lecciones que
+	# colocan piezas en nodos extremos). El ángulo del tablero no cambia.
+	_cam.fov = 37.0
 	# Camera on the player's side: player sits at the BOTTOM, enemy at the top.
 	# Cámara: se aleja MENOS que el factor de separación (MapData.SPACING 1.55) a
 	# propósito, para que el tablero llene el ancho y los CAMINOS se vean largos
@@ -520,7 +527,7 @@ func _tut_build_panel() -> void:
 	_tut_panel.offset_right = -12
 	_tut_panel.offset_top = 96
 	_tut_panel.offset_bottom = 178
-	_tut_panel.add_theme_stylebox_override("panel", UITheme.panel(Color(0.92, 0.975, 0.92, 0.97), UITheme.SUCCESS, 14, 2, 10))
+	_tut_panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.tint(UITheme.SUCCESS, 0.10, 0.97), UITheme.SUCCESS, 14, 2, 10))
 	_ui_layer.add_child(_tut_panel)
 	var vb := VBoxContainer.new()
 	_tut_panel.add_child(vb)
@@ -531,7 +538,7 @@ func _tut_build_panel() -> void:
 	_tut_ok = Button.new()
 	_tut_ok.text = "Entendido ✓"
 	_tut_ok.custom_minimum_size = Vector2(0, 34)
-	UITheme.button_font(_tut_ok, 13, UITheme.TEXT, true, 700)
+	UITheme.button_font(_tut_ok, 13, Color.WHITE, true, 800)
 	UITheme.style_primary(_tut_ok, UITheme.SUCCESS, 10)
 	_tut_ok.pressed.connect(func(): _tut_advance())
 	vb.add_child(_tut_ok)
@@ -714,7 +721,7 @@ func _lesson_complete() -> void:
 	cl.add_child(cc)
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(minf(400.0, get_viewport().get_visible_rect().size.x - 28.0), 0)
-	card.add_theme_stylebox_override("panel", UITheme.panel(Color(0.95, 0.985, 0.94, 0.99), UITheme.SUCCESS, 20, 2, 18))
+	card.add_theme_stylebox_override("panel", UITheme.panel(UITheme.tint(UITheme.SUCCESS, 0.08, 0.99), UITheme.SUCCESS, 20, 2, 18))
 	cc.add_child(card)
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1152,8 +1159,22 @@ func _add_node_core(n: Dictionary) -> void:
 # ---------------------------------------------------------------- figures
 ## `at_node` >= 0: aparece AHÍ aunque el estado ya esté más adelante (la CPU
 ## despliega y camina en la misma acción; la vista debe partir de la entrada).
-func _spawn_vis(uid: int, at_node := -1) -> void:
-	Sfx.play("deploy")
+## Crea el modelo 3D de TODA unidad viva que ya esté sobre el tablero al arrancar
+## (lecciones con tablero prescrito). Sin sonido ni FX: no es un despliegue.
+func _spawn_preplaced() -> void:
+	for nid in _gs.board.keys():
+		var uid := int(_gs.board[nid])
+		if _vis.has(uid) or not _gs.units.has(uid):
+			continue
+		if not bool(_gs.units[uid].get("alive", true)):
+			continue
+		_spawn_vis(uid, -1, true)
+
+## `quiet` = aparición SIN sonido ni efecto de invocación: se usa para las figuras
+## que la LECCIÓN deja ya colocadas en el tablero (no son un despliegue del jugador).
+func _spawn_vis(uid: int, at_node := -1, quiet := false) -> void:
+	if not quiet:
+		Sfx.play("deploy")
 	var u: Dictionary = _gs.units[uid]
 	var data: Dictionary = _gs.model_data(uid)   # rank-aware (ranked figures keep their model after KO)
 	var fig := Figure3D.new()
@@ -1164,7 +1185,8 @@ func _spawn_vis(uid: int, at_node := -1) -> void:
 	_face(fig, Vector3(0, 0, 1.0) if u["team"] == "player" else Vector3(0, 0, -1.0))
 	_add_team_ring(fig, u["team"])
 	fig.play_clip("idle")
-	_summon_fx(fig, u["team"])
+	if not quiet:
+		_summon_fx(fig, u["team"])
 	var lbl := Label3D.new()
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lbl.no_depth_test = true
@@ -1315,7 +1337,7 @@ func _build_ui() -> void:
 	for st in ["hover", "pressed", "hover_pressed", "focus"]:
 		_end_btn.add_theme_stylebox_override(st, glow_hot)
 	_end_btn.add_theme_stylebox_override("disabled",
-		UITheme.panel(Color(1.0, 0.985, 0.94, 0.96), UITheme.BORDER, 14, 1, 8))
+		UITheme.panel(UITheme.surf(0.96), UITheme.BORDER, 14, 1, 8))
 	var pulse := create_tween().set_loops()
 	pulse.tween_property(glow, "shadow_size", 18, 0.75).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	pulse.tween_property(glow, "shadow_size", 5, 0.75).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
@@ -1328,7 +1350,7 @@ func _build_ui() -> void:
 	bench_panel.offset_bottom = -8
 	bench_panel.offset_left = 8
 	bench_panel.offset_right = -8
-	bench_panel.add_theme_stylebox_override("panel", UITheme.panel(Color(1.0, 0.985, 0.94, 0.94), UITheme.BORDER, 14, 1, 6))
+	bench_panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.surf(0.94), UITheme.BORDER, 14, 1, 6))
 	layer.add_child(bench_panel)
 	# La banca ahora es de 6 (+ K.O. con contador): scroll horizontal si no cabe.
 	var bench_scroll := ScrollContainer.new()
@@ -1344,7 +1366,7 @@ func _build_ui() -> void:
 	en_pill.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	en_pill.offset_left = 10
 	en_pill.offset_top = 48
-	en_pill.add_theme_stylebox_override("panel", UITheme.pill(Color(1.0, 0.99, 0.95, 0.95), UITheme.ENERGY.darkened(0.1), 9))
+	en_pill.add_theme_stylebox_override("panel", UITheme.pill(UITheme.surf(0.95), UITheme.ENERGY.darkened(0.1), 9))
 	layer.add_child(en_pill)
 	_energy_label = Label.new()
 	UITheme.label(_energy_label, 18, UITheme.ENERGY, true, 800)
@@ -1358,7 +1380,7 @@ func _build_ui() -> void:
 	mods_panel.offset_right = -8
 	# sin esto usa el panel GRIS OSCURO por defecto de Godot (franja fea sobre
 	# el tema claro); tarjeta crema translúcida como el resto del HUD
-	mods_panel.add_theme_stylebox_override("panel", UITheme.panel(Color(1.0, 0.985, 0.94, 0.92), UITheme.BORDER, 12, 1, 4))
+	mods_panel.add_theme_stylebox_override("panel", UITheme.panel(UITheme.surf(0.92), UITheme.BORDER, 12, 1, 4))
 	layer.add_child(mods_panel)
 	_mods_box = HBoxContainer.new()
 	_mods_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1372,7 +1394,7 @@ func _build_ui() -> void:
 	_banner.offset_bottom = 150
 	_banner.offset_left = 20
 	_banner.offset_right = -20
-	_banner.add_theme_stylebox_override("panel", UITheme.panel(Color(1.0, 0.985, 0.94, 0.97), UITheme.GOLD.darkened(0.05), 14, 2, 10))
+	_banner.add_theme_stylebox_override("panel", UITheme.panel(UITheme.surf(0.97), UITheme.GOLD.darkened(0.05), 14, 2, 10))
 	_banner.visible = false
 	layer.add_child(_banner)
 	_banner_lbl = Label.new()
@@ -1415,7 +1437,7 @@ func _build_ui() -> void:
 	_net_banner.offset_right = 230
 	_net_banner.offset_top = 160
 	_net_banner.offset_bottom = 220
-	_net_banner.add_theme_stylebox_override("panel", UITheme.panel(Color(1.0, 0.955, 0.94, 0.97), UITheme.DANGER, 14, 2, 10))
+	_net_banner.add_theme_stylebox_override("panel", UITheme.panel(UITheme.tint(UITheme.DANGER, 0.06, 0.97), UITheme.DANGER, 14, 2, 10))
 	_net_banner.visible = false
 	layer.add_child(_net_banner)
 	_net_banner_lbl = Label.new()

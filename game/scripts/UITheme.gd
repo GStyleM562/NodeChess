@@ -167,6 +167,21 @@ static func _warm_shadow(sb: StyleBoxFlat, size := 6, dy := 3) -> void:
 	sb.shadow_size = size
 	sb.shadow_offset = Vector2(0, dy)
 
+## Fondo de panel del TEMA con transparencia (crema en claro, pizarra en oscuro).
+## Úsalo SIEMPRE en vez de un Color(...) literal: un fondo claro fijo deja el
+## texto (que sí sigue al tema) ilegible al activar el modo oscuro.
+static func surf(alpha := 1.0) -> Color:
+	var c := SURFACE
+	c.a = alpha
+	return c
+
+## Igual que surf(), pero TEÑIDO hacia un acento (verde de tutorial, rojo de
+## error…). Parte del SURFACE del tema, así que nunca invierte el contraste.
+static func tint(accent: Color, amount := 0.12, alpha := 1.0) -> Color:
+	var c := SURFACE.lerp(accent, amount)
+	c.a = alpha
+	return c
+
 ## Panel/tarjeta: crema con LABIO inferior 3D (borde grueso abajo, fino a los
 ## lados) tintado con `border` — la regla №1 del tema Juicy Hall.
 static func panel(bg := SURFACE, border := BORDER, radius := 16, bw := 2, pad := 10) -> StyleBoxFlat:

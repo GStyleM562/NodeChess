@@ -26,6 +26,12 @@ func _run_lesson(id: String) -> bool:
 	for i in 20:
 		await process_frame
 	ok = _expect("%s: carga (tablero vivo)" % id, is_instance_valid(b) and b.get("_gs") != null, true) and ok
+	# REGRESIÓN: las lecciones PRE-COLOCAN figuras en el tablero; si no se crea su
+	# modelo 3D quedan invisibles/intocables y la lección se atora para siempre.
+	# Toda unidad sobre el tablero AL CARGAR debe tener su Figure3D en _vis.
+	var on_board: int = (b.get("_gs").board as Dictionary).size()
+	var models: int = (b.get("_vis") as Dictionary).size()
+	ok = _expect("%s: figuras con modelo 3D (%d/%d)" % [id, models, on_board], models, on_board) and ok
 	var steps: int = (b.get("_steps_src") as Array).size()
 	ok = _expect("%s: tiene pasos (%d)" % [id, steps], steps > 0, true) and ok
 	# RECORRER todos los pasos: cada _tut_advance dibuja el 👉 del siguiente

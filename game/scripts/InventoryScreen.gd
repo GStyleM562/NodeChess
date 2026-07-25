@@ -207,7 +207,7 @@ func _guide_setup() -> void:
 	_guide_banner.offset_bottom = -12
 	_guide_banner.offset_left = 12
 	_guide_banner.offset_right = -12
-	_guide_banner.add_theme_stylebox_override("panel", UITheme.panel(Color(0.92, 0.975, 0.92, 0.97), UITheme.SUCCESS, 14, 2, 10))
+	_guide_banner.add_theme_stylebox_override("panel", UITheme.panel(UITheme.tint(UITheme.SUCCESS, 0.10, 0.97), UITheme.SUCCESS, 14, 2, 10))
 	var l := Label.new()
 	l.text = ("🎓 TUTORIAL · Toca «👉 Convertir» en una pieza con fragmentos completos (10/10) para CRAFTEARLA." \
 		if _guide == "menu_craft" else
