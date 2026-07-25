@@ -1,12 +1,25 @@
 # NodeChess
 
-Game Design Documentation for **NodeChess** — a Tactical Board Battler (top-down, Android, multiplayer).
+**NodeChess** — a Tactical Board Battler (top-down, Android, portrait, online 1v1).
 
-This repository currently hosts the project's design documentation. Source/assets are tracked separately.
+This repository hosts the **full project**: the Godot 4.6 game, the Node.js
+relay server for online play, and the design documentation.
+
+| Folder | What it is |
+| ------ | ---------- |
+| [`game/`](game/) | The Godot 4.6 project (GDScript). Tests live in [`game/tools/`](game/tools/) — 50 headless suites, runner `run_suite.ps1`. |
+| [`nodechess_server/`](nodechess_server/) | Node.js WebSocket relay (rooms by code + random matchmaking), deployed on Render. |
+| [`docs/`](docs/) | Design docs (GDD Parts 1–5), changelog, pending work, legal. |
+
+## Where to start
+
+- **Current state & recent work:** [CHANGELOG](docs/CHANGELOG.md)
+- **What's left to launch:** [PENDIENTES_Lanzamiento](docs/PENDIENTES_Lanzamiento.md)
+- **The whole game design in one read:** [GDD Context Summary](docs/GDD_Context_Summary.md)
+- **UI/UX rules to follow:** [UIUX_Juicy_Hall](docs/UIUX_Juicy_Hall.md)
+- **Legal (MX) & Play Console:** [terminosycondiciones](docs/terminosycondiciones.md)
 
 ## Documentation
-
-**Start here:** [GDD Context Summary](docs/GDD_Context_Summary.md) — the whole game (Parts 1–5) condensed into one read.
 
 All design documents live under [`docs/`](docs/), organized by part:
 
@@ -24,8 +37,10 @@ Visual references: [docs/Images Reference/](docs/Images%20Reference/)
 
 | Property | Value |
 | -------- | ----- |
-| Version | 1.0 |
+| Build | 0.33 (versionCode 33) |
 | Document Status | Rules Locked |
-| Target Platform | Android |
+| Target Platform | Android (portrait) |
 | Genre | Tactical Board Battler |
-| Multiplayer | Yes |
+| Multiplayer | Yes — rooms by code + random matchmaking (Render relay `v25`) |
+| Tests | 50/50 green |
+| Engine | Godot 4.6.3 |

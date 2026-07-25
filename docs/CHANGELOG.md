@@ -1,8 +1,10 @@
 # NodeChess — Estado del proyecto y registro de cambios
 
 > Resumen vivo: qué está HECHO, qué entró en la última tanda, y qué queda
-> PENDIENTE (mecánicas / diseño / mapa / técnico). Actualizado: 2026-07-08.
-> Plan de la vuelta y estados por punto: `docs/PENDIENTES_Vuelta01.md`.
+> PENDIENTE (mecánicas / diseño / mapa / técnico). Actualizado: **2026-07-25**
+> (build **0.33** / versionCode 33). Qué falta para LANZAR:
+> `docs/PENDIENTES_Lanzamiento.md`. Estados por punto de vueltas anteriores:
+> `docs/PENDIENTES_Vuelta01.md` · `_Vuelta02.md` · `_Vuelta03.md`.
 
 ## ✅ Sistemas funcionando hoy
 
@@ -99,29 +101,43 @@
 - Música por estado + 11 slots SFX; volúmenes y toggles en Configuración ⚙.
 
 ## 🕐 PENDIENTES
-> Lista completa y priorizada: `docs/PENDIENTES_Vuelta02.md` · Plan de
-> pruebas (suite + 🤖 robot + checklist humana): `docs/PLAN_Testing.md`.
+> **Lista maestra de lo que falta para lanzar: `docs/PENDIENTES_Lanzamiento.md`**
+> (bloqueantes, configuración administrativa y contenido diferido).
+> Plan de pruebas (suite + 🤖 robot + checklist humana): `docs/PLAN_Testing.md`.
+
+**🔴 Bloqueantes de lanzamiento (los 3 grandes)**
+- **SFX: 0 de 11.** El motor está listo (Music por estado + 11 slots de SFX,
+  crossfade y fallback silencioso) y la MÚSICA sí está (4/4 pistas, aunque
+  parecen cruzadas entre carpetas), pero `game/assets/audio/sfx/` solo tiene
+  `.gitkeep`: ningún golpe, K.O. ni clic suena. Lado de Gojan (o assets libres).
+- **ANUNCIOS reales sin activar**: `Ads.gd` funciona simulado; falta el plugin
+  AdMob para Godot 4 + pegar `UNIT_RELEASE`. Sin eso NO hay ingresos.
+  Pasos exactos: `docs/Ads_Setup.md`.
+- **Configuración administrativa en Play Console**: URL de privacidad, Data
+  safety e IARC. Detalle: `docs/terminosycondiciones.md` §8.
 
 **Del lado de GOJAN (assets, no bloquean código)**
-- 🔴 URGENTE — REDESPLEGAR EL RELAY EN RENDER (el auto-deploy NO funciona: los
-  pushes del 4-jul, 8-jul y 17-jul nunca se desplegaron; Render corre el server
-  del 1-jul que vacía los mazos → el online muere al empezar). En
-  dashboard.render.com → nodechess-server → "Manual Deploy → Deploy latest
-  commit"; y en Settings → Build & Deploy poner Auto-Deploy: Yes (branch main).
-  VERIFICAR: https://nodechess-server.onrender.com debe responder
-  "NodeChess relay OK v24". Después, ambos teléfonos con el build v24.
-- SFX reales (11 carpetas en `game/assets/audio/sfx/`).
-- Meshy: Storm Valkyrie nueva (sigue excluida de la CPU), isla real,
-  rocas/árboles de borde, clips de ataque extra por figura.
-- Iconografía propia para piezas/cofres/botones (hoy emojis).
-- Probar build nueva en dos teléfonos (online) y reportar.
+- Meshy: Storm Valkyrie nueva (sigue EXCLUIDA del equipo por defecto en
+  `Loadout.gd` — su modelo "ave" tapa la pantalla), isla real, rocas/árboles de
+  borde, clips de ataque extra por figura.
+- Iconografía propia para piezas/cofres/botones (hoy emojis enmarcados).
+- Probar el build 0.33 en DOS teléfonos (online + checklist humana) y reportar.
 
-**Vuelta 02 (decidido posponer)**
-- Tienda + monedas/gemas reales, anuncios/monetización (la Tienda ya se VE como
-  vista previa; falta activar compras). Perfil: editar nombre/avatar.
-- Misiones diarias / pity (GDD las marca "MVP disabled").
-- Guardado en la nube / cuentas (hoy: local + backup Google + códigos).
-- Cobertura de pruebas de UI táctil (drag&drop de banca es manual).
+**Diferido por decisión de Gojan (NO hacer por ahora)**
+- Puzzle Battles · Boss Battles · arquetipos de mapa nuevos · ladder/PvP gate
+  (solo "crear sala" + "encontrar rival") · colección completa (skins/wishlist)
+  · personalidades de bot extra · conversión inversa duplicados→fragmentos.
+
+**Sin decidir / post-lanzamiento**
+- Qué BONO da cada CLASE (hoy las clases solo cuestan Piece Points; el GDD
+  quería bonos/pasivas ocultas por clase) — decisión de diseño de Gojan.
+- Misiones diarias / pity (el GDD las marca "MVP disabled").
+- Guardado en la NUBE / cuentas (hoy: local + backup de Google + códigos).
+- CI (GitHub Actions con Godot headless) y telemetría de balance (F6).
+- Tamaño del .aab (176 MB; assets 205 MB: figuras 112 + tablero 88).
+- Cobertura de pruebas de UI táctil (drag&drop de banca sigue siendo manual).
+- Prueba de ACTUALIZACIÓN formal (instalar build viejo → jugar → actualizar →
+  verificar que no se pierde inventario/mazos/customs/nivel). Nunca hecha.
 
 ## 🔁 Protocolo de reanudación (si se corta la sesión)
 1. Leer este archivo y `docs/PENDIENTES_Vuelta01.md` (estados por punto).
@@ -133,6 +149,46 @@
    `F:\GodotProjects\keystores\` — JAMÁS commitear).
 
 ## 📜 Historial breve de tandas recientes
+- 🎓 **FIX tutoriales atorados + legibilidad (0.33)**: las lecciones
+  PRE-COLOCAN piezas, pero el modelo 3D solo se creaba al DESPLEGAR → las
+  figuras quedaban invisibles e intocables y la lección se atoraba SIEMPRE
+  (`_spawn_preplaced()` en Board3D; `_spawn_vis` con modo `quiet`). Además, 9
+  paneles del HUD tenían el FONDO claro FIJO mientras el texto sí seguía al
+  tema → en modo oscuro era texto claro sobre fondo claro: nuevos
+  `UITheme.surf()/tint()` (parten del SURFACE del tema, nunca invierten el
+  contraste). Cámara fov 34→37 para que las figuras del borde no se recorten.
+  `test_lessons_live` ahora exige `modelos3D == unidades_en_tablero`.
+- ⚖️ **LEGAL (0.32)**: investigación del marco mexicano (LFPDPPP 2025, LFPC/
+  PROFECO, Ley de Juegos y Sorteos para cajas, menores, Google Play/AdMob) →
+  `docs/terminosycondiciones.md` (22 KB: textos oficiales, mapa de Data safety,
+  checklist, spec para el sitio web). En la app: autoload `Legal` con Términos
+  y Aviso de Privacidad EMBEBIDOS + pantalla de aceptación obligatoria al
+  primer arranque + toggle de anuncios personalizados. Inventario POR PESTAÑAS
+  (Cofres | Piezas) como el Creador.
+- 💅 **Pulido de tema (0.31)**: contraste suave (fuera el negro + dorado
+  brillante), tipografía con CUERPO (`WEIGHT_BOOST` global), brillo de botones
+  mejorado y COLA DE CAJAS con temporizadores en el Inventario.
+- 🏠 **Home + navegación (0.30)**: nav inferior consistente de 4 (Inicio /
+  Colección / Tienda / Inventario) con la sección ACTUAL resaltada; "Cómo
+  jugar" y "Recompensas" a carriles laterales; ranuras de cofres visibles con
+  su temporizador; barra superior más grande; MENÚ DE PAUSA en partida
+  (Continuar / volumen / 🏳 Rendirse con confirmación — atrás ya NO abandona);
+  Creador POR PASOS (pestañas en vez de scroll); Tienda con pestaña
+  PIEZAS | CAJAS; precios de piezas ÷10; centro del mapa más abierto.
+- 🎬 **Presentación (0.28–0.29)**: pantalla de BIENVENIDA propia (splash) +
+  icono propio + sin logo de Godot al abrir; mapas más anchos (nodos 1.55× +
+  empuje radial); partículas circulares.
+- 🌙 **Modo OSCURO + anuncios + matchmaking (0.27)**: tema navy suave conmutable
+  en Configuración (`UITheme` pasó de `const` a `static var` + `apply_theme`);
+  wrapper AdMob (`Ads.gd`) con el App ID de Gojan y fallback simulado
+  (`docs/Ads_Setup.md`); verificación EN VIVO de los tutoriales
+  (`test_lessons_live`).
+- 📦 **Cajas POR TIPO + anuncios diarios + tutorial META**: cajas de Figuras /
+  Piezas de ataque / Pasivas / Variada (la rareza da MÁS contenido, pero
+  ESPECÍFICO del tipo); 3 anuncios con tope diario (🪙 ×5 / 💎 ×3 / 📦 ×2);
+  4 capítulos META ("Progreso") que enseñan recursos, cajas, inventario y
+  creación — y REGALAN el kit necesario cada vez que se juegan (15 capítulos
+  de tutorial en total).
 - 🌐⚡ MATCHMAKING "Encontrar rival" (server v25): además de crear sala, botón que
   empareja con un rival RANDOM (cola de 1 en el relay) y AUTO-INICIA la partida.
   server.js: casos `find`/`cancel_find` + `waiting`; NetClient.find_match/
